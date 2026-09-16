@@ -44,3 +44,4 @@ for r in roles:
     print(f" - Role: {r[1]}")
 
 conn.close()
+

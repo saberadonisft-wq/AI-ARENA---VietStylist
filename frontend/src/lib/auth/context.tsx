@@ -92,7 +92,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           .catch((err) => {
             console.warn("Phiên đăng nhập hết hạn hoặc không hợp lệ:", err?.message);
             // Nếu lỗi 401 hoặc xác thực thất bại
-            if (err?.statusCode === 401) {
+            if (err?.status === 401 || err?.statusCode === 401 || err?.message?.includes("401") || err?.code === "UNAUTHORIZED") {
               logout();
             }
           });

@@ -28,6 +28,15 @@ import {
   ShieldAlert,
   Server,
   Palette,
+  Crown,
+  Feather,
+  BookOpen,
+  Share2,
+  Compass,
+  FileText,
+  Sliders,
+  Check,
+  Plus,
 } from "lucide-react";
 
 export default function TaiKhoanPage() {
@@ -35,14 +44,23 @@ export default function TaiKhoanPage() {
   const { user, isLoggedIn, isAdmin, isStylist, logout, token } = useAuth();
   const [showAuthModal, setShowAuthModal] = useState(false);
 
-  const [activeTab, setActiveTab] = useState<"outfits" | "drafts" | "privacy" | "system">("outfits");
+  // Dynamic initial tab based on role
+  const [activeTab, setActiveTab] = useState<string>("outfits");
   const [outfits, setOutfits] = useState<OutfitResponse[]>([]);
   const [loadingOutfits, setLoadingOutfits] = useState(false);
   const [localDraft, setLocalDraft] = useState<any | null>(null);
   const [backendHealth, setBackendHealth] = useState<any | null>(null);
   const [statusMessage, setStatusMessage] = useState<{ type: "success" | "error" | "info"; text: string } | null>(null);
 
-  // Lấy dữ liệu outfits
+  useEffect(() => {
+    if (isAdmin) {
+      setActiveTab("admin_hub");
+    } else {
+      setActiveTab("outfits");
+    }
+  }, [isAdmin]);
+
+  // Lấy dữ liệu outfits và trạng thái hệ thống
   useEffect(() => {
     fetchOutfits();
     checkLocalDraft();
@@ -60,7 +78,7 @@ export default function TaiKhoanPage() {
       const data = await api.listUserOutfits();
       setOutfits(data || []);
     } catch (err: any) {
-      console.warn("Không thể tải danh sách outfit:", err.message);
+      console.warn("Không thể tải danh sách outfit:", err?.message);
       setOutfits([]);
     } finally {
       setLoadingOutfits(false);
@@ -108,7 +126,6 @@ export default function TaiKhoanPage() {
 
   // Mở trong Studio
   const handleOpenInStudio = (outfit: OutfitResponse) => {
-    // Lưu vào draft và chuyển trang
     try {
       localStorage.setItem("viet_stylist_current_draft", JSON.stringify({
         title: outfit.title,
@@ -151,7 +168,7 @@ export default function TaiKhoanPage() {
   const handleClearLocalDraft = () => {
     localStorage.removeItem("viet_stylist_current_draft");
     setLocalDraft(null);
-    showNotification("Đã dọn sạch bản nháp và bộ nhớ tạm trên thiết bị này.", "info");
+    showNotification("Đã dọn sạch bản nháp trên thiết bị này.", "info");
   };
 
   // Xóa dữ liệu cá nhân theo quyền riêng tư
@@ -160,10 +177,19 @@ export default function TaiKhoanPage() {
     localStorage.removeItem("viet_stylist_auth_token");
     localStorage.removeItem("viet_stylist_user");
     localStorage.removeItem("viet_stylist_current_draft");
-    setLocalDraft(null);
+    localStorage.removeItem("viet_stylist_recent_looks");
     logout();
-    showNotification("Đã dọn dẹp sạch toàn bộ dữ liệu cá nhân và cache thiết bị.", "success");
+    showNotification("Đã xóa toàn bộ dữ liệu cá nhân và đăng xuất an toàn.", "success");
   };
+
+  // Xác định định danh giao diện theo vai trò (Role Identity)
+  const roleType = !isLoggedIn
+    ? "guest"
+    : isAdmin
+    ? "admin"
+    : isStylist
+    ? "stylist"
+    : "member";
 
   return (
     <div className="min-h-screen bg-[#FAF8F5] pb-20">
@@ -184,115 +210,272 @@ export default function TaiKhoanPage() {
         </div>
       )}
 
-      {/* Header Hồ sơ */}
-      <section className="bg-white border-b border-stone-200 pt-8 pb-10">
+      {/* Header Hồ Sơ Cá Nhân Tùy Biến Theo Vai Trò */}
+      <section
+        className={`border-b pt-8 pb-10 transition-colors ${
+          roleType === "admin"
+            ? "bg-gradient-to-r from-red-50/80 via-white to-amber-50/60 border-red-200/70"
+            : roleType === "stylist"
+            ? "bg-gradient-to-r from-amber-50/80 via-white to-orange-50/50 border-amber-200/70"
+            : roleType === "member"
+            ? "bg-gradient-to-r from-emerald-50/70 via-white to-teal-50/50 border-emerald-200/60"
+            : "bg-white border-stone-200"
+        }`}
+      >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+            {/* User Info Block */}
             <div className="flex items-start sm:items-center space-x-4">
-              <div className="w-16 h-16 rounded-2xl bg-heritage-red/10 border-2 border-heritage-red/30 flex items-center justify-center text-heritage-red font-serif text-2xl font-bold shadow-sm">
-                {user ? user.displayName.charAt(0) : "K"}
+              {/* Avatar tùy biến theo vai trò */}
+              <div
+                className={`w-16 h-16 rounded-2xl flex items-center justify-center font-serif text-2xl font-bold shadow-md relative ${
+                  roleType === "admin"
+                    ? "bg-gradient-to-br from-heritage-red to-red-800 text-white border-2 border-amber-300"
+                    : roleType === "stylist"
+                    ? "bg-gradient-to-br from-amber-500 to-amber-700 text-white border-2 border-amber-200"
+                    : roleType === "member"
+                    ? "bg-gradient-to-br from-emerald-600 to-teal-700 text-white border-2 border-emerald-200"
+                    : "bg-stone-200 text-stone-600 border border-stone-300"
+                }`}
+              >
+                {user ? user.displayName.charAt(0).toUpperCase() : "K"}
+                {roleType === "admin" && (
+                  <span className="absolute -top-1.5 -right-1.5 w-6 h-6 rounded-full bg-amber-400 text-stone-900 flex items-center justify-center shadow-xs border border-white">
+                    <Crown className="w-3.5 h-3.5" />
+                  </span>
+                )}
+                {roleType === "stylist" && (
+                  <span className="absolute -top-1.5 -right-1.5 w-6 h-6 rounded-full bg-amber-300 text-amber-900 flex items-center justify-center shadow-xs border border-white">
+                    <Palette className="w-3.5 h-3.5" />
+                  </span>
+                )}
               </div>
+
               <div>
                 <div className="flex items-center space-x-2.5 flex-wrap gap-y-1">
                   <h1 className="font-serif text-2xl font-bold text-stone-900">
                     {user ? user.displayName : "Khách vãng lai"}
                   </h1>
-                  {isAdmin && (
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-heritage-red/10 text-heritage-red border border-heritage-red/20">
-                      <Shield className="w-3 h-3 mr-1" /> Quản trị viên Di sản (Admin)
+
+                  {/* Badge theo vai trò */}
+                  {roleType === "admin" && (
+                    <span className="inline-flex items-center px-3 py-0.5 rounded-full text-xs font-bold bg-heritage-red text-white shadow-xs border border-amber-300">
+                      <Crown className="w-3.5 h-3.5 mr-1 text-amber-300" />
+                      Quản trị viên Di sản (Admin F15)
                     </span>
                   )}
-                  {isStylist && !isAdmin && (
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-200">
-                      <Sparkles className="w-3 h-3 mr-1" /> Chuyên gia Stylist
+                  {roleType === "stylist" && (
+                    <span className="inline-flex items-center px-3 py-0.5 rounded-full text-xs font-bold bg-amber-600 text-white shadow-xs border border-amber-300">
+                      <Palette className="w-3.5 h-3.5 mr-1" />
+                      Chuyên gia Stylist (Stylist Pro)
                     </span>
                   )}
-                  {isLoggedIn && !isAdmin && !isStylist && (
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">
-                      <Sparkles className="w-3 h-3 mr-1" /> Thành viên
+                  {roleType === "member" && (
+                    <span className="inline-flex items-center px-3 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                      <Sparkles className="w-3.5 h-3.5 mr-1 text-emerald-600" />
+                      Thành viên / Học sinh - Sinh viên
                     </span>
                   )}
-                  {!isLoggedIn && (
-                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-stone-100 text-stone-700 border border-stone-200">
+                  {roleType === "guest" && (
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-stone-100 text-stone-700 border border-stone-200">
                       Chưa đăng nhập
                     </span>
                   )}
                 </div>
-                <p className="text-sm text-stone-500 mt-1">
-                  {user ? user.email : "Dữ liệu lưu tạm trên trình duyệt hiện tại. Đăng nhập để bảo vệ & đồng bộ đa thiết bị."}
+
+                {/* Subtitle & Mission theo vai trò */}
+                <p className="text-xs text-stone-600 mt-1 max-w-xl leading-relaxed">
+                  {roleType === "admin"
+                    ? "Toàn quyền quản trị hệ thống: Thẩm định quy tắc di sản triều Nguyễn, quản lý danh mục cổ phục số hóa và phân quyền người dùng."
+                    : roleType === "stylist"
+                    ? "Nhà sáng tạo cổ phong: Phối đồ ngũ hành, xuất bản Lookbook chia sẻ và đăng tải câu chuyện cổ phục trên tạp chí di sản."
+                    : roleType === "member"
+                    ? "Học sinh, sinh viên yêu nét đẹp cổ phục Việt: Trải nghiệm thử đồ 2D trực quan, lưu giữ bộ phối cá nhân và chia sẻ cùng bạn bè."
+                    : "Đăng nhập bằng tài khoản Google để bảo lưu các bộ phối, đồng bộ đa thiết bị và trải nghiệm đầy đủ quyền năng."}
                 </p>
+
+                {user && (
+                  <div className="flex items-center gap-2 mt-1.5 text-[11px] text-stone-500">
+                    <span className="font-mono">{user.email}</span>
+                    <span>•</span>
+                    <span className="text-emerald-700 font-medium flex items-center gap-1">
+                      <Shield className="w-3 h-3 text-emerald-600" /> Xác thực an toàn Google OAuth
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
 
-            {/* Tùy chọn tài khoản bảo mật */}
-            <div className="bg-stone-50 p-3.5 rounded-xl border border-stone-200 flex flex-col sm:flex-row items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <Shield className="w-4 h-4 text-emerald-600" />
-                <span className="text-xs text-stone-700 font-medium">
-                  {isLoggedIn ? `Tài khoản đã xác thực: ${user?.displayName}` : "Phiên làm việc khách cục bộ"}
-                </span>
-              </div>
-              <div className="flex items-center space-x-2 w-full sm:w-auto justify-end">
-                {isAdmin && (
+            {/* Quick Actions theo vai trò */}
+            <div className="flex items-center space-x-2.5 flex-wrap gap-y-2 justify-start md:justify-end">
+              {roleType === "admin" && (
+                <>
                   <Link
                     href="/quan-tri"
-                    className="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-heritage-red text-white hover:bg-heritage-red-dark transition-all flex items-center space-x-1.5 shadow-xs"
+                    className="px-4 py-2 rounded-xl text-xs font-bold bg-heritage-red text-white hover:bg-heritage-red-dark transition-all flex items-center space-x-1.5 shadow-md hover:shadow-lg"
                   >
-                    <Shield className="w-3.5 h-3.5" />
+                    <Crown className="w-4 h-4 text-amber-300" />
                     <span>Cổng Quản trị F15</span>
                   </Link>
-                )}
-                {isLoggedIn ? (
-                  <button
-                    onClick={logout}
-                    className="px-3.5 py-1.5 rounded-lg text-xs font-medium bg-white text-stone-700 hover:bg-stone-100 border border-stone-300 transition-all flex items-center space-x-1.5"
+                  <Link
+                    href="/chuyen-co-phuc"
+                    className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-white border border-stone-300 text-stone-700 hover:bg-stone-50 transition-all flex items-center space-x-1.5"
                   >
-                    <LogOut className="w-3.5 h-3.5" />
-                    <span>Đăng xuất</span>
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => setShowAuthModal(true)}
-                    className="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-heritage-red text-white hover:bg-heritage-red-dark transition-all flex items-center space-x-1.5 shadow-xs"
+                    <Feather className="w-3.5 h-3.5 text-heritage-red" />
+                    <span>Duyệt Chuyện Cổ phục</span>
+                  </Link>
+                </>
+              )}
+
+              {roleType === "stylist" && (
+                <>
+                  <Link
+                    href="/"
+                    className="px-4 py-2 rounded-xl text-xs font-bold bg-amber-600 text-white hover:bg-amber-700 transition-all flex items-center space-x-1.5 shadow-md"
                   >
-                    <Lock className="w-3.5 h-3.5" />
-                    <span>Đăng nhập tài khoản</span>
-                  </button>
-                )}
-              </div>
+                    <Sparkles className="w-4 h-4" />
+                    <span>Studio Phối đồ Mới</span>
+                  </Link>
+                  <Link
+                    href="/chuyen-co-phuc"
+                    className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-white border border-amber-300 text-amber-900 hover:bg-amber-50 transition-all flex items-center space-x-1.5"
+                  >
+                    <Feather className="w-3.5 h-3.5 text-amber-600" />
+                    <span>Viết bài Chuyện Cổ phục</span>
+                  </Link>
+                </>
+              )}
+
+              {roleType === "member" && (
+                <>
+                  <Link
+                    href="/"
+                    className="px-4 py-2 rounded-xl text-xs font-bold bg-heritage-red text-white hover:bg-heritage-red-dark transition-all flex items-center space-x-1.5 shadow-md"
+                  >
+                    <Sparkles className="w-4 h-4" />
+                    <span>Thử đồ trong Studio</span>
+                  </Link>
+                  <Link
+                    href="/thu-vien"
+                    className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-white border border-stone-300 text-stone-700 hover:bg-stone-50 transition-all flex items-center space-x-1.5"
+                  >
+                    <Compass className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Thư viện Cổ phục</span>
+                  </Link>
+                </>
+              )}
+
+              {isLoggedIn ? (
+                <button
+                  onClick={logout}
+                  className="px-3 py-2 rounded-xl text-xs font-medium bg-white text-stone-600 hover:text-red-700 hover:bg-red-50 border border-stone-200 transition-all flex items-center space-x-1"
+                  title="Đăng xuất khỏi phiên hiện tại"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  <span>Đăng xuất</span>
+                </button>
+              ) : (
+                <button
+                  onClick={() => setShowAuthModal(true)}
+                  className="px-4 py-2 rounded-xl text-xs font-bold bg-heritage-red text-white hover:bg-heritage-red-dark transition-all flex items-center space-x-1.5 shadow-md"
+                >
+                  <Lock className="w-3.5 h-3.5" />
+                  <span>Đăng nhập tài khoản</span>
+                </button>
+              )}
             </div>
           </div>
 
-          {/* Quick stats strip */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-8 pt-6 border-t border-stone-100">
-            <div className="bg-stone-50/80 p-3.5 rounded-xl border border-stone-200/70">
-              <span className="text-xs text-stone-500 block">Bộ phối đã lưu</span>
-              <span className="text-xl font-bold text-stone-900 font-serif mt-0.5 block">{outfits.length}</span>
-            </div>
-            <div className="bg-stone-50/80 p-3.5 rounded-xl border border-stone-200/70">
-              <span className="text-xs text-stone-500 block">Bản nháp cục bộ</span>
-              <span className="text-xl font-bold text-stone-900 font-serif mt-0.5 block">
-                {localDraft ? "1 bản chưa lưu" : "Trống"}
-              </span>
-            </div>
-            <div className="bg-stone-50/80 p-3.5 rounded-xl border border-stone-200/70">
-              <span className="text-xs text-stone-500 block">Máy chủ FastAPI</span>
-              <span className="text-xl font-bold text-emerald-700 font-serif mt-0.5 flex items-center space-x-1">
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block animate-pulse"></span>
-                <span className="text-sm font-semibold">{backendHealth?.status || "Đang kết nối"}</span>
-              </span>
-            </div>
-            <div className="bg-stone-50/80 p-3.5 rounded-xl border border-stone-200/70">
-              <span className="text-xs text-stone-500 block">Dữ liệu di sản</span>
-              <span className="text-xl font-bold text-stone-900 font-serif mt-0.5 block">17 Cổ phục Chuẩn</span>
-            </div>
+          {/* Quick Stats Grid Tùy Biến Theo Vai Trò */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-8 pt-6 border-t border-stone-200/60">
+            {roleType === "admin" ? (
+              <>
+                <div className="bg-white/90 p-3.5 rounded-xl border border-red-200/80 shadow-xs">
+                  <span className="text-[11px] text-stone-500 uppercase tracking-wider font-semibold block">Kho Di sản Phục chế</span>
+                  <span className="text-xl font-bold text-heritage-red font-serif mt-0.5 block">17 Cổ phục Chuẩn</span>
+                </div>
+                <div className="bg-white/90 p-3.5 rounded-xl border border-red-200/80 shadow-xs">
+                  <span className="text-[11px] text-stone-500 uppercase tracking-wider font-semibold block">Quy tắc Thẩm định (F10)</span>
+                  <span className="text-xl font-bold text-amber-700 font-serif mt-0.5 block">5 Bộ luật Di sản</span>
+                </div>
+                <div className="bg-white/90 p-3.5 rounded-xl border border-red-200/80 shadow-xs">
+                  <span className="text-[11px] text-stone-500 uppercase tracking-wider font-semibold block">Tác phẩm Toàn sàn</span>
+                  <span className="text-xl font-bold text-stone-900 font-serif mt-0.5 block">{outfits.length} Bộ phối / 5 BST</span>
+                </div>
+                <div className="bg-white/90 p-3.5 rounded-xl border border-red-200/80 shadow-xs">
+                  <span className="text-[11px] text-stone-500 uppercase tracking-wider font-semibold block">Đám mây & Media (R2)</span>
+                  <span className="text-xl font-bold text-emerald-700 font-serif mt-0.5 flex items-center space-x-1">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block animate-pulse"></span>
+                    <span className="text-xs font-semibold">R2 + Supabase OK</span>
+                  </span>
+                </div>
+              </>
+            ) : roleType === "stylist" ? (
+              <>
+                <div className="bg-white/90 p-3.5 rounded-xl border border-amber-200 shadow-xs">
+                  <span className="text-[11px] text-stone-500 uppercase tracking-wider font-semibold block">Tác phẩm Sáng tạo</span>
+                  <span className="text-xl font-bold text-amber-800 font-serif mt-0.5 block">{outfits.length} Bộ phối</span>
+                </div>
+                <div className="bg-white/90 p-3.5 rounded-xl border border-amber-200 shadow-xs">
+                  <span className="text-[11px] text-stone-500 uppercase tracking-wider font-semibold block">Bộ sưu tập Lookbook</span>
+                  <span className="text-xl font-bold text-stone-900 font-serif mt-0.5 block">5 Bộ sưu tập</span>
+                </div>
+                <div className="bg-white/90 p-3.5 rounded-xl border border-amber-200 shadow-xs">
+                  <span className="text-[11px] text-stone-500 uppercase tracking-wider font-semibold block">Hòa hợp Ngũ hành (F07)</span>
+                  <span className="text-xl font-bold text-emerald-700 font-serif mt-0.5 block">Đạt chuẩn 96%</span>
+                </div>
+                <div className="bg-white/90 p-3.5 rounded-xl border border-amber-200 shadow-xs">
+                  <span className="text-[11px] text-stone-500 uppercase tracking-wider font-semibold block">Bản nháp Studio</span>
+                  <span className="text-xl font-bold text-amber-700 font-serif mt-0.5 block">
+                    {localDraft ? "1 bản đang sửa" : "Sẵn sàng phối"}
+                  </span>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="bg-white/90 p-3.5 rounded-xl border border-emerald-200/80 shadow-xs">
+                  <span className="text-[11px] text-stone-500 uppercase tracking-wider font-semibold block">Tủ đồ của bạn</span>
+                  <span className="text-xl font-bold text-heritage-red font-serif mt-0.5 block">{outfits.length} Bộ đã lưu</span>
+                </div>
+                <div className="bg-white/90 p-3.5 rounded-xl border border-emerald-200/80 shadow-xs">
+                  <span className="text-[11px] text-stone-500 uppercase tracking-wider font-semibold block">Bản nháp đang thử</span>
+                  <span className="text-xl font-bold text-stone-900 font-serif mt-0.5 block">
+                    {localDraft ? "1 bản nháp" : "Chưa có"}
+                  </span>
+                </div>
+                <div className="bg-white/90 p-3.5 rounded-xl border border-emerald-200/80 shadow-xs">
+                  <span className="text-[11px] text-stone-500 uppercase tracking-wider font-semibold block">Cổ phục Khám phá</span>
+                  <span className="text-xl font-bold text-stone-900 font-serif mt-0.5 block">17 Mẫu truyền thống</span>
+                </div>
+                <div className="bg-white/90 p-3.5 rounded-xl border border-emerald-200/80 shadow-xs">
+                  <span className="text-[11px] text-stone-500 uppercase tracking-wider font-semibold block">Quyền riêng tư AI (F14)</span>
+                  <span className="text-xl font-bold text-emerald-700 font-serif mt-0.5 block">Bảo vệ an toàn</span>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </section>
 
-      {/* Main Tabs Navigation */}
+      {/* Main Tabs Navigation Thích Ứng Theo Vai Trò */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
         <div className="flex border-b border-stone-200 space-x-6 overflow-x-auto">
+          {/* Tabs dành riêng cho Admin */}
+          {roleType === "admin" && (
+            <button
+              onClick={() => setActiveTab("admin_hub")}
+              className={`pb-3 text-sm font-semibold whitespace-nowrap transition-all border-b-2 flex items-center space-x-2 ${
+                activeTab === "admin_hub"
+                  ? "border-heritage-red text-heritage-red"
+                  : "border-transparent text-stone-500 hover:text-stone-800"
+              }`}
+            >
+              <Crown className="w-4 h-4 text-amber-500" />
+              <span>Bảng Điều Hành Quản Trị (Admin Hub)</span>
+            </button>
+          )}
+
+          {/* Tab Bộ phối */}
           <button
             onClick={() => setActiveTab("outfits")}
             className={`pb-3 text-sm font-semibold whitespace-nowrap transition-all border-b-2 flex items-center space-x-2 ${
@@ -302,8 +485,16 @@ export default function TaiKhoanPage() {
             }`}
           >
             <Layers className="w-4 h-4" />
-            <span>Bộ phối của tôi ({outfits.length})</span>
+            <span>
+              {roleType === "admin"
+                ? `Kho Bộ phối Toàn quyền (${outfits.length})`
+                : roleType === "stylist"
+                ? `Tác phẩm Sáng tạo (${outfits.length})`
+                : `Tủ đồ Cổ phục của tôi (${outfits.length})`}
+            </span>
           </button>
+
+          {/* Tab Bản nháp */}
           <button
             onClick={() => setActiveTab("drafts")}
             className={`pb-3 text-sm font-semibold whitespace-nowrap transition-all border-b-2 flex items-center space-x-2 ${
@@ -313,8 +504,27 @@ export default function TaiKhoanPage() {
             }`}
           >
             <HardDrive className="w-4 h-4" />
-            <span>Bản nháp & Đồng bộ ({localDraft ? "1" : "0"})</span>
+            <span>Bản nháp Studio ({localDraft ? "1" : "0"})</span>
           </button>
+
+          {/* Tab Lookbook (cho Stylist & Member) */}
+          {(roleType === "stylist" || roleType === "member" || roleType === "admin") && (
+            <button
+              onClick={() => setActiveTab("lookbooks")}
+              className={`pb-3 text-sm font-semibold whitespace-nowrap transition-all border-b-2 flex items-center space-x-2 ${
+                activeTab === "lookbooks"
+                  ? "border-heritage-red text-heritage-red"
+                  : "border-transparent text-stone-500 hover:text-stone-800"
+              }`}
+            >
+              <FolderHeart className="w-4 h-4 text-rose-500" />
+              <span>
+                {roleType === "stylist" ? "Lookbook Sáng tạo & Chia sẻ" : "Bộ sưu tập Lookbook"}
+              </span>
+            </button>
+          )}
+
+          {/* Tab Quyền riêng tư & Media (F14) */}
           <button
             onClick={() => setActiveTab("privacy")}
             className={`pb-3 text-sm font-semibold whitespace-nowrap transition-all border-b-2 flex items-center space-x-2 ${
@@ -326,27 +536,150 @@ export default function TaiKhoanPage() {
             <Lock className="w-4 h-4" />
             <span>Quyền riêng tư & Media (F14)</span>
           </button>
-          <button
-            onClick={() => setActiveTab("system")}
-            className={`pb-3 text-sm font-semibold whitespace-nowrap transition-all border-b-2 flex items-center space-x-2 ${
-              activeTab === "system"
-                ? "border-heritage-red text-heritage-red"
-                : "border-transparent text-stone-500 hover:text-stone-800"
-            }`}
-          >
-            <Server className="w-4 h-4" />
-            <span>Hệ thống & Hợp đồng API</span>
-          </button>
+
+          {/* Tab Hệ thống & Hợp đồng API */}
+          {roleType === "admin" && (
+            <button
+              onClick={() => setActiveTab("system")}
+              className={`pb-3 text-sm font-semibold whitespace-nowrap transition-all border-b-2 flex items-center space-x-2 ${
+                activeTab === "system"
+                  ? "border-heritage-red text-heritage-red"
+                  : "border-transparent text-stone-500 hover:text-stone-800"
+              }`}
+            >
+              <Server className="w-4 h-4" />
+              <span>Hạ tầng & Hợp đồng API</span>
+            </button>
+          )}
         </div>
 
-        {/* Tab 1: Bộ phối của tôi */}
+        {/* ========================================================================= */}
+        {/* TAB NỘI DUNG: ADMIN HUB (DÀNH RIÊNG CHO QUẢN TRỊ VIÊN) */}
+        {/* ========================================================================= */}
+        {activeTab === "admin_hub" && roleType === "admin" && (
+          <div className="mt-8 space-y-8 animate-in fade-in duration-200">
+            {/* 4 Khối hành động quản trị cốt lõi */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+              <div className="bg-white p-5 rounded-2xl border border-red-100 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
+                <div>
+                  <div className="w-10 h-10 rounded-xl bg-red-100 text-heritage-red flex items-center justify-center mb-3">
+                    <Layers className="w-5 h-5" />
+                  </div>
+                  <h3 className="font-serif font-bold text-stone-900 text-base">Kho Cổ Phục Di Sản</h3>
+                  <p className="text-xs text-stone-500 mt-1 leading-relaxed">
+                    Quản lý 17 bộ cổ phục số hóa, thêm biến thể màu sắc ngũ hành và kiểm duyệt metadata lịch sử.
+                  </p>
+                </div>
+                <Link
+                  href="/quan-tri"
+                  className="mt-4 inline-flex items-center space-x-1.5 text-xs font-bold text-heritage-red hover:underline"
+                >
+                  <span>Mở kho quản lý đồ</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </Link>
+              </div>
+
+              <div className="bg-white p-5 rounded-2xl border border-amber-100 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
+                <div>
+                  <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center mb-3">
+                    <ShieldAlert className="w-5 h-5" />
+                  </div>
+                  <h3 className="font-serif font-bold text-stone-900 text-base">Quy Tắc Văn Hóa (F10)</h3>
+                  <p className="text-xs text-stone-500 mt-1 leading-relaxed">
+                    Cấu hình luật thẩm định hữu nhậm, cấm kỵ hoa văn hoàng gia và bảo toàn quy chuẩn triều Nguyễn.
+                  </p>
+                </div>
+                <Link
+                  href="/quan-tri"
+                  className="mt-4 inline-flex items-center space-x-1.5 text-xs font-bold text-amber-700 hover:underline"
+                >
+                  <span>Cấu hình quy tắc</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </Link>
+              </div>
+
+              <div className="bg-white p-5 rounded-2xl border border-emerald-100 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
+                <div>
+                  <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center mb-3">
+                    <Feather className="w-5 h-5" />
+                  </div>
+                  <h3 className="font-serif font-bold text-stone-900 text-base">Chuyện Cổ Phục & Blog</h3>
+                  <p className="text-xs text-stone-500 mt-1 leading-relaxed">
+                    Biên tập các câu chuyện cổ phục, xuất bản bài viết của Stylist và quản lý nguồn trích dẫn lịch sử.
+                  </p>
+                </div>
+                <Link
+                  href="/chuyen-co-phuc"
+                  className="mt-4 inline-flex items-center space-x-1.5 text-xs font-bold text-emerald-700 hover:underline"
+                >
+                  <span>Đến Tạp chí Di sản</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </Link>
+              </div>
+
+              <div className="bg-white p-5 rounded-2xl border border-blue-100 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
+                <div>
+                  <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center mb-3">
+                    <Database className="w-5 h-5" />
+                  </div>
+                  <h3 className="font-serif font-bold text-stone-900 text-base">Hạ Tầng Media R2</h3>
+                  <p className="text-xs text-stone-500 mt-1 leading-relaxed">
+                    Kiểm soát bucket Cloudflare R2 công khai và riêng tư, bảo vệ token ký tạm và ảnh người dùng.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setActiveTab("privacy")}
+                  className="mt-4 inline-flex items-center space-x-1.5 text-xs font-bold text-blue-700 hover:underline text-left"
+                >
+                  <span>Xem báo cáo Media R2</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Banner Lối Tắt Vào Cổng Quản Trị F15 Toàn Năng */}
+            <div className="bg-gradient-to-r from-stone-900 to-stone-800 text-white rounded-2xl p-6 sm:p-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 shadow-xl border border-stone-700">
+              <div className="space-y-1.5">
+                <div className="flex items-center space-x-2">
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-amber-400 text-stone-900">
+                    Phân Quyền Admin Tuyệt Đối
+                  </span>
+                  <span className="text-xs text-stone-400 font-mono">ID: {user?.id}</span>
+                </div>
+                <h2 className="font-serif text-xl sm:text-2xl font-bold text-white">
+                  Cổng Quản Trị Hệ Thống F15 (Admin Dashboard)
+                </h2>
+                <p className="text-xs text-stone-300 max-w-2xl leading-relaxed">
+                  Trang chuyên dụng để thêm mới mẫu trang phục số hóa (F01), gắn tầng SVG/PNG (F02), định nghĩa quy tắc văn hóa (F10) và duyệt bài viết chuyên sâu.
+                </p>
+              </div>
+              <Link
+                href="/quan-tri"
+                className="px-6 py-3 bg-heritage-red hover:bg-heritage-red-dark text-white rounded-xl text-xs font-bold shadow-lg transition-all flex items-center space-x-2 shrink-0"
+              >
+                <Crown className="w-4 h-4 text-amber-300" />
+                <span>Mở Cổng Quản Trị F15 Ngay</span>
+              </Link>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* TAB NỘI DUNG: DANH SÁCH BỘ PHỐI (CHUNG CHO CÁC ROLE) */}
+        {/* ========================================================================= */}
         {activeTab === "outfits" && (
-          <div className="mt-8">
+          <div className="mt-8 animate-in fade-in duration-200">
             <div className="flex items-center justify-between mb-6">
               <div>
-                <h2 className="text-lg font-serif font-bold text-stone-900">Danh sách Bộ phối cá nhân</h2>
+                <h2 className="text-lg font-serif font-bold text-stone-900">
+                  {roleType === "admin"
+                    ? "Danh sách Bộ phối Quản trị & Mẫu Di sản"
+                    : roleType === "stylist"
+                    ? "Tác phẩm Sáng tạo Stylist"
+                    : "Tủ đồ Cổ phục Cá nhân"}
+                </h2>
                 <p className="text-xs text-stone-500 mt-0.5">
-                  Mỗi bộ phối lưu trữ snapshot cấu hình trang phục, màu sắc, hướng vạt và các phiên bản sửa đổi (F08, F13).
+                  Mỗi bộ phối lưu trữ snapshot cấu hình trang phục, màu sắc ngũ hành, hướng vạt và các phiên bản sửa đổi (F08, F13).
                 </p>
               </div>
               <div className="flex items-center space-x-3">
@@ -371,7 +704,7 @@ export default function TaiKhoanPage() {
             {loadingOutfits ? (
               <div className="bg-white rounded-2xl border border-stone-200 p-12 text-center">
                 <div className="w-8 h-8 border-2 border-heritage-red border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
-                <p className="text-sm text-stone-500">Đang tải danh sách bộ phối cá nhân...</p>
+                <p className="text-sm text-stone-500">Đang tải danh sách bộ phối...</p>
               </div>
             ) : outfits.length === 0 ? (
               <div className="bg-white rounded-2xl border border-stone-200 p-12 text-center max-w-lg mx-auto">
@@ -394,7 +727,14 @@ export default function TaiKhoanPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {outfits.map((outfit) => {
                   const items = outfit.current_snapshot?.items || [];
-                  const occasionName = outfit.occasion_id === "ky_yeu" ? "Kỷ yếu Cổ phong" : outfit.occasion_id === "tet_nguyen_dan" ? "Tết Nguyên Đán" : outfit.occasion_id === "le_hoi_truong" ? "Lễ hội trường" : outfit.occasion_id || "Chung";
+                  const occasionName =
+                    outfit.occasion_id === "ky_yeu"
+                      ? "Kỷ yếu Cổ phong"
+                      : outfit.occasion_id === "tet_nguyen_dan"
+                      ? "Tết Nguyên Đán"
+                      : outfit.occasion_id === "le_hoi_truong"
+                      ? "Lễ hội trường"
+                      : outfit.occasion_id || "Chung";
                   return (
                     <div
                       key={outfit.id}
@@ -405,7 +745,7 @@ export default function TaiKhoanPage() {
                           <h3 className="font-serif font-bold text-stone-900 text-base line-clamp-1">
                             {outfit.title}
                           </h3>
-                          <span className="shrink-0 text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-heritage-gold/15 text-heritage-gold border border-heritage-gold/30">
+                          <span className="shrink-0 text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200">
                             v{outfit.revision}
                           </span>
                         </div>
@@ -414,7 +754,13 @@ export default function TaiKhoanPage() {
                           <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-stone-100 text-stone-600">
                             {occasionName}
                           </span>
-                          <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${outfit.style_mode === "remix" ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-800"}`}>
+                          <span
+                            className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                              outfit.style_mode === "remix"
+                                ? "bg-amber-100 text-amber-800"
+                                : "bg-emerald-100 text-emerald-800"
+                            }`}
+                          >
                             {outfit.style_mode === "remix" ? "Phối Remix" : "Cổ phong Chuẩn"}
                           </span>
                         </div>
@@ -433,7 +779,9 @@ export default function TaiKhoanPage() {
                                   className="w-2 h-2 rounded-full inline-block shrink-0"
                                   style={{ backgroundColor: it.colorHex || "#CBD5E0" }}
                                 ></span>
-                                <span className="truncate max-w-[120px]">{it.itemId.replace("item_", "").replaceAll("_", " ")}</span>
+                                <span className="truncate max-w-[120px]">
+                                  {it.itemId.replace("item_", "").replaceAll("_", " ")}
+                                </span>
                               </span>
                             ))}
                           </div>
@@ -470,25 +818,75 @@ export default function TaiKhoanPage() {
           </div>
         )}
 
-        {/* Tab 2: Bản nháp & Đồng bộ cục bộ */}
+        {/* ========================================================================= */}
+        {/* TAB NỘI DUNG: LOOKBOOK SÁNG TẠO & CHIA SẺ */}
+        {/* ========================================================================= */}
+        {activeTab === "lookbooks" && (
+          <div className="mt-8 animate-in fade-in duration-200 max-w-4xl space-y-6">
+            <div className="bg-white rounded-2xl border border-stone-200 p-6 flex items-center justify-between flex-wrap gap-4">
+              <div>
+                <h2 className="font-serif font-bold text-lg text-stone-900 flex items-center space-x-2">
+                  <FolderHeart className="w-5 h-5 text-rose-600" />
+                  <span>Bộ Sưu Tập Lookbook Cá Nhân</span>
+                </h2>
+                <p className="text-xs text-stone-500 mt-1 max-w-xl leading-relaxed">
+                  Tập hợp các bộ phối thành album chủ đề (Tết, Kỷ yếu, Lễ hội), xuất bản liên kết chia sẻ bảo mật (Token Hash) với thời hạn tự hủy (F09).
+                </p>
+              </div>
+              <Link
+                href="/lookbook"
+                className="px-4 py-2 bg-heritage-red hover:bg-heritage-red-dark text-white text-xs font-semibold rounded-xl transition-all shadow-sm flex items-center space-x-1.5"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Xem & Tạo Lookbook Mới</span>
+              </Link>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="bg-stone-50 p-5 rounded-2xl border border-stone-200 space-y-2">
+                <span className="text-xs font-bold text-stone-800 uppercase tracking-wider block">
+                  Chia Sẻ Công Khai An Toàn
+                </span>
+                <p className="text-xs text-stone-600 leading-relaxed">
+                  Mỗi Lookbook khi chia sẻ sẽ tạo ra URL ngẫu nhiên kèm mã băm SHA-256 (Token Hash), không làm lộ ID tài khoản và cho phép thu hồi bất kỳ lúc nào.
+                </p>
+              </div>
+              <div className="bg-stone-50 p-5 rounded-2xl border border-stone-200 space-y-2">
+                <span className="text-xs font-bold text-stone-800 uppercase tracking-wider block">
+                  Đóng Góp Câu Chuyện Di Sản
+                </span>
+                <p className="text-xs text-stone-600 leading-relaxed">
+                  Bạn có thể đính kèm câu chuyện lịch sử cho từng mẫu áo trong Lookbook để tạo nên cuốn tạp chí thời trang cổ phong sinh động.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* TAB NỘI DUNG: BẢN NHÁP & ĐỒNG BỘ CỤC BỘ */}
+        {/* ========================================================================= */}
         {activeTab === "drafts" && (
-          <div className="mt-8 max-w-3xl">
+          <div className="mt-8 max-w-3xl animate-in fade-in duration-200">
             <div className="bg-white rounded-2xl border border-stone-200 p-6 mb-6">
               <h2 className="font-serif font-bold text-lg text-stone-900 mb-1 flex items-center space-x-2">
                 <HardDrive className="w-5 h-5 text-heritage-red" />
                 <span>Bản nháp Studio hiện hành (Client LocalStorage)</span>
               </h2>
               <p className="text-xs text-stone-500 mb-6 leading-relaxed">
-                Khi sử dụng Studio ở chế độ khách vãng lai, toàn bộ thao tác phối đồ, xoay vạt và màu sắc được lưu an toàn trong trình duyệt của bạn để không mất mát khi tải lại trang (F13).
+                Toàn bộ thao tác phối đồ, xoay vạt và màu sắc được lưu an toàn trong trình duyệt của bạn để không mất mát khi tải lại trang (F13).
               </p>
 
               {localDraft ? (
                 <div className="bg-stone-50 rounded-xl p-5 border border-stone-200">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h4 className="font-medium text-stone-900 text-sm">{localDraft.title || "Bản phối Studio chưa đặt tên"}</h4>
+                      <h4 className="font-medium text-stone-900 text-sm">
+                        {localDraft.title || "Bản phối Studio chưa đặt tên"}
+                      </h4>
                       <p className="text-xs text-stone-500 mt-0.5">
-                        Sự kiện: {localDraft.occasionId || "kỷ yếu"} | Phong cách: {localDraft.styleMode || "traditional"}
+                        Sự kiện: {localDraft.occasionId || "kỷ yếu"} | Phong cách:{" "}
+                        {localDraft.styleMode || "traditional"}
                       </p>
                     </div>
                     <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-200">
@@ -553,9 +951,11 @@ export default function TaiKhoanPage() {
           </div>
         )}
 
-        {/* Tab 3: Quyền riêng tư & Media R2 */}
+        {/* ========================================================================= */}
+        {/* TAB NỘI DUNG: QUYỀN RIÊNG TƯ & MEDIA R2 (F14) */}
+        {/* ========================================================================= */}
         {activeTab === "privacy" && (
-          <div className="mt-8 max-w-3xl space-y-6">
+          <div className="mt-8 max-w-3xl space-y-6 animate-in fade-in duration-200">
             <div className="bg-white rounded-2xl border border-stone-200 p-6">
               <h2 className="font-serif font-bold text-lg text-stone-900 mb-2 flex items-center space-x-2">
                 <Lock className="w-5 h-5 text-heritage-red" />
@@ -605,9 +1005,11 @@ export default function TaiKhoanPage() {
           </div>
         )}
 
-        {/* Tab 4: Hệ thống & API */}
-        {activeTab === "system" && (
-          <div className="mt-8 max-w-3xl space-y-6">
+        {/* ========================================================================= */}
+        {/* TAB NỘI DUNG: HỆ THỐNG & API (ADMIN ONLY) */}
+        {/* ========================================================================= */}
+        {activeTab === "system" && roleType === "admin" && (
+          <div className="mt-8 max-w-3xl space-y-6 animate-in fade-in duration-200">
             <div className="bg-white rounded-2xl border border-stone-200 p-6">
               <h2 className="font-serif font-bold text-lg text-stone-900 mb-4 flex items-center space-x-2">
                 <Server className="w-5 h-5 text-heritage-red" />
