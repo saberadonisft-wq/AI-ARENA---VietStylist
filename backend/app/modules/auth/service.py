@@ -1,3 +1,4 @@
+import os
 import uuid
 import secrets
 import hashlib
@@ -163,7 +164,12 @@ class AuthService:
     @classmethod
     async def google_auth(cls, req: GoogleAuthRequest) -> AuthResponse:
         """Đăng nhập hoặc Đăng ký tự động qua Google OAuth 2.0."""
-        if not settings.GOOGLE_CLIENT_ID:
+        google_client_id = (
+            settings.GOOGLE_CLIENT_ID
+            or os.getenv("GOOGLE_CLIENT_ID")
+            or "336358137441-abj1lpeeogkpjmdr3hhr0i29di40e3b6.apps.googleusercontent.com"
+        )
+        if not google_client_id:
             raise AppError(
                 code="GOOGLE_AUTH_UNAVAILABLE", message="Đăng nhập Google chưa được cấu hình.", status_code=503,
             )
@@ -180,8 +186,8 @@ class AuthService:
                 "issuer": ["accounts.google.com", "https://accounts.google.com"],
                 "options": {"require": ["exp", "iat", "sub", "aud", "iss", "email"]},
             }
-            if settings.GOOGLE_CLIENT_ID:
-                decode_kwargs["audience"] = settings.GOOGLE_CLIENT_ID
+            if google_client_id:
+                decode_kwargs["audience"] = google_client_id
             else:
                 decode_kwargs["options"]["verify_aud"] = False
 
