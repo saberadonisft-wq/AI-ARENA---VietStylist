@@ -1,6 +1,6 @@
 import json
 from typing import Optional, Dict, Any
-from app.core.database import Database
+from app.core.database import Database, db_transaction
 
 
 class SolutionFormRepository:
@@ -34,8 +34,9 @@ class SolutionFormRepository:
         ))
 
     @staticmethod
-    def update_form(
-        form_id: str,
+    def update_form_cas(
+        owner_id: str,
+        expected_revision: int,
         team_name: str,
         product_name: str,
         target_audience: Optional[str],
@@ -43,17 +44,19 @@ class SolutionFormRepository:
         proposed_solution: Optional[str],
         cultural_safeguards: Optional[str],
         lookbook_references_json: str,
-        new_revision: int,
         status: str,
-    ) -> None:
-        Database.execute("""
+    ) -> bool:
+        """Atomic Compare-And-Swap (CAS) update by owner_id and revision (O03)."""
+        rowcount = Database.execute("""
             UPDATE solution_forms
             SET team_name = ?, product_name = ?, target_audience = ?,
                 problem_statement = ?, proposed_solution = ?, cultural_safeguards = ?,
-                lookbook_references = ?, revision = ?, status = ?, updated_at = CURRENT_TIMESTAMP
-            WHERE id = ?
+                lookbook_references = ?, revision = revision + 1, status = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE owner_id = ? AND revision = ?
         """, (
             team_name, product_name, target_audience,
             problem_statement, proposed_solution, cultural_safeguards,
-            lookbook_references_json, new_revision, status, form_id,
+            lookbook_references_json, status,
+            owner_id, expected_revision,
         ))
+        return rowcount > 0

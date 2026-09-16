@@ -55,13 +55,10 @@ class MediaService:
         )
 
     @staticmethod
-    def complete_upload(media_id: str, owner_id: Optional[str], req: CompleteUploadRequest) -> MediaAssetResponse:
+    def complete_upload(media_id: str, owner_id: str, req: CompleteUploadRequest) -> MediaAssetResponse:
         media = MediaRepository.get_media_by_id(media_id)
-        if not media:
+        if not media or media.get("owner_id") != owner_id:
             raise AppError(code="MEDIA_NOT_FOUND", message="Không tìm thấy phiên tải lên", status_code=404)
-
-        if owner_id and media["owner_id"] and media["owner_id"] != owner_id:
-            raise AppError(code="FORBIDDEN", message="Bạn không có quyền hoàn tất file này", status_code=403)
 
         # Kiểm tra file đã lên storage chưa
         head_info = r2_client.verify_object_exists(media["bucket"], media["object_key"])
@@ -101,21 +98,21 @@ class MediaService:
         if not media:
             raise AppError(code="MEDIA_NOT_FOUND", message="Không tìm thấy file yêu cầu", status_code=404)
 
-        # Kiểm tra quyền nếu file private
-        if media["visibility"] == "private":
-            if not user_id or media["owner_id"] != user_id:
-                raise AppError(code="FORBIDDEN", message="Bạn không có quyền truy cập file riêng tư này", status_code=403)
+        # Kiểm tra quyền nếu file private hoặc unlisted
+        if media["visibility"] in ("private", "unlisted"):
+            if not user_id:
+                raise AppError(code="UNAUTHORIZED", message="Yêu cầu đăng nhập để truy cập tài nguyên riêng tư", status_code=401)
+            if media.get("owner_id") != user_id:
+                raise AppError(code="MEDIA_NOT_FOUND", message="Không tìm thấy file yêu cầu", status_code=404)
 
         url = r2_client.generate_access_url(media["bucket"], media["object_key"], visibility=media["visibility"])
         return AccessUrlResponse(access_url=url, expires_in=3600)
 
     @staticmethod
-    def delete_media(media_id: str, user_id: Optional[str]) -> None:
+    def delete_media(media_id: str, user_id: str) -> None:
         media = MediaRepository.get_media_by_id(media_id)
-        if not media:
-            return
-        if user_id and media["owner_id"] and media["owner_id"] != user_id:
-            raise AppError(code="FORBIDDEN", message="Bạn không có quyền xóa file này", status_code=403)
+        if not media or media.get("owner_id") != user_id:
+            raise AppError(code="MEDIA_NOT_FOUND", message="Không tìm thấy file yêu cầu", status_code=404)
 
         r2_client.delete_object(media["bucket"], media["object_key"])
         MediaRepository.delete_media(media_id)

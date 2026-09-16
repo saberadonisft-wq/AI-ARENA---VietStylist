@@ -9,7 +9,7 @@ import httpx
 import jwt
 from fastapi import status
 
-from app.core.database import Database, get_db_connection
+from app.core.database import Database, get_db_connection, db_transaction
 from app.core.config import settings
 from app.core.security import create_access_token
 from app.core.errors import AppError
@@ -73,7 +73,7 @@ class AuthService:
         password_hash = cls.hash_password(req.password, salt)
 
         try:
-            with get_db_connection() as conn:
+            with db_transaction() as conn:
                 conn.execute(
                     """INSERT INTO accounts (id, email, password_hash, salt, display_name, auth_provider, is_active)
                     VALUES (?, ?, ?, ?, ?, 'local', 1)""",

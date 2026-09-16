@@ -10,22 +10,24 @@ client = TestClient(app)
 
 
 def test_snapshot_placement_metadata_and_conflict():
+    headers = {"Authorization": "Bearer dev-user-test-1"}
     snapshot = {"items": [{"slot": "outerwear", "itemId": "item_ao_tac_do", "transform": {"dx": 40, "dy": -10, "scale": 1.4, "rotation": 25}}],
                 "lockedSlots": ["outerwear"], "backgroundTheme": "dopaper", "aspectRatio": "1:1"}
-    created = client.post("/api/outfits", json={"title": "Before", "snapshot": snapshot}).json()
+    created = client.post("/api/outfits", json={"title": "Before", "snapshot": snapshot}, headers=headers).json()
     assert created["current_snapshot"]["items"][0]["transform"] == snapshot["items"][0]["transform"]
-    response = client.put(f"/api/outfits/{created['id']}", json={"revision": 1, "title": "After", "occasion_id": "tet", "style_mode": "remix", "snapshot": snapshot})
+    response = client.put(f"/api/outfits/{created['id']}", json={"revision": 1, "title": "After", "occasion_id": "tet", "style_mode": "remix", "snapshot": snapshot}, headers=headers)
     assert response.status_code == 200
     saved = response.json()
     assert (saved["title"], saved["occasion_id"], saved["style_mode"], saved["revision"]) == ("After", "tet", "remix", 2)
     assert saved["current_snapshot"]["styleMode"] == "remix"
     assert saved["current_snapshot"]["lockedSlots"] == ["outerwear"]
     assert saved["current_snapshot"]["backgroundTheme"] == "dopaper"
-    assert client.put(f"/api/outfits/{created['id']}", json={"revision": 1, "snapshot": snapshot}).status_code == 409
+    assert client.put(f"/api/outfits/{created['id']}", json={"revision": 1, "snapshot": snapshot}, headers=headers).status_code == 409
 
 
 def test_parallel_saves_only_accept_one_revision():
-    created = client.post("/api/outfits", json={"snapshot": {"items": []}}).json()
+    headers = {"Authorization": "Bearer dev-user-test-1"}
+    created = client.post("/api/outfits", json={"snapshot": {"items": []}}, headers=headers).json()
     def save(number):
         return OutfitRepository.save_revision(created["id"], 1, f"version-{number}", json.dumps(created["current_snapshot"]), f"Save {number}", "ky_yeu", "traditional", None)
     with ThreadPoolExecutor(max_workers=2) as executor:

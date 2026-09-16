@@ -1,6 +1,6 @@
-from typing import List, Optional
+from typing import List
 from fastapi import APIRouter, Depends
-from app.core.security import get_current_user_optional, require_current_user, AuthenticatedUser
+from app.core.security import require_current_user, AuthenticatedUser
 from app.modules.outfits.schemas import (
     CreateOutfitRequest,
     UpdateOutfitRequest,
@@ -22,38 +22,38 @@ async def list_user_outfits(user: AuthenticatedUser = Depends(require_current_us
 @router.post("", response_model=OutfitResponse)
 async def create_outfit(
     req: CreateOutfitRequest,
-    user: Optional[AuthenticatedUser] = Depends(get_current_user_optional),
+    user: AuthenticatedUser = Depends(require_current_user),
 ):
-    """Lưu bộ phối mới (hỗ trợ cả khách và người dùng đã đăng nhập)."""
-    user_id = user.user_id if user else None
-    return OutfitService.create_outfit(user_id, req)
+    """Lưu bộ phối mới của người dùng đã đăng nhập (R04)."""
+    return OutfitService.create_outfit(user.user_id, req)
 
 
 @router.get("/{outfit_id}", response_model=OutfitResponse)
-async def get_outfit(outfit_id: str):
-    """Xem thông tin chi tiết và snapshot hiện hành của bộ phối."""
-    return OutfitService.get_outfit(outfit_id)
+async def get_outfit(
+    outfit_id: str,
+    user: AuthenticatedUser = Depends(require_current_user),
+):
+    """Xem thông tin chi tiết và snapshot hiện hành của bộ phối thuộc sở hữu (R04)."""
+    return OutfitService.get_outfit(outfit_id, user.user_id)
 
 
 @router.put("/{outfit_id}", response_model=OutfitResponse)
 async def update_outfit(
     outfit_id: str,
     req: UpdateOutfitRequest,
-    user: Optional[AuthenticatedUser] = Depends(get_current_user_optional),
+    user: AuthenticatedUser = Depends(require_current_user),
 ):
-    """Cập nhật bộ phối kèm kiểm tra xung đột revision phiên bản (Optimistic Concurrency)."""
-    user_id = user.user_id if user else None
-    return OutfitService.update_outfit(outfit_id, user_id, req)
+    """Cập nhật bộ phối kèm kiểm tra quyền sở hữu và xung đột revision phiên bản (R04, O03)."""
+    return OutfitService.update_outfit(outfit_id, user.user_id, req)
 
 
 @router.delete("/{outfit_id}")
 async def delete_outfit(
     outfit_id: str,
-    user: Optional[AuthenticatedUser] = Depends(get_current_user_optional),
+    user: AuthenticatedUser = Depends(require_current_user),
 ):
-    """Xóa bộ phối (Soft delete)."""
-    user_id = user.user_id if user else None
-    OutfitService.delete_outfit(outfit_id, user_id)
+    """Xóa bộ phối của chính mình (Soft delete, R04)."""
+    OutfitService.delete_outfit(outfit_id, user.user_id)
     return {"message": "Đã xóa bộ phối thành công"}
 
 

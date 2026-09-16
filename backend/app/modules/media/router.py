@@ -17,29 +17,29 @@ from app.core.errors import AppError
 router = APIRouter(prefix="/media", tags=["Cloudflare R2 Media Management"])
 
 
+from app.core.security import get_current_user_optional, require_current_user, AuthenticatedUser
+
 @router.post("/uploads", response_model=UploadUrlResponse)
 async def request_upload_url(
     req: RequestUploadUrlInput,
-    user: Optional[AuthenticatedUser] = Depends(get_current_user_optional),
+    user: AuthenticatedUser = Depends(require_current_user),
 ):
     """
-    Tạo phiên tải lên file ảnh/video và cấp URL upload có hạn (Direct to R2) (F14).
+    Tạo phiên tải lên file ảnh/video và cấp URL upload có hạn (Direct to R2) (F14, R04).
     """
-    user_id = user.user_id if user else None
-    return MediaService.create_upload_session(user_id, req)
+    return MediaService.create_upload_session(user.user_id, req)
 
 
 @router.post("/{media_id}/complete", response_model=MediaAssetResponse)
 async def complete_upload(
     media_id: str,
     req: CompleteUploadRequest,
-    user: Optional[AuthenticatedUser] = Depends(get_current_user_optional),
+    user: AuthenticatedUser = Depends(require_current_user),
 ):
     """
-    Xác nhận hoàn tất upload, kiểm tra HEAD và metadata trên storage trước khi chuyển trạng thái 'ready'.
+    Xác nhận hoàn tất upload bởi chính chủ sở hữu phiên tải lên (R04).
     """
-    user_id = user.user_id if user else None
-    return MediaService.complete_upload(media_id, user_id, req)
+    return MediaService.complete_upload(media_id, user.user_id, req)
 
 
 @router.get("/{media_id}/access", response_model=AccessUrlResponse)
@@ -48,7 +48,7 @@ async def get_media_access(
     user: Optional[AuthenticatedUser] = Depends(get_current_user_optional),
 ):
     """
-    Cấp URL truy cập ngắn hạn cho file riêng tư sau khi xác thực quyền người dùng.
+    Cấp URL truy cập ngắn hạn cho file riêng tư sau khi xác thực quyền người dùng (R04, R05).
     """
     user_id = user.user_id if user else None
     return MediaService.get_access_url(media_id, user_id)
@@ -57,11 +57,10 @@ async def get_media_access(
 @router.delete("/{media_id}")
 async def delete_media(
     media_id: str,
-    user: Optional[AuthenticatedUser] = Depends(get_current_user_optional),
+    user: AuthenticatedUser = Depends(require_current_user),
 ):
-    """Xóa file khỏi R2 và Supabase."""
-    user_id = user.user_id if user else None
-    MediaService.delete_media(media_id, user_id)
+    """Xóa file thuộc sở hữu của người dùng (R04)."""
+    MediaService.delete_media(media_id, user.user_id)
     return {"message": "Đã xóa file thành công"}
 
 

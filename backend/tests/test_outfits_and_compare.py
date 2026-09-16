@@ -6,6 +6,7 @@ client = TestClient(app)
 
 
 def test_create_and_update_outfit_optimistic_locking():
+    headers = {"Authorization": "Bearer dev-user-test-1"}
     # 1. Tạo outfit mới
     create_payload = {
         "title": "Bản phối Test Kỷ yếu",
@@ -22,7 +23,7 @@ def test_create_and_update_outfit_optimistic_locking():
             ]
         }
     }
-    create_res = client.post("/api/outfits", json=create_payload)
+    create_res = client.post("/api/outfits", json=create_payload, headers=headers)
     assert create_res.status_code == 200
     created = create_res.json()
     outfit_id = created["id"]
@@ -44,13 +45,13 @@ def test_create_and_update_outfit_optimistic_locking():
             ]
         }
     }
-    update_res = client.put(f"/api/outfits/{outfit_id}", json=update_payload)
+    update_res = client.put(f"/api/outfits/{outfit_id}", json=update_payload, headers=headers)
     assert update_res.status_code == 200
     updated = update_res.json()
     assert updated["revision"] == 2
 
     # 3. Thử update lại với revision cũ (revision = 1) -> Phải báo lỗi 409 CONFLICT!
-    conflict_res = client.put(f"/api/outfits/{outfit_id}", json=update_payload)
+    conflict_res = client.put(f"/api/outfits/{outfit_id}", json=update_payload, headers=headers)
     assert conflict_res.status_code == 409
     err = conflict_res.json()
     assert err["error"]["code"] == "REVISION_CONFLICT"
