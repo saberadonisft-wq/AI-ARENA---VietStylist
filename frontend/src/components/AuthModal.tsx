@@ -101,6 +101,8 @@ export default function AuthModal({
 
       if (googleBtnContainerRef.current) {
         googleBtnContainerRef.current.innerHTML = "";
+        const parentWidth = googleBtnContainerRef.current.parentElement?.clientWidth || 360;
+        const targetWidth = Math.min(Math.max(parentWidth, 240), 380);
         google.accounts.id.renderButton(googleBtnContainerRef.current, {
           theme: "outline",
           size: "large",
@@ -108,7 +110,7 @@ export default function AuthModal({
           shape: "rectangular",
           text: "continue_with",
           logo_alignment: "left",
-          width: 380,
+          width: targetWidth,
         });
         setIsGsiReady(true);
       }
@@ -125,12 +127,12 @@ export default function AuthModal({
 
       // Render Google Sign-In button
       if ((window as any).google?.accounts?.id) {
-        initGoogleButton();
+        setTimeout(initGoogleButton, 80);
       } else {
         const interval = setInterval(() => {
           if ((window as any).google?.accounts?.id) {
             clearInterval(interval);
-            initGoogleButton();
+            setTimeout(initGoogleButton, 80);
           }
         }, 200);
 
