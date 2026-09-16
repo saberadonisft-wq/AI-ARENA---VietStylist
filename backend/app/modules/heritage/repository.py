@@ -24,7 +24,12 @@ class HeritageRepository:
         return Database.fetch_all(query, tuple(params))
 
     @staticmethod
-    def get_article_by_slug_or_id(identifier: str) -> Optional[Dict[str, Any]]:
+    def get_article_by_slug_or_id(identifier: str, published_only: bool = True) -> Optional[Dict[str, Any]]:
+        if published_only:
+            return Database.fetch_one(
+                "SELECT * FROM heritage_articles WHERE (id = ? OR slug = ?) AND status = 'published'",
+                (identifier, identifier),
+            )
         return Database.fetch_one(
             "SELECT * FROM heritage_articles WHERE id = ? OR slug = ?",
             (identifier, identifier),

@@ -751,11 +751,11 @@ Việc tiếp theo:
 - [x] R04: owner policy đồng nhất outfit/media/job/form, không fallback guest owner chung.
 - [x] R05: private media/grant/TTL/staging/promote/delete retry và quota an toàn.
 - [x] R06: migration versioned fresh/old/partial/repeat, không mất nội dung, blog API hết lỗi thiếu cột.
-- [ ] R07: lookbook không gắn version người khác, share projection không lộ thông tin riêng.
-- [ ] R08: lookbook create/update atomic, fault injection không mất entry/metadata.
-- [ ] R09: draft/unpublished không lộ qua detail/nested/cache; lịch sử owner xử lý đúng.
+- [x] R07: lookbook không gắn version người khác, share projection không lộ thông tin riêng.
+- [x] R08: lookbook create/update atomic, fault injection không mất entry/metadata.
+- [x] R09: draft/unpublished không lộ qua detail/nested/cache; lịch sử owner xử lý đúng.
 - [ ] R10: OpenAPI canonical có đủ routes/schemas/security/errors và drift test.
-- [ ] R11: origin cấu hình, TTL validated, revoke link và expiry đúng.
+- [x] R11: origin cấu hình, TTL validated, revoke link và expiry đúng.
 - [x] O01: close connection, transaction API, batch queries/index, số đo query/memory/lock.
 - [ ] O02: sync work không chặn event loop, client reuse, timeout/concurrency có giới hạn.
 - [x] O03: outfit/account atomic, solution form unique+CAS, concurrency tests.

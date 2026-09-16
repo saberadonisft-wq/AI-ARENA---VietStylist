@@ -1,6 +1,8 @@
 import json
+import sqlite3
 from typing import List, Optional, Dict, Any
-from app.core.database import Database
+from app.core.database import Database, db_transaction
+from app.core.errors import AppError
 
 
 class LookbookRepository:
@@ -13,6 +15,106 @@ class LookbookRepository:
     @staticmethod
     def get_lookbook_by_id(lookbook_id: str) -> Optional[Dict[str, Any]]:
         return Database.fetch_one("SELECT * FROM lookbooks WHERE id = ?", (lookbook_id,))
+
+    @staticmethod
+    def validate_outfit_versions_ownership(version_ids: List[str], owner_id: str, conn: Optional[sqlite3.Connection] = None) -> bool:
+        if not version_ids:
+            return True
+        unique_ids = list(set(version_ids))
+        placeholders = ", ".join(["?"] * len(unique_ids))
+        sql = f"""
+            SELECT v.id, o.owner_id, o.is_deleted
+            FROM outfit_versions v
+            JOIN outfits o ON v.outfit_id = o.id
+            WHERE v.id IN ({placeholders})
+        """
+        if conn:
+            cursor = conn.execute(sql, tuple(unique_ids))
+            rows = [dict(r) for r in cursor.fetchall()]
+        else:
+            rows = Database.fetch_all(sql, tuple(unique_ids))
+
+        if len(rows) != len(unique_ids):
+            return False
+
+        for r in rows:
+            if r.get("owner_id") != owner_id or r.get("is_deleted") != 0:
+                return False
+
+        return True
+
+    @staticmethod
+    def create_with_entries(
+        lookbook_id: str,
+        owner_id: str,
+        title: str,
+        description: Optional[str],
+        cover_image_url: Optional[str],
+        visibility: str,
+        entries: List[Dict[str, Any]],
+    ) -> None:
+        with db_transaction() as conn:
+            if entries:
+                version_ids = [e["outfit_version_id"] for e in entries]
+                if not LookbookRepository.validate_outfit_versions_ownership(version_ids, owner_id, conn=conn):
+                    raise AppError(code="INVALID_OUTFIT_VERSION", message="Một hoặc nhiều phiên bản bộ phối không hợp lệ hoặc không thuộc quyền sở hữu của bạn", status_code=422)
+
+            conn.execute("""
+                INSERT INTO lookbooks (id, owner_id, title, description, cover_image_url, visibility)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (lookbook_id, owner_id, title, description, cover_image_url, visibility))
+
+            if entries:
+                entry_params = [
+                    (e["id"], lookbook_id, e["outfit_version_id"], e["sort_order"], e.get("notes"))
+                    for e in entries
+                ]
+                conn.executemany("""
+                    INSERT INTO lookbook_entries (id, lookbook_id, outfit_version_id, sort_order, notes)
+                    VALUES (?, ?, ?, ?, ?)
+                """, entry_params)
+
+    @staticmethod
+    def update_with_entries(
+        lookbook_id: str,
+        owner_id: str,
+        title: str,
+        description: Optional[str],
+        cover_image_url: Optional[str],
+        visibility: str,
+        entries: Optional[List[Dict[str, Any]]],
+    ) -> None:
+        with db_transaction() as conn:
+            cur = conn.execute("SELECT owner_id FROM lookbooks WHERE id = ?", (lookbook_id,))
+            current = cur.fetchone()
+            if not current:
+                raise AppError(code="LOOKBOOK_NOT_FOUND", message="Không tìm thấy lookbook yêu cầu", status_code=404)
+            if current["owner_id"] != owner_id:
+                raise AppError(code="FORBIDDEN", message="Bạn không có quyền sửa lookbook này", status_code=403)
+
+            conn.execute("""
+                UPDATE lookbooks
+                SET title = ?, description = ?, cover_image_url = ?, visibility = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            """, (title, description, cover_image_url, visibility, lookbook_id))
+
+            if entries is not None:
+                if entries:
+                    version_ids = [e["outfit_version_id"] for e in entries]
+                    if not LookbookRepository.validate_outfit_versions_ownership(version_ids, owner_id, conn=conn):
+                        raise AppError(code="INVALID_OUTFIT_VERSION", message="Một hoặc nhiều phiên bản bộ phối không hợp lệ hoặc không thuộc quyền sở hữu của bạn", status_code=422)
+
+                conn.execute("DELETE FROM lookbook_entries WHERE lookbook_id = ?", (lookbook_id,))
+
+                if entries:
+                    entry_params = [
+                        (e["id"], lookbook_id, e["outfit_version_id"], e["sort_order"], e.get("notes"))
+                        for e in entries
+                    ]
+                    conn.executemany("""
+                        INSERT INTO lookbook_entries (id, lookbook_id, outfit_version_id, sort_order, notes)
+                        VALUES (?, ?, ?, ?, ?)
+                    """, entry_params)
 
     @staticmethod
     def create_lookbook(
@@ -44,7 +146,10 @@ class LookbookRepository:
 
     @staticmethod
     def delete_lookbook(lookbook_id: str) -> None:
-        Database.execute("DELETE FROM lookbooks WHERE id = ?", (lookbook_id,))
+        with db_transaction() as conn:
+            conn.execute("DELETE FROM lookbook_entries WHERE lookbook_id = ?", (lookbook_id,))
+            conn.execute("DELETE FROM share_links WHERE lookbook_id = ?", (lookbook_id,))
+            conn.execute("DELETE FROM lookbooks WHERE id = ?", (lookbook_id,))
 
     @staticmethod
     def add_entry(entry_id: str, lookbook_id: str, outfit_version_id: str, sort_order: int, notes: Optional[str]) -> None:
@@ -95,3 +200,8 @@ class LookbookRepository:
     @staticmethod
     def revoke_share_link(link_id: str) -> None:
         Database.execute("UPDATE share_links SET is_revoked = 1, revoked_at = CURRENT_TIMESTAMP WHERE id = ?", (link_id,))
+
+    @staticmethod
+    def revoke_shares_by_lookbook(lookbook_id: str) -> int:
+        return Database.execute("UPDATE share_links SET is_revoked = 1, revoked_at = CURRENT_TIMESTAMP WHERE lookbook_id = ? AND is_revoked = 0", (lookbook_id,))
+

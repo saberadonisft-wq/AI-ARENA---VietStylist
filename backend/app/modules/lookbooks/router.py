@@ -65,4 +65,15 @@ async def share_lookbook(
     user: AuthenticatedUser = Depends(require_current_user),
 ):
     """Tạo liên kết chia sẻ công khai hoặc unlisted với token băm ngẫu nhiên bảo mật cao (F09)."""
-    return LookbookService.generate_share_link(lookbook_id, user.user_id, req.expires_in_days or 30)
+    days = 30 if req.expires_in_days is None else req.expires_in_days
+    return LookbookService.generate_share_link(lookbook_id, user.user_id, days)
+
+
+@router.delete("/{lookbook_id}/shares")
+async def revoke_lookbook_shares(
+    lookbook_id: str,
+    user: AuthenticatedUser = Depends(require_current_user),
+):
+    """Thu hồi toàn bộ liên kết chia sẻ của lookbook."""
+    return LookbookService.revoke_shares(lookbook_id, user.user_id)
+

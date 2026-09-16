@@ -55,7 +55,9 @@ class CatalogRepository:
         return Database.fetch_all(query, tuple(params))
 
     @staticmethod
-    def get_item_by_id(item_id: str) -> Optional[Dict[str, Any]]:
+    def get_item_by_id(item_id: str, published_only: bool = True) -> Optional[Dict[str, Any]]:
+        if published_only:
+            return Database.fetch_one("SELECT * FROM items WHERE id = ? AND is_published = 1", (item_id,))
         return Database.fetch_one("SELECT * FROM items WHERE id = ?", (item_id,))
 
     @staticmethod

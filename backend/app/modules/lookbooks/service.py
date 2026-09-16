@@ -4,6 +4,7 @@ import secrets
 import uuid
 from datetime import datetime, timezone, timedelta
 from typing import List, Optional, Dict, Any
+from app.core.config import settings
 from app.modules.lookbooks.schemas import (
     CreateLookbookRequest,
     UpdateLookbookRequest,
@@ -40,25 +41,24 @@ class LookbookService:
     @staticmethod
     def create_lookbook(owner_id: str, req: CreateLookbookRequest) -> LookbookResponse:
         lookbook_id = str(uuid.uuid4())
-        LookbookRepository.create_lookbook(
+        entries_data = [
+            {
+                "id": str(uuid.uuid4()),
+                "outfit_version_id": e.outfit_version_id,
+                "sort_order": e.sort_order,
+                "notes": e.notes,
+            }
+            for e in req.entries
+        ]
+        LookbookRepository.create_with_entries(
             lookbook_id=lookbook_id,
             owner_id=owner_id,
             title=req.title,
             description=req.description,
             cover_image_url=req.cover_image_url,
             visibility=req.visibility,
+            entries=entries_data,
         )
-
-        for e in req.entries:
-            entry_id = str(uuid.uuid4())
-            LookbookRepository.add_entry(
-                entry_id=entry_id,
-                lookbook_id=lookbook_id,
-                outfit_version_id=e.outfit_version_id,
-                sort_order=e.sort_order,
-                notes=e.notes,
-            )
-
         return LookbookService.get_lookbook(lookbook_id, owner_id)
 
     @staticmethod
@@ -96,14 +96,27 @@ class LookbookService:
         cover_image_url = req.cover_image_url if req.cover_image_url is not None else current["cover_image_url"]
         visibility = req.visibility if req.visibility is not None else current["visibility"]
 
-        LookbookRepository.update_lookbook(lookbook_id, title, description, cover_image_url, visibility)
-
+        entries_data = None
         if req.entries is not None:
-            LookbookRepository.clear_entries(lookbook_id)
-            for e in req.entries:
-                entry_id = str(uuid.uuid4())
-                LookbookRepository.add_entry(entry_id, lookbook_id, e.outfit_version_id, e.sort_order, e.notes)
+            entries_data = [
+                {
+                    "id": str(uuid.uuid4()),
+                    "outfit_version_id": e.outfit_version_id,
+                    "sort_order": e.sort_order,
+                    "notes": e.notes,
+                }
+                for e in req.entries
+            ]
 
+        LookbookRepository.update_with_entries(
+            lookbook_id=lookbook_id,
+            owner_id=owner_id,
+            title=title,
+            description=description,
+            cover_image_url=cover_image_url,
+            visibility=visibility,
+            entries=entries_data,
+        )
         return LookbookService.get_lookbook(lookbook_id, owner_id)
 
     @staticmethod
@@ -123,12 +136,15 @@ class LookbookService:
         if current["owner_id"] != owner_id:
             raise AppError(code="FORBIDDEN", message="Bạn không có quyền chia sẻ lookbook này", status_code=403)
 
+        if expires_in_days is None or expires_in_days < 1 or expires_in_days > 30:
+            raise AppError(code="VALIDATION_ERROR", message="expires_in_days phải nằm trong khoảng từ 1 đến 30 ngày", status_code=422)
+
         token = secrets.token_urlsafe(32)
         token_hash = hashlib.sha256(token.encode()).hexdigest()
         token_prefix = token[:8]
         link_id = str(uuid.uuid4())
 
-        expires_at = (datetime.now(timezone.utc) + timedelta(days=expires_in_days)).isoformat() if expires_in_days else None
+        expires_at = (datetime.now(timezone.utc) + timedelta(days=expires_in_days)).isoformat()
 
         LookbookRepository.create_share_link(
             link_id=link_id,
@@ -140,7 +156,8 @@ class LookbookService:
             expires_at=expires_at,
         )
 
-        share_url = f"http://localhost:3000/chia-se/{token}"
+        origin = settings.FRONTEND_PUBLIC_ORIGIN.rstrip("/")
+        share_url = f"{origin}/chia-se/{token}"
         return ShareLinkResponse(
             share_token=token,
             share_url=share_url,
@@ -149,14 +166,29 @@ class LookbookService:
         )
 
     @staticmethod
+    def revoke_shares(lookbook_id: str, owner_id: str) -> Dict[str, Any]:
+        current = LookbookRepository.get_lookbook_by_id(lookbook_id)
+        if not current:
+            raise AppError(code="LOOKBOOK_NOT_FOUND", message="Không tìm thấy lookbook yêu cầu", status_code=404)
+        if current["owner_id"] != owner_id:
+            raise AppError(code="FORBIDDEN", message="Bạn không có quyền thu hồi chia sẻ của lookbook này", status_code=403)
+        count = LookbookRepository.revoke_shares_by_lookbook(lookbook_id)
+        return {"message": "Đã thu hồi tất cả liên kết chia sẻ của lookbook", "revoked_count": count}
+
+    @staticmethod
     def resolve_shared_token(token: str) -> SharedLookbookViewResponse:
         token_hash = hashlib.sha256(token.encode()).hexdigest()
         share = LookbookRepository.get_share_by_token_hash(token_hash)
-        if not share:
+        if not share or share.get("is_revoked"):
             raise AppError(code="SHARE_NOT_FOUND", message="Liên kết chia sẻ không tồn tại hoặc đã bị thu hồi", status_code=404)
 
         if share.get("expires_at"):
-            exp = datetime.fromisoformat(share["expires_at"])
+            exp_str = share["expires_at"]
+            if exp_str.endswith("Z"):
+                exp_str = exp_str[:-1] + "+00:00"
+            exp = datetime.fromisoformat(exp_str)
+            if exp.tzinfo is None:
+                exp = exp.replace(tzinfo=timezone.utc)
             if exp < datetime.now(timezone.utc):
                 raise AppError(code="SHARE_EXPIRED", message="Liên kết chia sẻ đã hết hạn hiệu lực", status_code=410)
 
