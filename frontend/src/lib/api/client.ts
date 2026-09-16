@@ -10,6 +10,7 @@ import {
   ColorAnalysisResponse,
   WeatherResponse,
   HeritageArticle,
+  CreateStoryPayload,
   HeritageSource,
   Lookbook,
   SolutionForm,
@@ -116,9 +117,25 @@ export const api = {
   getAvatars: () => apiFetch<Avatar[]>("/api/catalog/avatars"),
   getStarterOutfits: () => apiFetch<StarterOutfit[]>("/api/catalog/starter-outfits"),
 
-  // Heritage
-  getHeritageArticles: () => apiFetch<HeritageArticle[]>("/api/heritage/articles"),
+  // Heritage & Stylist Blog Stories
+  getHeritageArticles: (filters?: { era?: string; category?: string; search?: string }) => {
+    const params = new URLSearchParams();
+    if (filters?.era && filters.era !== "all") params.append("era", filters.era);
+    if (filters?.category && filters.category !== "all") params.append("category", filters.category);
+    if (filters?.search) params.append("search", filters.search);
+    const qs = params.toString();
+    return apiFetch<HeritageArticle[]>(`/api/heritage/articles${qs ? `?${qs}` : ""}`);
+  },
   getHeritageArticle: (slugOrId: string) => apiFetch<HeritageArticle>(`/api/heritage/articles/${slugOrId}`),
+  createHeritageArticle: (payload: CreateStoryPayload) =>
+    apiFetch<any>("/api/heritage/articles", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  deleteHeritageArticle: (slugOrId: string) =>
+    apiFetch<any>(`/api/heritage/articles/${slugOrId}`, {
+      method: "DELETE",
+    }),
   getHeritageSources: () => apiFetch<HeritageSource[]>("/api/heritage/sources"),
 
   // Cultural Check (F10)

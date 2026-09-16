@@ -18,6 +18,7 @@ import {
   X,
   Palette,
   ChevronDown,
+  Feather,
 } from "lucide-react";
 
 export default function Navbar() {
@@ -32,7 +33,7 @@ export default function Navbar() {
     { href: "/", label: "Studio Phối đồ", icon: Sparkles },
     { href: "/thu-vien", label: "Thư viện Cổ phục", icon: BookOpen },
     { href: "/lookbook", label: "Lookbook", icon: FolderHeart },
-    { href: "/giai-phap", label: "Giải pháp F12", icon: FileSpreadsheet },
+    { href: "/chuyen-co-phuc", label: "Chuyện Cổ phục", icon: Feather },
     ...(isAdmin ? [{ href: "/quan-tri", label: "Quản trị F15", icon: ShieldCheck }] : []),
   ];
 

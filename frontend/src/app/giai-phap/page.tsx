@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import Link from "next/link";
 import { SolutionForm, Lookbook } from "@/lib/types/api";
 import { api } from "@/lib/api/client";
 import { useAuth } from "@/lib/auth/context";
@@ -13,6 +14,7 @@ import {
   Check,
   AlertCircle,
   FolderHeart,
+  Feather,
 } from "lucide-react";
 
 export default function GiaiPhapPage() {
@@ -104,6 +106,29 @@ export default function GiaiPhapPage() {
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
+      {/* Banner thông báo chuyển sang Chuyện Cổ phục */}
+      <div className="p-3.5 bg-red-50/80 border border-red-200/90 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs shadow-xs no-print">
+        <div className="flex items-center space-x-2.5">
+          <div className="w-8 h-8 rounded-full bg-heritage-red text-white flex items-center justify-center shrink-0">
+            <Feather className="w-4 h-4" />
+          </div>
+          <div>
+            <div className="font-bold text-stone-900">
+              Khám phá Trang Blog & Câu chuyện Cổ phục mới!
+            </div>
+            <div className="text-stone-600">
+              Nơi Stylist và Chuyên gia chia sẻ nguồn gốc, hoa văn và bí quyết phối phục trang Việt.
+            </div>
+          </div>
+        </div>
+        <Link
+          href="/chuyen-co-phuc"
+          className="px-4 py-2 rounded-xl bg-heritage-red hover:bg-heritage-red-dark text-white font-semibold text-xs shadow-xs transition-all whitespace-nowrap"
+        >
+          Đến Góc Stylist →
+        </Link>
+      </div>
+
       {/* Header & Công cụ In / Lưu */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 no-print">
         <div className="space-y-1">

@@ -8,10 +8,15 @@ from typing import Any, Dict, List, Optional, Tuple
 from app.core.config import settings
 
 # Path to database file if using SQLite
-SQLITE_DB_PATH = settings.DATABASE_URL.replace("sqlite:///", "")
-if not os.path.isabs(SQLITE_DB_PATH) and SQLITE_DB_PATH.startswith("./"):
-    # Resolve relative to backend root
-    SQLITE_DB_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", SQLITE_DB_PATH[2:]))
+if settings.DATABASE_URL.startswith("sqlite:///"):
+    SQLITE_DB_PATH = settings.DATABASE_URL.replace("sqlite:///", "")
+    if SQLITE_DB_PATH.startswith("./"):
+        SQLITE_DB_PATH = SQLITE_DB_PATH[2:]
+else:
+    SQLITE_DB_PATH = "viet_phuc_remix.db"
+
+if not os.path.isabs(SQLITE_DB_PATH):
+    SQLITE_DB_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", SQLITE_DB_PATH))
 
 
 def get_db_connection() -> sqlite3.Connection:

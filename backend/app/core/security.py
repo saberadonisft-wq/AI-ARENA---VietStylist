@@ -21,6 +21,10 @@ class AuthenticatedUser:
     def is_editor(self) -> bool:
         return "editor" in self.roles or self.is_admin
 
+    @property
+    def is_stylist(self) -> bool:
+        return "stylist" in self.roles or self.is_admin
+
 
 def verify_supabase_jwt(token: str) -> Dict[str, Any]:
     """

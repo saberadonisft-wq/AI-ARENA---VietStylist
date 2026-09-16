@@ -231,7 +231,31 @@ export interface HeritageArticle {
   modern_interpretation?: string;
   status: string;
   version: number;
+  author_id?: string;
+  author_name?: string;
+  author_role?: "stylist" | "admin" | string;
+  cover_image_url?: string;
+  category?: string;
+  era?: string;
+  related_garment_id?: string;
+  read_time_minutes?: number;
+  likes_count?: number;
+  created_at?: string;
   sources?: ArticleSourceCitation[];
+}
+
+export interface CreateStoryPayload {
+  title: string;
+  short_summary: string;
+  full_content: string;
+  category?: string;
+  era?: string;
+  related_garment_id?: string;
+  historical_context?: string;
+  modern_interpretation?: string;
+  structural_description?: string;
+  cover_image_url?: string;
+  read_time_minutes?: number;
 }
 
 export interface LookbookEntryDetail {
