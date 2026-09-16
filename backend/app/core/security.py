@@ -28,20 +28,33 @@ class AuthenticatedUser:
 
 def verify_supabase_jwt(token: str) -> Dict[str, Any]:
     """
-    Xác minh JWT từ Supabase Auth với đầy đủ chữ ký, hạn dùng (exp), và issuer nếu có.
+    Xác minh JWT từ ứng dụng/Supabase Auth với chữ ký bắt buộc, hạn dùng (exp), và claims hợp lệ.
     """
+    secret = settings.get_jwt_secret()
+    if not secret:
+        raise AppError(code="SERVER_CONFIGURATION_ERROR", message="JWT secret chưa được cấu hình trên máy chủ.", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
     try:
-        # Nếu có secret, xác minh HMAC-SHA256
-        # Supabase mặc định dùng HS256 với JWT secret
-        payload = jwt.decode(
-            token,
-            settings.SUPABASE_JWT_SECRET,
-            algorithms=["HS256"],
-            options={
-                "verify_signature": bool(settings.SUPABASE_JWT_SECRET),
+        decode_kwargs = {
+            "algorithms": ["HS256"],
+            "options": {
+                "verify_signature": True,
                 "verify_exp": True,
+                "require": ["sub", "exp", "iat"],
             },
-        )
+            "leeway": 10,
+        }
+        if settings.JWT_AUDIENCE:
+            decode_kwargs["audience"] = settings.JWT_AUDIENCE
+        else:
+            decode_kwargs["options"]["verify_aud"] = False
+
+        if settings.JWT_ISSUER:
+            decode_kwargs["issuer"] = settings.JWT_ISSUER
+        else:
+            decode_kwargs["options"]["verify_iss"] = False
+
+        payload = jwt.decode(token, secret, **decode_kwargs)
         return payload
     except jwt.ExpiredSignatureError:
         raise AppError(code="TOKEN_EXPIRED", message="Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.", status_code=status.HTTP_401_UNAUTHORIZED)
@@ -59,59 +72,70 @@ def parse_bearer_token(authorization: Optional[str]) -> Optional[str]:
 
 
 def create_access_token(user_id: str, email: Optional[str] = None, roles: Optional[List[str]] = None, expires_delta: Optional[int] = 3600) -> str:
-    """Tạo JWT có chữ ký HS256 tương thích với Supabase Auth."""
+    """Tạo JWT có chữ ký HS256 chuẩn bảo mật."""
     now = int(time.time())
     payload = {
         "sub": user_id,
         "user_id": user_id,
         "email": email or f"{user_id}@example.com",
+        "iss": settings.JWT_ISSUER,
+        "aud": settings.JWT_AUDIENCE,
         "app_metadata": {"roles": roles or ["user"]},
         "iat": now,
         "exp": now + (expires_delta or 3600),
     }
-    return jwt.encode(payload, settings.SUPABASE_JWT_SECRET, algorithm="HS256")
+    secret = settings.get_jwt_secret()
+    if not secret:
+        raise AppError(code="SERVER_CONFIGURATION_ERROR", message="JWT secret chưa được cấu hình.", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    return jwt.encode(payload, secret, algorithm="HS256")
 
 
 async def get_current_user_optional(authorization: Optional[str] = Header(None)) -> Optional[AuthenticatedUser]:
     """
-    Dependency lấy user nếu có token hợp lệ, trả về None nếu là khách (Guest).
+    Dependency lấy user nếu có token hợp lệ.
+    - Không gửi token: trả về None (Guest).
+    - Có gửi token nhưng token sai/hết hạn: trả về lỗi 401, KHÔNG âm thầm hạ quyền xuống Guest.
     """
-    token = parse_bearer_token(authorization)
-    if not token:
+    if not authorization:
         return None
 
-    # Hỗ trợ dev token cho testing và local
-    if settings.ENVIRONMENT == "development" and token.startswith("dev-user-"):
+    token = parse_bearer_token(authorization)
+    if not token:
+        raise AppError(code="INVALID_TOKEN", message="Header Authorization phải có định dạng 'Bearer <token>'", status_code=status.HTTP_401_UNAUTHORIZED)
+
+    # Dev token chỉ chấp nhận ở môi trường development/test, tuyệt đối cấm ở production
+    if token.startswith("dev-user-"):
+        if settings.ENVIRONMENT == "production":
+            raise AppError(code="INVALID_TOKEN", message="Dev tokens are disabled in production", status_code=status.HTTP_401_UNAUTHORIZED)
         user_id = token
         roles = ["admin"] if "admin" in user_id else ["user"]
         return AuthenticatedUser(user_id=user_id, email=f"{user_id}@example.com", roles=roles)
 
-    try:
-        payload = verify_supabase_jwt(token)
-        user_id = payload.get("sub") or payload.get("user_id")
-        if not user_id:
-            return None
-        if settings.ENVIRONMENT != "development" and user_id.startswith("usr_demo_"):
-            return None
-        from app.core.database import Database
-        account = Database.fetch_one("SELECT is_active FROM accounts WHERE id = ?", (user_id,))
-        if account and not account["is_active"]:
-            return None
-        email = payload.get("email")
-        app_metadata = payload.get("app_metadata", {})
-        user_roles = app_metadata.get("roles", ["user"])
-        if isinstance(user_roles, str):
-            user_roles = [user_roles]
+    payload = verify_supabase_jwt(token)
+    user_id = payload.get("sub") or payload.get("user_id")
+    if not user_id:
+        raise AppError(code="INVALID_TOKEN", message="Token thiếu định danh người dùng (sub)", status_code=status.HTTP_401_UNAUTHORIZED)
 
-        return AuthenticatedUser(user_id=user_id, email=email, roles=user_roles, claims=payload)
-    except AppError:
-        # Token lỗi hoặc hết hạn
-        return None
+    from app.core.database import Database
+    account = Database.fetch_one("SELECT is_active, email FROM accounts WHERE id = ?", (user_id,))
+    if not account:
+        raise AppError(code="USER_NOT_FOUND", message="Tài khoản không tồn tại trên hệ thống", status_code=status.HTTP_401_UNAUTHORIZED)
+    if not account.get("is_active"):
+        raise AppError(code="ACCOUNT_DISABLED", message="Tài khoản đã bị vô hiệu hóa", status_code=status.HTTP_401_UNAUTHORIZED)
+
+    # Lấy vai trò mới nhất trực tiếp từ cơ sở dữ liệu để đảm bảo việc thu hồi quyền (revoke) có hiệu lực ngay
+    role_rows = Database.fetch_all("SELECT role FROM user_roles WHERE user_id = ?", (user_id,))
+    user_roles = [r["role"] for r in role_rows if "role" in r]
+    if not user_roles:
+        user_roles = ["user"]
+
+    email = account.get("email") or payload.get("email")
+    return AuthenticatedUser(user_id=user_id, email=email, roles=user_roles, claims=payload)
 
 
 async def require_current_user(user: Optional[AuthenticatedUser] = Depends(get_current_user_optional)) -> AuthenticatedUser:
     """
-    Dependency bắt buộc người dùng phải đăng nhập.
+    Dependency bắt buộc người dùng phải đăng nhập hợp lệ.
     """
     if not user:
         raise AppError(
@@ -124,7 +148,7 @@ async def require_current_user(user: Optional[AuthenticatedUser] = Depends(get_c
 
 def require_role(required_roles: List[str]):
     """
-    Dependency kiểm tra vai trò người dùng (admin, editor).
+    Dependency kiểm tra vai trò người dùng (admin, editor, stylist).
     """
     async def role_checker(user: AuthenticatedUser = Depends(require_current_user)) -> AuthenticatedUser:
         has_role = any(role in user.roles for role in required_roles)

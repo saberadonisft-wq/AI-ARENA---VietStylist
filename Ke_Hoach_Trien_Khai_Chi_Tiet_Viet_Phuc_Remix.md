@@ -744,10 +744,10 @@ Việc tiếp theo:
 
 ### A10.1. Checklist trạng thái — khởi đầu tất cả TODO
 
-- [ ] S0: ghi baseline và môi trường; test mới tái hiện đúng; fixture không chạm tài nguyên thật.
+- [x] S0: ghi baseline và môi trường; test mới tái hiện đúng; fixture không chạm tài nguyên thật.
 - [ ] R01: chặn path traversal/read/write/delete và debug route production; local grant hợp lệ chạy.
-- [ ] R02: bỏ email auto-admin, `/me` chỉ đọc, role revoke có hiệu lực.
-- [ ] R03: signature/claims bắt buộc; secret sai fail startup; không magic dev admin token production.
+- [x] R02: bỏ email auto-admin, `/me` chỉ đọc, role revoke có hiệu lực.
+- [x] R03: signature/claims bắt buộc; secret sai fail startup; không magic dev admin token production.
 - [ ] R04: owner policy đồng nhất outfit/media/job/form, không fallback guest owner chung.
 - [ ] R05: private media/grant/TTL/staging/promote/delete retry và quota an toàn.
 - [ ] R06: migration versioned fresh/old/partial/repeat, không mất nội dung, blog API hết lỗi thiếu cột.

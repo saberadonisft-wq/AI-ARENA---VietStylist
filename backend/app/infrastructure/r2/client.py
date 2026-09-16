@@ -98,7 +98,11 @@ class R2StorageClient:
             except Exception:
                 return None
         else:
-            file_path = os.path.join(self.local_dir, bucket, object_key)
+            try:
+                from app.modules.media.path_utils import safe_join_media_path
+                file_path = safe_join_media_path(self.local_dir, bucket, object_key)
+            except Exception:
+                return None
             if os.path.exists(file_path):
                 return {
                     "size_bytes": os.path.getsize(file_path),
@@ -114,7 +118,11 @@ class R2StorageClient:
             except Exception:
                 return False
         else:
-            file_path = os.path.join(self.local_dir, bucket, object_key)
+            try:
+                from app.modules.media.path_utils import safe_join_media_path
+                file_path = safe_join_media_path(self.local_dir, bucket, object_key)
+            except Exception:
+                return False
             if os.path.exists(file_path):
                 try:
                     os.remove(file_path)

