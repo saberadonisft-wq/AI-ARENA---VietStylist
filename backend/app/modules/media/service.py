@@ -98,15 +98,29 @@ class MediaService:
         if not media:
             raise AppError(code="MEDIA_NOT_FOUND", message="Không tìm thấy file yêu cầu", status_code=404)
 
-        # Kiểm tra quyền nếu file private hoặc unlisted
+        # Kiểm tra quyền nếu file private hoặc unlisted (R04: bảo vệ quyền riêng tư, trả 404 trước khi lộ trạng thái)
         if media["visibility"] in ("private", "unlisted"):
             if not user_id:
                 raise AppError(code="UNAUTHORIZED", message="Yêu cầu đăng nhập để truy cập tài nguyên riêng tư", status_code=401)
             if media.get("owner_id") != user_id:
                 raise AppError(code="MEDIA_NOT_FOUND", message="Không tìm thấy file yêu cầu", status_code=404)
 
-        url = r2_client.generate_access_url(media["bucket"], media["object_key"], visibility=media["visibility"])
-        return AccessUrlResponse(access_url=url, expires_in=3600)
+        # Không cấp access URL cho file pending, deleting hoặc deleted (R05, A2.2)
+        if media["status"] != "ready":
+            raise AppError(code="MEDIA_NOT_READY", message="Tài nguyên chưa sẵn sàng để truy cập", status_code=409)
+
+        ttl = 300  # 5 minutes per plan R05
+        if r2_client.is_configured and r2_client.s3:
+            url = r2_client.generate_access_url(media["bucket"], media["object_key"], visibility=media["visibility"], expires_in=ttl)
+        else:
+            if media["visibility"] == "public":
+                url = f"http://localhost:{settings.PORT}/api/media/files/{media['bucket']}/{media['object_key']}"
+            else:
+                from app.modules.media.grant_utils import create_media_grant
+                grant = create_media_grant(media_id=media["id"], purpose="read", expires_in=ttl)
+                url = f"http://localhost:{settings.PORT}/api/media/files/{media['bucket']}/{media['object_key']}?grant={grant}"
+
+        return AccessUrlResponse(access_url=url, expires_in=ttl)
 
     @staticmethod
     def delete_media(media_id: str, user_id: str) -> None:
@@ -114,5 +128,12 @@ class MediaService:
         if not media or media.get("owner_id") != user_id:
             raise AppError(code="MEDIA_NOT_FOUND", message="Không tìm thấy file yêu cầu", status_code=404)
 
-        r2_client.delete_object(media["bucket"], media["object_key"])
-        MediaRepository.delete_media(media_id)
+        # 1. Đánh dấu deleting để ngăn cấp grant mới (R05)
+        MediaRepository.mark_media_deleting(media_id)
+
+        # 2. Xóa object khỏi storage
+        success = r2_client.delete_object(media["bucket"], media["object_key"])
+
+        # 3. Hoàn tất xóa nếu storage thành công (idempotent)
+        if success:
+            MediaRepository.delete_media(media_id)

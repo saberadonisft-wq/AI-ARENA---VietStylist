@@ -32,5 +32,36 @@ class MediaRepository:
         """, (size_bytes, width, height, public_url, media_id))
 
     @staticmethod
+    def get_media_by_bucket_and_key(bucket: str, object_key: str) -> Optional[Dict[str, Any]]:
+        return Database.fetch_one("SELECT * FROM media_assets WHERE bucket = ? AND object_key = ?", (bucket, object_key))
+
+    @staticmethod
+    def mark_media_deleting(media_id: str) -> None:
+        Database.execute("""
+            UPDATE media_assets
+            SET status = 'deleting', updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        """, (media_id,))
+
+    @staticmethod
+    def mark_media_deleted(media_id: str) -> None:
+        Database.execute("""
+            UPDATE media_assets
+            SET status = 'deleted', updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        """, (media_id,))
+
+    @staticmethod
     def delete_media(media_id: str) -> None:
         Database.execute("DELETE FROM media_assets WHERE id = ?", (media_id,))
+
+    @staticmethod
+    def get_stale_pending_media(older_than_seconds: int = 7200) -> list:
+        return Database.fetch_all("""
+            SELECT * FROM media_assets
+            WHERE status = 'pending' AND created_at < datetime('now', '-' || ? || ' seconds')
+        """, (older_than_seconds,))
+
+    @staticmethod
+    def get_deleting_media() -> list:
+        return Database.fetch_all("SELECT * FROM media_assets WHERE status = 'deleting'")

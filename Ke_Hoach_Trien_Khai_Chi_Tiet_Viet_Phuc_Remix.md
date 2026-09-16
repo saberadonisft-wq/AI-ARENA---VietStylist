@@ -745,20 +745,20 @@ Việc tiếp theo:
 ### A10.1. Checklist trạng thái — khởi đầu tất cả TODO
 
 - [x] S0: ghi baseline và môi trường; test mới tái hiện đúng; fixture không chạm tài nguyên thật.
-- [ ] R01: chặn path traversal/read/write/delete và debug route production; local grant hợp lệ chạy.
+- [x] R01: chặn path traversal/read/write/delete và debug route production; local grant hợp lệ chạy.
 - [x] R02: bỏ email auto-admin, `/me` chỉ đọc, role revoke có hiệu lực.
 - [x] R03: signature/claims bắt buộc; secret sai fail startup; không magic dev admin token production.
-- [ ] R04: owner policy đồng nhất outfit/media/job/form, không fallback guest owner chung.
-- [ ] R05: private media/grant/TTL/staging/promote/delete retry và quota an toàn.
-- [ ] R06: migration versioned fresh/old/partial/repeat, không mất nội dung, blog API hết lỗi thiếu cột.
+- [x] R04: owner policy đồng nhất outfit/media/job/form, không fallback guest owner chung.
+- [x] R05: private media/grant/TTL/staging/promote/delete retry và quota an toàn.
+- [x] R06: migration versioned fresh/old/partial/repeat, không mất nội dung, blog API hết lỗi thiếu cột.
 - [ ] R07: lookbook không gắn version người khác, share projection không lộ thông tin riêng.
 - [ ] R08: lookbook create/update atomic, fault injection không mất entry/metadata.
 - [ ] R09: draft/unpublished không lộ qua detail/nested/cache; lịch sử owner xử lý đúng.
 - [ ] R10: OpenAPI canonical có đủ routes/schemas/security/errors và drift test.
 - [ ] R11: origin cấu hình, TTL validated, revoke link và expiry đúng.
-- [ ] O01: close connection, transaction API, batch queries/index, số đo query/memory/lock.
+- [x] O01: close connection, transaction API, batch queries/index, số đo query/memory/lock.
 - [ ] O02: sync work không chặn event loop, client reuse, timeout/concurrency có giới hạn.
-- [ ] O03: outfit/account atomic, solution form unique+CAS, concurrency tests.
+- [x] O03: outfit/account atomic, solution form unique+CAS, concurrency tests.
 - [ ] O04: validation/body size/rate limit/error envelope/cache privacy.
 - [ ] O05: Gemini output validation/fallback/quota; weather cache recovery; chất lượng AI báo riêng.
 - [ ] O06: cleanup staging/job an toàn, try-on trung thực unavailable, không xóa rộng.
