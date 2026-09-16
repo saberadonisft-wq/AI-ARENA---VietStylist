@@ -206,3 +206,4 @@ Những năm gần đây, phong trào phục dựng cổ phục thời Lê Trung
 
 if __name__ == "__main__":
     migrate_and_seed_blog()
+

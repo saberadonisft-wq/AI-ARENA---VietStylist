@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { useAuth } from "@/lib/auth/context";
 import Logo from "@/components/Logo";
 import {
@@ -53,11 +53,98 @@ export default function AuthModal({
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Google Identity Services (GSI)
+  const googleBtnContainerRef = useRef<HTMLDivElement>(null);
+  const [isGsiReady, setIsGsiReady] = useState(false);
+
+  const initGoogleButton = () => {
+    if (typeof window === "undefined") return;
+    const google = (window as any).google;
+    if (!google?.accounts?.id) return;
+
+    const clientId =
+      process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ||
+      "336358137441-abj1lpeeogkpjmdr3hhr0i29di40e3b6.apps.googleusercontent.com";
+
+    try {
+      google.accounts.id.initialize({
+        client_id: clientId,
+        callback: async (response: { credential?: string }) => {
+          if (!response?.credential) {
+            setErrorMsg("Không nhận được token xác thực từ Google.");
+            return;
+          }
+          setIsSubmitting(true);
+          setErrorMsg(null);
+          try {
+            const res = await googleLogin({ credential: response.credential });
+            setSuccessMsg(
+              `Đăng nhập Google thành công! Chào mừng ${
+                res?.user?.display_name || "bạn"
+              }.`
+            );
+            setTimeout(() => {
+              handleClose();
+            }, 600);
+          } catch (err: any) {
+            console.error("Google authentication error:", err);
+            setErrorMsg(
+              err?.message || "Xác thực Google thất bại. Vui lòng thử lại."
+            );
+          } finally {
+            setIsSubmitting(false);
+          }
+        },
+        auto_select: false,
+        cancel_on_tap_outside: true,
+      });
+
+      if (googleBtnContainerRef.current) {
+        googleBtnContainerRef.current.innerHTML = "";
+        google.accounts.id.renderButton(googleBtnContainerRef.current, {
+          theme: "outline",
+          size: "large",
+          type: "standard",
+          shape: "rectangular",
+          text: "continue_with",
+          logo_alignment: "left",
+          width: 380,
+        });
+        setIsGsiReady(true);
+      }
+    } catch (err) {
+      console.warn("Could not initialize Google Identity Services:", err);
+    }
+  };
+
   useEffect(() => {
     if (isOpen) {
       setActiveTab(defaultTab);
       setErrorMsg(null);
       setSuccessMsg(null);
+
+      // Render Google Sign-In button
+      if ((window as any).google?.accounts?.id) {
+        initGoogleButton();
+      } else {
+        const interval = setInterval(() => {
+          if ((window as any).google?.accounts?.id) {
+            clearInterval(interval);
+            initGoogleButton();
+          }
+        }, 200);
+
+        const timeout = setTimeout(() => {
+          clearInterval(interval);
+        }, 4000);
+
+        return () => {
+          clearInterval(interval);
+          clearTimeout(timeout);
+        };
+      }
+    } else {
+      setIsGsiReady(false);
     }
   }, [isOpen, defaultTab]);
 
@@ -116,19 +203,21 @@ export default function AuthModal({
     }
   };
 
-  const handleGoogleLogin = async () => {
+  const handleGoogleFallbackClick = async () => {
     setErrorMsg(null);
-    setIsSubmitting(true);
-    try {
-      await googleLogin();
-      setSuccessMsg("Đăng nhập Google thành công!");
-      setTimeout(() => {
-        handleClose();
-      }, 600);
-    } catch (err: any) {
-      setErrorMsg(err?.message || "Không thể đăng nhập bằng Google Auth.");
-    } finally {
-      setIsSubmitting(false);
+    if (typeof window === "undefined") return;
+    const google = (window as any).google;
+    if (google?.accounts?.id) {
+      initGoogleButton();
+      try {
+        google.accounts.id.prompt();
+      } catch {
+        // One-tap prompt might not show if dismissed
+      }
+    } else {
+      setErrorMsg(
+        "Dịch vụ Google Identity đang được kết nối. Vui lòng thử lại sau vài giây hoặc chọn Đăng nhập 1-chạm / Mật khẩu."
+      );
     }
   };
 
@@ -257,33 +346,41 @@ export default function AuthModal({
             </span>
           </div>
 
-          {/* Google Auth Button */}
-          <button
-            type="button"
-            disabled={isBusy}
-            onClick={handleGoogleLogin}
-            className="w-full flex items-center justify-center space-x-2.5 py-2.5 px-4 rounded-xl border border-stone-300 hover:bg-stone-50 font-medium text-xs text-stone-700 shadow-sm transition-all"
-          >
-            <svg className="w-4 h-4" viewBox="0 0 24 24">
-              <path
-                fill="#4285F4"
-                d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-              />
-              <path
-                fill="#34A853"
-                d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-              />
-              <path
-                fill="#FBBC05"
-                d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
-              />
-              <path
-                fill="#EA4335"
-                d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
-              />
-            </svg>
-            <span>Tiếp tục với Google OAuth</span>
-          </button>
+          {/* Google Sign-in Official GSI Button & Fallback */}
+          <div className="w-full flex flex-col items-center justify-center min-h-[44px]">
+            <div
+              ref={googleBtnContainerRef}
+              className={`w-full flex justify-center ${isGsiReady ? "block" : "hidden"}`}
+            />
+            {!isGsiReady && (
+              <button
+                type="button"
+                disabled={isBusy}
+                onClick={handleGoogleFallbackClick}
+                className="w-full flex items-center justify-center space-x-2.5 py-2.5 px-4 rounded-xl border border-stone-300 hover:bg-stone-50 font-medium text-xs text-stone-700 shadow-sm transition-all"
+              >
+                <svg className="w-4 h-4" viewBox="0 0 24 24">
+                  <path
+                    fill="#4285F4"
+                    d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                  />
+                  <path
+                    fill="#34A853"
+                    d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                  />
+                  <path
+                    fill="#FBBC05"
+                    d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+                  />
+                  <path
+                    fill="#EA4335"
+                    d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+                  />
+                </svg>
+                <span>Tiếp tục với Google OAuth</span>
+              </button>
+            )}
+          </div>
 
           {/* Tab Switcher: Đăng nhập / Đăng ký */}
           <div className="flex border-b border-stone-200">

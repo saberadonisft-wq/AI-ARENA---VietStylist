@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import "./globals.css";
 import { AuthProvider } from "@/lib/auth/context";
 import Navbar from "@/components/Navbar";
@@ -34,6 +35,7 @@ export default function RootLayout({
         />
       </head>
       <body className="flex flex-col min-h-screen bg-[#FAF8F5] text-stone-800">
+        <Script src="https://accounts.google.com/gsi/client" strategy="afterInteractive" />
         <AuthProvider>
           <Navbar />
           <main className="flex-1">{children}</main>

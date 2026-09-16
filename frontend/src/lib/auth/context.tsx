@@ -28,12 +28,7 @@ interface AuthContextType {
     displayName: string;
     role?: string;
   }) => Promise<AuthResponse>;
-  googleLogin: (payload?: {
-    credential?: string;
-    email?: string;
-    display_name?: string;
-    avatar_url?: string;
-  }) => Promise<AuthResponse>;
+  googleLogin: (payload?: { credential?: string }) => Promise<AuthResponse>;
   quickDemoLogin: (role: "admin" | "stylist" | "user") => Promise<void>;
   login: (userIdOrEmail?: string, role?: string) => Promise<void>;
   logout: () => void;
@@ -150,12 +145,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const googleLogin = async (payload?: {
     credential?: string;
-    email?: string;
-    display_name?: string;
-    avatar_url?: string;
   }): Promise<AuthResponse> => {
     if (!payload?.credential) {
-      throw new Error("Đăng nhập Google chưa sẵn sàng. Vui lòng dùng email và mật khẩu.");
+      throw new Error("Không nhận được token xác thực từ Google.");
     }
     setIsLoading(true);
     try {

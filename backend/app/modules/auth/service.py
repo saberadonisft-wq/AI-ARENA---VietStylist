@@ -171,32 +171,37 @@ class AuthService:
             header = jwt.get_unverified_header(req.credential)
             if header.get("alg") != "RS256" or not header.get("kid"):
                 raise ValueError("Invalid signing key")
-            async with httpx.AsyncClient(timeout=4.0) as client:
+            async with httpx.AsyncClient(timeout=5.0) as client:
                 response = await client.get("https://www.googleapis.com/oauth2/v3/certs")
                 response.raise_for_status()
             key = next(k for k in response.json()["keys"] if k["kid"] == header["kid"])
-            data = jwt.decode(
-                req.credential, jwt.PyJWK.from_dict(key).key, algorithms=["RS256"],
-                audience=settings.GOOGLE_CLIENT_ID,
-                issuer=["accounts.google.com", "https://accounts.google.com"],
-                options={"require": ["exp", "iat", "sub", "aud", "iss", "email"]},
-            )
+            decode_kwargs = {
+                "algorithms": ["RS256"],
+                "issuer": ["accounts.google.com", "https://accounts.google.com"],
+                "options": {"require": ["exp", "iat", "sub", "aud", "iss", "email"]},
+            }
+            if settings.GOOGLE_CLIENT_ID:
+                decode_kwargs["audience"] = settings.GOOGLE_CLIENT_ID
+            else:
+                decode_kwargs["options"]["verify_aud"] = False
+
+            data = jwt.decode(req.credential, jwt.PyJWK.from_dict(key).key, **decode_kwargs)
             if data.get("email_verified") is not True or not data.get("sub") or not data.get("email"):
                 raise ValueError("Unverified identity")
         except httpx.HTTPError:
-            raise AppError(code="GOOGLE_AUTH_UNAVAILABLE", message="Không thể kết nối Google. Vui lòng thử lại.", status_code=503)
-        except (jwt.PyJWTError, ValueError, KeyError, TypeError, StopIteration):
-            raise AppError(code="GOOGLE_AUTH_FAILED", message="Thông tin xác thực Google không hợp lệ.", status_code=401)
+            raise AppError(code="GOOGLE_AUTH_UNAVAILABLE", message="Không thể kết nối máy chủ Google để xác thực. Vui lòng thử lại.", status_code=503)
+        except (jwt.PyJWTError, ValueError, KeyError, TypeError, StopIteration) as err:
+            raise AppError(code="GOOGLE_AUTH_FAILED", message=f"Thông tin xác thực Google không hợp lệ: {str(err)}", status_code=401)
 
         email = data["email"].strip().lower()
         google_sub = data["sub"]
         display_name = data.get("name") or email.split("@")[0]
         avatar_url = data.get("picture")
 
-        # Kiểm tra tài khoản đã tồn tại chưa
+        # Kiểm tra tài khoản đã tồn tại theo provider_id hoặc email
         existing = Database.fetch_one(
-            "SELECT * FROM accounts WHERE auth_provider = 'google' AND provider_id = ?",
-            (google_sub,),
+            "SELECT * FROM accounts WHERE (auth_provider = 'google' AND provider_id = ?) OR email = ?",
+            (google_sub, email),
         )
 
         if existing:
@@ -204,17 +209,20 @@ class AuthService:
                 raise AppError(code="UNAUTHORIZED", message="Tài khoản đã bị vô hiệu hóa.", status_code=401)
             account_id = existing["id"]
             email = existing["email"]
-            # Cập nhật avatar nếu có
-            if avatar_url and not existing.get("avatar_url"):
-                Database.execute(
-                    "UPDATE accounts SET avatar_url = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-                    (avatar_url, account_id),
-                )
+            # Cập nhật thông tin bổ sung nếu có
+            Database.execute(
+                """
+                UPDATE accounts 
+                SET provider_id = COALESCE(provider_id, ?),
+                    avatar_url = COALESCE(avatar_url, ?),
+                    updated_at = CURRENT_TIMESTAMP 
+                WHERE id = ?
+                """,
+                (google_sub, avatar_url, account_id),
+            )
             roles = cls.get_user_roles(account_id)
             display_name = existing["display_name"]
         else:
-            if Database.fetch_one("SELECT id FROM accounts WHERE email = ?", (email,)):
-                raise AppError(code="ACCOUNT_LINK_REQUIRED", message="Email đã có tài khoản. Vui lòng đăng nhập bằng phương thức đã đăng ký.", status_code=409)
             # Tạo tài khoản mới từ Google
             account_id = f"usr_gg_{uuid.uuid4().hex[:10]}"
             Database.execute(
