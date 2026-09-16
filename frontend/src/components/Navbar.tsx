@@ -149,17 +149,6 @@ export default function Navbar() {
                         </Link>
                       )}
 
-                      <button
-                        onClick={() => {
-                          setShowUserDropdown(false);
-                          setShowAuthModal(true);
-                        }}
-                        className="w-full text-left flex items-center space-x-2 px-3 py-2 text-xs text-stone-700 hover:bg-stone-50 hover:text-heritage-red transition-colors"
-                      >
-                        <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                        <span>Đổi vai trò phân quyền...</span>
-                      </button>
-
                       <div className="border-t border-stone-100 my-1" />
 
                       <button

@@ -159,31 +159,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const quickDemoLogin = async (role: "admin" | "stylist" | "user"): Promise<void> => {
-    setIsLoading(true);
-    const credentials = {
-      admin: { email: "admin@vietstylist.vn", password: "admin123" },
-      stylist: { email: "stylist@vietstylist.vn", password: "stylist123" },
-      user: { email: "user@vietstylist.vn", password: "user123" },
-    }[role];
-
-    try {
-      const res = await api.login(credentials);
-      handleAuthSuccess(res);
-    } finally {
-      setIsLoading(false);
-    }
+  const quickDemoLogin = async (_role?: "admin" | "stylist" | "user"): Promise<void> => {
+    throw new Error("Tài khoản demo đã bị gỡ bỏ theo chính sách bảo mật hệ thống.");
   };
 
   // Hàm tương thích ngược với các component cũ
-  const login = async (userIdOrEmail: string = "user_sinh_vien_01", role: string = "user"): Promise<void> => {
-    if (role === "admin" || userIdOrEmail.includes("admin")) {
-      await quickDemoLogin("admin");
-    } else if (role === "stylist" || userIdOrEmail.includes("stylist")) {
-      await quickDemoLogin("stylist");
-    } else {
-      await quickDemoLogin("user");
-    }
+  const login = async (_userIdOrEmail?: string, _role?: string): Promise<void> => {
+    throw new Error("Vui lòng sử dụng phương thức đăng nhập chính thức bằng Google hoặc Email.");
   };
 
   const logout = () => {

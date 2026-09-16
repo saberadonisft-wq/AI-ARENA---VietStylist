@@ -30,9 +30,9 @@ import {
   Palette,
 } from "lucide-react";
 
-export default function AccountPage() {
+export default function TaiKhoanPage() {
   const router = useRouter();
-  const { user, isLoggedIn, isAdmin, isStylist, isEditor, quickDemoLogin, logout, token } = useAuth();
+  const { user, isLoggedIn, isAdmin, isStylist, logout, token } = useAuth();
   const [showAuthModal, setShowAuthModal] = useState(false);
 
   const [activeTab, setActiveTab] = useState<"outfits" | "drafts" | "privacy" | "system">("outfits");
@@ -198,13 +198,18 @@ export default function AccountPage() {
                     {user ? user.displayName : "Khách vãng lai"}
                   </h1>
                   {isAdmin && (
-                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-purple-100 text-purple-800 border border-purple-200">
-                      <Shield className="w-3 h-3 mr-1" /> Quản trị viên Di sản
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-heritage-red/10 text-heritage-red border border-heritage-red/20">
+                      <Shield className="w-3 h-3 mr-1" /> Quản trị viên Di sản (Admin)
                     </span>
                   )}
-                  {isLoggedIn && !isAdmin && (
-                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">
-                      <Sparkles className="w-3 h-3 mr-1" /> Học sinh / Sinh viên
+                  {isStylist && !isAdmin && (
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-200">
+                      <Sparkles className="w-3 h-3 mr-1" /> Chuyên gia Stylist
+                    </span>
+                  )}
+                  {isLoggedIn && !isAdmin && !isStylist && (
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                      <Sparkles className="w-3 h-3 mr-1" /> Thành viên
                     </span>
                   )}
                   {!isLoggedIn && (
@@ -219,59 +224,39 @@ export default function AccountPage() {
               </div>
             </div>
 
-            {/* Chuyển đổi vai trò kiểm thử & Đăng nhập (F13 & F15) */}
-            <div className="bg-stone-50 p-3.5 rounded-xl border border-stone-200 flex flex-col gap-2.5">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-stone-600 uppercase tracking-wider flex items-center gap-1.5">
-                  <Sparkles className="w-3.5 h-3.5 text-amber-600" />
-                  Chuyển đổi vai trò kiểm thử (RBAC):
+            {/* Tùy chọn tài khoản bảo mật */}
+            <div className="bg-stone-50 p-3.5 rounded-xl border border-stone-200 flex flex-col sm:flex-row items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <Shield className="w-4 h-4 text-emerald-600" />
+                <span className="text-xs text-stone-700 font-medium">
+                  {isLoggedIn ? `Tài khoản đã xác thực: ${user?.displayName}` : "Phiên làm việc khách cục bộ"}
                 </span>
-                <button
-                  onClick={() => setShowAuthModal(true)}
-                  className="text-xs text-heritage-red font-medium hover:underline flex items-center gap-1"
-                >
-                  <Lock className="w-3 h-3" />
-                  <span>Đăng nhập / Đăng ký</span>
-                </button>
               </div>
-              <div className="flex items-center space-x-2 flex-wrap gap-y-1.5">
-                <button
-                  onClick={() => quickDemoLogin("user")}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                    isLoggedIn && !isAdmin && !isStylist
-                      ? "bg-heritage-red text-white shadow-xs"
-                      : "bg-white text-stone-700 hover:bg-stone-100 border border-stone-200"
-                  }`}
-                >
-                  🎓 Sinh viên (Học sinh)
-                </button>
-                <button
-                  onClick={() => quickDemoLogin("stylist")}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                    isLoggedIn && isStylist && !isAdmin
-                      ? "bg-amber-600 text-white shadow-xs"
-                      : "bg-white text-stone-700 hover:bg-stone-100 border border-stone-200"
-                  }`}
-                >
-                  🎨 Stylist Pro (Tạo mẫu)
-                </button>
-                <button
-                  onClick={() => quickDemoLogin("admin")}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                    isAdmin
-                      ? "bg-red-800 text-white shadow-xs"
-                      : "bg-white text-stone-700 hover:bg-stone-100 border border-stone-200"
-                  }`}
-                >
-                  👑 Quản trị viên (Admin F15)
-                </button>
-                {isLoggedIn && (
+              <div className="flex items-center space-x-2 w-full sm:w-auto justify-end">
+                {isAdmin && (
+                  <Link
+                    href="/quan-tri"
+                    className="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-heritage-red text-white hover:bg-heritage-red-dark transition-all flex items-center space-x-1.5 shadow-xs"
+                  >
+                    <Shield className="w-3.5 h-3.5" />
+                    <span>Cổng Quản trị F15</span>
+                  </Link>
+                )}
+                {isLoggedIn ? (
                   <button
                     onClick={logout}
-                    className="px-3 py-1.5 rounded-lg text-xs font-medium bg-stone-200 text-stone-700 hover:bg-stone-300 transition-all flex items-center space-x-1 ml-auto"
+                    className="px-3.5 py-1.5 rounded-lg text-xs font-medium bg-white text-stone-700 hover:bg-stone-100 border border-stone-300 transition-all flex items-center space-x-1.5"
                   >
-                    <LogOut className="w-3 h-3" />
+                    <LogOut className="w-3.5 h-3.5" />
                     <span>Đăng xuất</span>
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => setShowAuthModal(true)}
+                    className="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-heritage-red text-white hover:bg-heritage-red-dark transition-all flex items-center space-x-1.5 shadow-xs"
+                  >
+                    <Lock className="w-3.5 h-3.5" />
+                    <span>Đăng nhập tài khoản</span>
                   </button>
                 )}
               </div>

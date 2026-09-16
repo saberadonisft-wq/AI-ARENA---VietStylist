@@ -38,8 +38,6 @@ from app.modules.auth.service import AuthService
 async def lifespan(app: FastAPI):
     # Khởi tạo database và dữ liệu di sản mẫu khi startup
     init_database()
-    # Khởi tạo tài khoản demo phân quyền (Admin, Stylist, Sinh viên)
-    AuthService.seed_default_accounts()
     yield
 
 

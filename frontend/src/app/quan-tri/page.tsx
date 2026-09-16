@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 
 export default function QuanTriPage() {
-  const { user, isLoggedIn, isAdmin, quickDemoLogin } = useAuth();
+  const { user, isLoggedIn, isAdmin } = useAuth();
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [activeTab, setActiveTab] = useState<"items" | "rules" | "articles">("items");
 
@@ -154,20 +154,19 @@ export default function QuanTriPage() {
 
         <div className="flex flex-col gap-2.5 pt-2">
           <button
-            onClick={() => quickDemoLogin("admin")}
+            onClick={() => setShowAuthModal(true)}
             className="w-full py-2.5 px-4 bg-heritage-red hover:bg-heritage-red-dark text-white rounded-xl text-xs font-semibold shadow-sm transition-all flex items-center justify-center space-x-2"
           >
-            <ShieldCheck className="w-4 h-4" />
-            <span>Kích hoạt Quyền Admin (1-chạm Demo)</span>
+            <Lock className="w-3.5 h-3.5" />
+            <span>Đăng nhập tài khoản Quản trị</span>
           </button>
 
-          <button
-            onClick={() => setShowAuthModal(true)}
-            className="w-full py-2 px-4 bg-white hover:bg-stone-50 text-stone-700 rounded-xl text-xs font-medium border border-stone-300 transition-all flex items-center justify-center space-x-1.5"
+          <Link
+            href="/"
+            className="w-full py-2 px-4 bg-white hover:bg-stone-50 text-stone-700 rounded-xl text-xs font-medium border border-stone-300 transition-all flex items-center justify-center space-x-1.5 text-center"
           >
-            <Lock className="w-3.5 h-3.5" />
-            <span>Đăng nhập tài khoản khác</span>
-          </button>
+            <span>Quay về Trang chủ</span>
+          </Link>
         </div>
 
         <AuthModal

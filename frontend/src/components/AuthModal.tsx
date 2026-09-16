@@ -35,7 +35,6 @@ export default function AuthModal({
     loginWithCredentials,
     registerWithCredentials,
     googleLogin,
-    quickDemoLogin,
     isLoading: authContextLoading,
   } = useAuth();
 
@@ -223,28 +222,6 @@ export default function AuthModal({
     }
   };
 
-  const handleQuickDemo = async (role: "admin" | "stylist" | "user") => {
-    setErrorMsg(null);
-    setIsSubmitting(true);
-    try {
-      await quickDemoLogin(role);
-      const roleTitle =
-        role === "admin"
-          ? "Quản trị viên Di sản"
-          : role === "stylist"
-          ? "Chuyên gia Stylist"
-          : "Học sinh / Sinh viên";
-      setSuccessMsg(`Đã đăng nhập thành công với vai trò ${roleTitle}!`);
-      setTimeout(() => {
-        handleClose();
-      }, 500);
-    } catch (err: any) {
-      setErrorMsg(err?.message || "Lỗi khi đăng nhập demo.");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
   const isBusy = isSubmitting || authContextLoading;
 
   return (
@@ -283,71 +260,6 @@ export default function AuthModal({
             </div>
           )}
 
-          {/* Quick 1-Click Role Demo Bar */}
-          <div className="bg-stone-50 border border-stone-200/90 rounded-xl p-3.5 space-y-2.5">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-stone-600 flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-amber-600" />
-                Đăng nhập 1-chạm (Dành cho Giám khảo / Test RBAC)
-              </span>
-              <span className="text-[10px] text-stone-600">3 tài khoản mẫu</span>
-            </div>
-
-            <div className="grid grid-cols-3 gap-2">
-              <button
-                type="button"
-                disabled={isBusy}
-                onClick={() => handleQuickDemo("admin")}
-                className="group flex flex-col items-center justify-center p-2.5 rounded-lg bg-white border border-red-200 hover:border-heritage-red hover:bg-red-50/50 transition-all text-center"
-              >
-                <div className="w-7 h-7 rounded-full bg-red-100 text-heritage-red flex items-center justify-center mb-1 group-hover:scale-105 transition-transform">
-                  <ShieldCheck className="w-4 h-4" />
-                </div>
-                <span className="text-[11px] font-bold text-stone-800 group-hover:text-heritage-red line-clamp-1">
-                  Admin F15
-                </span>
-                <span className="text-[9px] text-stone-600 line-clamp-1">Toàn quyền</span>
-              </button>
-
-              <button
-                type="button"
-                disabled={isBusy}
-                onClick={() => handleQuickDemo("stylist")}
-                className="group flex flex-col items-center justify-center p-2.5 rounded-lg bg-white border border-amber-200 hover:border-amber-600 hover:bg-amber-50/50 transition-all text-center"
-              >
-                <div className="w-7 h-7 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center mb-1 group-hover:scale-105 transition-transform">
-                  <Palette className="w-4 h-4" />
-                </div>
-                <span className="text-[11px] font-bold text-stone-800 group-hover:text-amber-800 line-clamp-1">
-                  Stylist Pro
-                </span>
-                <span className="text-[9px] text-stone-600 line-clamp-1">Phối & Xuất bản</span>
-              </button>
-
-              <button
-                type="button"
-                disabled={isBusy}
-                onClick={() => handleQuickDemo("user")}
-                className="group flex flex-col items-center justify-center p-2.5 rounded-lg bg-white border border-stone-200 hover:border-stone-400 hover:bg-stone-100/60 transition-all text-center"
-              >
-                <div className="w-7 h-7 rounded-full bg-stone-100 text-stone-700 flex items-center justify-center mb-1 group-hover:scale-105 transition-transform">
-                  <UserIcon className="w-4 h-4" />
-                </div>
-                <span className="text-[11px] font-bold text-stone-800 group-hover:text-stone-900 line-clamp-1">
-                  Thành viên
-                </span>
-                <span className="text-[9px] text-stone-600 line-clamp-1">Học sinh / Thử đồ</span>
-              </button>
-            </div>
-          </div>
-
-          <div className="relative flex items-center justify-center">
-            <div className="border-t border-stone-200 w-full" />
-            <span className="bg-white px-3 text-[11px] text-stone-600 uppercase font-medium absolute">
-              hoặc tài khoản thực
-            </span>
-          </div>
-
           {/* Google Sign-in Official GSI Button & Fallback */}
           <div className="w-full flex flex-col items-center justify-center min-h-[44px]">
             <div
@@ -382,6 +294,13 @@ export default function AuthModal({
                 <span>Tiếp tục với Google OAuth</span>
               </button>
             )}
+          </div>
+
+          <div className="relative flex items-center justify-center my-3">
+            <div className="border-t border-stone-200 w-full" />
+            <span className="bg-white px-3 text-[10px] text-stone-500 uppercase font-semibold tracking-wider absolute">
+              hoặc tài khoản mật khẩu
+            </span>
           </div>
 
           {/* Tab Switcher: Đăng nhập / Đăng ký */}

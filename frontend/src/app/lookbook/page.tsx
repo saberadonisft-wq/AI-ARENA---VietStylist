@@ -7,9 +7,11 @@ import { api } from "@/lib/api/client";
 import { useAuth } from "@/lib/auth/context";
 import { FolderHeart, Plus, Share2, Eye, Lock, Globe, Sparkles, Check } from "lucide-react";
 import { LookbookCardSkeleton } from "@/components/ui/Skeleton";
+import AuthModal from "@/components/AuthModal";
 
 export default function LookbookPage() {
-  const { user, isLoggedIn, login } = useAuth();
+  const { user, isLoggedIn } = useAuth();
+  const [showAuthModal, setShowAuthModal] = useState(false);
   const [lookbooks, setLookbooks] = useState<Lookbook[]>([]);
   const [userOutfits, setUserOutfits] = useState<OutfitResponse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -109,7 +111,7 @@ export default function LookbookPage() {
           </button>
         ) : (
           <button
-            onClick={() => login("sinh_vien_01", "user")}
+            onClick={() => setShowAuthModal(true)}
             className="inline-flex items-center space-x-2 px-4 py-2 bg-stone-900 hover:bg-stone-800 text-white rounded-xl text-xs font-semibold shadow-sm transition-all shrink-0"
           >
             <Sparkles className="w-4 h-4 text-heritage-gold" />
@@ -155,7 +157,7 @@ export default function LookbookPage() {
             </p>
           </div>
           <button
-            onClick={() => login("sinh_vien_01", "user")}
+            onClick={() => setShowAuthModal(true)}
             className="px-5 py-2 bg-heritage-red text-white text-xs font-semibold rounded-xl hover:bg-heritage-red-dark transition-all"
           >
             Đăng nhập ngay
@@ -346,6 +348,11 @@ export default function LookbookPage() {
           </div>
         </div>
       )}
+
+      <AuthModal
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+      />
     </div>
   );
 }
