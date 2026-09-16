@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useRef, useImperativeHandle, forwardRef, useState, useEffect } from "react";
-import { Avatar, AssetLayer, SnapshotItem, CatalogItem, ItemTransform } from "@/lib/types/api";
+import { Avatar, AssetLayer, SnapshotItem, CatalogItem } from "@/lib/types/api";
 import {
   RotateCcw,
   RotateCw,
@@ -17,6 +17,13 @@ export interface Canvas2DHandle {
   resetAllTransforms: () => void;
 }
 
+export interface ItemTransform {
+  dx: number;
+  dy: number;
+  scale: number;
+  rotation: number;
+}
+
 export interface Canvas2DProps {
   avatar: Avatar | null;
   layers: AssetLayer[];
@@ -27,8 +34,6 @@ export interface Canvas2DProps {
   backgroundTheme?: "white" | "dopaper";
   selectedSlot?: string | null;
   onSelectItem?: (slot: string) => void;
-  lockedSlots?: string[];
-  onItemsChange?: (items: SnapshotItem[]) => void;
   className?: string;
 }
 
@@ -316,8 +321,6 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
       backgroundTheme = "white",
       selectedSlot: externalSelectedSlot,
       onSelectItem,
-      lockedSlots = [],
-      onItemsChange,
       className = "",
     },
     ref
@@ -335,17 +338,7 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
     }, [externalSelectedSlot]);
 
     // Trạng thái biến đổi của từng slot (dx, dy, scale, rotation)
-    const [transforms, setTransformState] = useState<Record<string, ItemTransform>>({});
-    const transformsRef = useRef<Record<string, ItemTransform>>({});
-    const setTransforms = (update: (previous: Record<string, ItemTransform>) => Record<string, ItemTransform>) => {
-      transformsRef.current = update(transformsRef.current);
-      setTransformState(transformsRef.current);
-    };
-    useEffect(() => {
-      transformsRef.current = {};
-      setTransformState({});
-      setDragSession(null);
-    }, [equippedItems]);
+    const [transforms, setTransforms] = useState<Record<string, ItemTransform>>({});
 
     // Trạng thái kéo chuột đang diễn ra
     const [dragSession, setDragSession] = useState<{
@@ -368,7 +361,6 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
     // Lấy transform hiện hành của món đồ
     const getTransform = (eq: SnapshotItem): ItemTransform => {
       if (transforms[eq.slot]) return transforms[eq.slot];
-      if (eq.transform) return eq.transform;
       const geom = getItemGeometry(eq);
       return {
         dx: geom.defaultDx,
@@ -381,16 +373,18 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
     // Quy đổi tọa độ chuột sang tọa độ viewBox (800 x 1200) của SVG
     const getSvgCoordinates = (e: React.PointerEvent | PointerEvent) => {
       if (!svgRef.current) return { x: 0, y: 0 };
-      const matrix = svgRef.current.getScreenCTM();
-      if (!matrix) return { x: 0, y: 0 };
-      const point = new DOMPoint(e.clientX, e.clientY).matrixTransform(matrix.inverse());
-      return { x: point.x, y: point.y };
+      const rect = svgRef.current.getBoundingClientRect();
+      const scaleX = 800 / rect.width;
+      const scaleY = 1200 / rect.height;
+      return {
+        x: (e.clientX - rect.left) * scaleX,
+        y: (e.clientY - rect.top) * scaleY,
+      };
     };
 
     // Bắt đầu kéo di chuyển
     const handlePointerDownMove = (e: React.PointerEvent, slot: string) => {
       e.stopPropagation();
-      if (lockedSlots.includes(slot)) return;
       e.currentTarget.setPointerCapture(e.pointerId);
       setActiveSlot(slot);
       onSelectItem?.(slot);
@@ -411,7 +405,6 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
     // Bắt đầu kéo tay cầm co dãn (Resize)
     const handlePointerDownResize = (e: React.PointerEvent, slot: string) => {
       e.stopPropagation();
-      if (lockedSlots.includes(slot)) return;
       e.currentTarget.setPointerCapture(e.pointerId);
 
       const pt = getSvgCoordinates(e);
@@ -430,7 +423,6 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
     // Bắt đầu kéo tay cầm xoay (Rotate)
     const handlePointerDownRotate = (e: React.PointerEvent, slot: string) => {
       e.stopPropagation();
-      if (lockedSlots.includes(slot)) return;
       e.currentTarget.setPointerCapture(e.pointerId);
 
       const pt = getSvgCoordinates(e);
@@ -509,24 +501,35 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
     };
 
     const handlePointerUp = () => {
-      if (!dragSession) return;
-      const transform = transformsRef.current[dragSession.slot];
-      if (transform && !lockedSlots.includes(dragSession.slot)) {
-        onItemsChange?.(equippedItems.map(item => item.slot === dragSession.slot ? { ...item, transform } : item));
-      }
       setDragSession(null);
-      setTransforms(() => ({}));
+    };
+
+    useEffect(() => {
+      const handleGlobalPointerUp = () => {
+        if (dragSession) setDragSession(null);
+      };
+      window.addEventListener("pointerup", handleGlobalPointerUp);
+      return () => window.removeEventListener("pointerup", handleGlobalPointerUp);
+    }, [dragSession]);
+
+    const resetSlotTransform = (slot: string) => {
+      const currentEq = equippedItems.find((it) => it.slot === slot);
+      if (!currentEq) return;
+      const geom = getItemGeometry(currentEq);
+      setTransforms((prev) => ({
+        ...prev,
+        [slot]: {
+          dx: geom.defaultDx,
+          dy: geom.defaultDy,
+          scale: geom.defaultScale,
+          rotation: geom.defaultRotation,
+        },
+      }));
     };
 
     const resetAllTransforms = () => {
-      onItemsChange?.(equippedItems.map(item => lockedSlots.includes(item.slot) ? item : { ...item, transform: undefined }));
-      setTransforms(() => ({}));
+      setTransforms({});
       setActiveSlot(null);
-    };
-
-    const commitTransform = (item: SnapshotItem, transform: ItemTransform) => {
-      if (lockedSlots.includes(item.slot)) return;
-      onItemsChange?.(equippedItems.map(eq => eq.slot === item.slot ? { ...eq, transform } : eq));
     };
 
     useImperativeHandle(ref, () => ({
@@ -538,22 +541,7 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
         await new Promise((r) => setTimeout(r, 50));
 
         try {
-          const svgElement = svgRef.current.cloneNode(true) as SVGSVGElement;
-          svgElement.querySelectorAll('[id^="selection-overlay-"]').forEach(element => element.remove());
-          await Promise.all(Array.from(svgElement.querySelectorAll("image")).map(async element => {
-            const href = element.getAttribute("href");
-            if (!href || href.startsWith("data:")) return;
-            const response = await fetch(href);
-            if (!response.ok) throw new Error("Không tải được ảnh trang phục để xuất. Vui lòng thử lại.");
-            const blob = await response.blob();
-            const dataUrl = await new Promise<string>((resolve, reject) => {
-              const reader = new FileReader();
-              reader.onload = () => resolve(String(reader.result));
-              reader.onerror = () => reject(new Error("Không đọc được ảnh trang phục."));
-              reader.readAsDataURL(blob);
-            });
-            element.setAttribute("href", dataUrl);
-          }));
+          const svgElement = svgRef.current;
           const svgString = new XMLSerializer().serializeToString(svgElement);
           const svgBlob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
           const URL = window.URL || window.webkitURL || window;
@@ -563,16 +551,16 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
             const img = new Image();
             img.crossOrigin = "anonymous";
             img.onload = () => {
-              try {
               const canvas = document.createElement("canvas");
-              const targetWidth = ratio === "1:1" ? 1400 : 1440;
-              const targetHeight = ratio === "1:1" ? 1400 : 2560;
+              const targetWidth = 1400;
+              const targetHeight = ratio === "1:1" ? 1400 : 2488;
 
               canvas.width = targetWidth;
               canvas.height = targetHeight;
               const ctx = canvas.getContext("2d");
               if (!ctx) {
-                throw new Error("Không thể khởi tạo Canvas 2D context");
+                reject(new Error("Không thể khởi tạo Canvas 2D context"));
+                return;
               }
 
               if (backgroundTheme === "white") {
@@ -597,7 +585,10 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
               ctx.fillStyle = "#1A202C";
               ctx.font = "bold 34px serif";
               ctx.textAlign = "center";
-              const titleText = "VIETSTYLIST • DI SẢN & PHỐI ĐỒ";
+              const titleText =
+                viewMode === "flatlay"
+                  ? "VIỆT PHỤC REMIX • OOTD FLAT-LAY"
+                  : "VIỆT PHỤC REMIX • CỔ PHỤC STUDIO";
               ctx.fillText(titleText, targetWidth / 2, targetHeight - (ratio === "1:1" ? 48 : 96));
 
               ctx.fillStyle = "#718096";
@@ -608,9 +599,8 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
                 targetHeight - (ratio === "1:1" ? 18 : 55)
               );
 
+              URL.revokeObjectURL(blobURL);
               resolve(canvas.toDataURL("image/png"));
-              } catch (error) { reject(error); }
-              finally { URL.revokeObjectURL(blobURL); }
             };
             img.onerror = (e) => {
               URL.revokeObjectURL(blobURL);
@@ -636,10 +626,7 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
       const geom = getItemGeometry(eq);
       const t = getTransform(eq);
 
-      const realImageUrl = dbItem?.metadata?.transparent_image_url || dbItem?.metadata?.real_image_url;
-      // Existing catalogue asset with a verified transparent cutout.
-      const canvasImageUrl = realImageUrl === "/garments/item_ao_tac_xanh_reu.png"
-        ? "/garments/item_ao_tac_xanh_reu_transparent.png" : realImageUrl;
+      const realImageUrl = (dbItem?.metadata as any)?.real_image_url;
       const customHex = eq.colorHex;
 
       // Tâm quay và co dãn chính xác của món này
@@ -665,19 +652,23 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
               {/* 1. Ảnh thật bóc tách (Cloudflare R2 / Public) */}
               {realImageUrl ? (
                 <image
-                  href={canvasImageUrl}
+                  href={
+                    realImageUrl.includes(".png") && !realImageUrl.includes("_transparent")
+                      ? realImageUrl.replace(".png", "_transparent.png")
+                      : realImageUrl
+                  }
                   x={x}
                   y={y}
                   width={w}
                   height={h}
                   preserveAspectRatio="xMidYMid meet"
-                  style={{ filter: "drop-shadow(0 8px 12px rgba(26, 32, 44, 0.12))" }}
+                  filter="url(#flatlayDropShadow)"
                 />
               ) : layer?.svg_content ? (
                 /* 2. Lớp vẽ SVG */
                 <g
+                  filter="url(#flatlayDropShadow)"
                   style={{
-                    filter: "drop-shadow(0 8px 12px rgba(26, 32, 44, 0.12))",
                     ['--layer-color' as any]: customHex || undefined,
                   }}
                   dangerouslySetInnerHTML={{
@@ -717,53 +708,43 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
       const stemStartY = rotateAtBottom ? y + h + 6 : y - 6;
       const stemEndY = rotateAtBottom ? rotateBtnY - 15 : rotateBtnY + 15;
 
-      // Hiển thị TOÀN BỘ tên trang phục đầy đủ, không cắt ngắn
-      const displayLabel = dbItem?.name || geom.label;
-      const pillWidth = Math.max(180, Math.round(displayLabel.length * 9.8 + 40));
-      const pillHeight = 32;
-      const pillRx = pillHeight / 2;
-
       return (
         <g id={`selection-overlay-${eq.slot}`} transform={transformString} className="select-none pointer-events-auto">
-          {/* 1. Khung Bounding Box viền trung tính (Không màu - fill none để không làm lệch màu trang phục) */}
+          {/* 1. Khung Bounding Box viền đỏ đứt nét */}
           <rect
             x={x - 6}
             y={y - 6}
             width={w + 12}
             height={h + 12}
             rx={6}
-            fill="none"
-            stroke="#475569"
-            strokeWidth={1.6}
-            strokeDasharray="5 4"
+            fill="rgba(155, 44, 44, 0.04)"
+            stroke="#9B2C2C"
+            strokeWidth={2}
+            strokeDasharray="6 4"
             className="pointer-events-none"
           />
 
-          {/* 2. Nhãn tên món đồ (To, rõ ràng, bo góc chuẩn mực) */}
-          <g transform={`translate(${cx}, ${y - 24})`} className="pointer-events-none">
+          {/* 2. Nhãn tên món đồ */}
+          <g transform={`translate(${cx}, ${y - 18})`} className="pointer-events-none">
             <rect
-              x={-pillWidth / 2}
-              y={-pillHeight / 2}
-              width={pillWidth}
-              height={pillHeight}
-              rx={pillRx}
-              fill="#0F172A"
-              stroke="#334155"
-              strokeWidth={1.5}
-              opacity={0.96}
+              x={-75}
+              y={-12}
+              width={150}
+              height={20}
+              rx={10}
+              fill="#1A202C"
+              opacity={0.92}
             />
             <text
               x={0}
               y={0}
               fill="#FFFFFF"
-              fontSize={14}
-              fontFamily="'Be Vietnam Pro', sans-serif"
-              fontWeight="700"
-              letterSpacing="0.25px"
+              fontSize={9.5}
+              fontWeight="bold"
               textAnchor="middle"
               dominantBaseline="middle"
             >
-              {displayLabel}
+              {dbItem?.name ? dbItem.name.slice(0, 18) : geom.label}
             </text>
           </g>
 
@@ -781,19 +762,27 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
               onPointerDown={(e) => handlePointerDownResize(e, eq.slot)}
               onDoubleClick={(e) => {
                 e.stopPropagation();
-                commitTransform(eq, { ...getTransform(eq), scale: geom.defaultScale });
+                // Nhấn đúp vào góc để trở về cỡ gốc 100%
+                setTransforms((prev) => ({
+                  ...prev,
+                  [eq.slot]: {
+                    ...getTransform(eq),
+                    scale: 1,
+                  },
+                }));
               }}
             >
               {/* Vùng bấm lớn (Hit area) */}
               <circle cx={0} cy={0} r={16} fill="transparent" />
-              {/* Chấm tròn tay cầm sắc nét màu trung tính */}
+              {/* Chấm tròn tay cầm sắc nét */}
               <circle
                 cx={0}
                 cy={0}
                 r={6.5}
                 fill="#FFFFFF"
-                stroke="#334155"
-                strokeWidth={2}
+                stroke="#9B2C2C"
+                strokeWidth={2.2}
+                filter="url(#flatlayDropShadow)"
                 className="transition-transform group-hover:scale-125"
               />
               <title>Kéo góc để phóng to/thu nhỏ (Nhấn đúp để về 100%)</title>
@@ -802,26 +791,33 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
 
           {/* 4. Nút xoay duy nhất: Nhấn giữ và kéo chuột để xoay ảnh */}
           <g>
-            {/* Đường gióng đứt nét màu trung tính nối từ viền đến nút xoay */}
+            {/* Đường gióng đứt nét nối từ viền đến nút xoay */}
             <line
               x1={cx}
               y1={stemStartY}
               x2={cx}
               y2={stemEndY}
-              stroke="#64748B"
-              strokeWidth={1.5}
+              stroke="#9B2C2C"
+              strokeWidth={1.8}
               strokeDasharray="3 3"
               className="pointer-events-none"
             />
 
-            {/* Cụm nút tròn xoay ảnh màu trung tính */}
+            {/* Cụm nút tròn xoay ảnh */}
             <g
               transform={`translate(${cx}, ${rotateBtnY})`}
-              className="cursor-grab active:cursor-grabbing group hover:scale-[1.15] transition-transform"
+              className="cursor-grab active:cursor-grabbing group hover:scale-115 transition-transform"
               onPointerDown={(e) => handlePointerDownRotate(e, eq.slot)}
               onDoubleClick={(e) => {
                 e.stopPropagation();
-                commitTransform(eq, { ...getTransform(eq), rotation: geom.defaultRotation });
+                // Nhấn đúp để trở về góc 0°
+                setTransforms((prev) => ({
+                  ...prev,
+                  [eq.slot]: {
+                    ...getTransform(eq),
+                    rotation: 0,
+                  },
+                }));
               }}
             >
               {/* Vùng bấm rộng */}
@@ -830,16 +826,17 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
               <circle
                 cx={0}
                 cy={0}
-                r={14}
+                r={15}
                 fill="#FFFFFF"
-                stroke="#334155"
-                strokeWidth={2}
+                stroke="#9B2C2C"
+                strokeWidth={2.2}
+                filter="url(#flatlayDropShadow)"
               />
-              {/* Icon mũi tên xoay tròn trung tính */}
+              {/* Icon mũi tên xoay tròn */}
               <path
                 d="M-5 -2 A5.5 5.5 0 1 1 5 -2 M5 -5.5 L5 -1 L1.5 -2.5"
                 fill="none"
-                stroke="#334155"
+                stroke="#9B2C2C"
                 strokeWidth={1.8}
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -858,16 +855,12 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
     return (
       <div
         ref={containerRef}
-        className={`relative flex flex-col items-center justify-center rounded-2xl overflow-hidden border border-stone-300 shadow-sm select-none ${
+        className={`relative flex flex-col items-center justify-center rounded-2xl overflow-hidden border border-stone-300 shadow-sm select-none transition-colors duration-300 ${
           backgroundTheme === "white" ? "bg-white" : "bg-[#FAF8F5]"
         } ${className}`}
         style={{
           aspectRatio: aspectRatio === "1:1" ? "1 / 1" : "9 / 16",
-          maxHeight: "78vh",
-          minHeight: "560px",
-          transform: "translateZ(0)",
-          contain: "paint layout",
-          touchAction: "none",
+          maxHeight: "82vh",
           cursor:
             dragSession?.type === "rotate"
               ? "grabbing"
@@ -879,11 +872,11 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
         }}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
-        onPointerCancel={() => { setDragSession(null); setTransforms(() => ({})); }}
+        onPointerCancel={handlePointerUp}
       >
         {/* Nền giấy dó nếu bật theme dopaper */}
         {backgroundTheme === "dopaper" && (
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,var(--tw-gradient-stops))] from-amber-50/70 to-stone-200/50 pointer-events-none" />
+          <div className="absolute inset-0 bg-radial from-amber-50/70 to-stone-200/50 pointer-events-none" />
         )}
 
         {/* SVG Artboard chuẩn 800 x 1200 px */}
@@ -896,33 +889,78 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
             if (!dragSession) setActiveSlot(null);
           }}
         >
-          {/* BẢNG PHỐI ĐỒ FLAT-LAY (OOTD COLLAGE) */}
-          <g id="flatlay-outfit-board">
-            {/* Render tất cả các lớp đồ theo thứ tự z-index */}
-            {equippedItems
-              .slice()
-              .sort((a, b) => {
-                const zA = getItemGeometry(a).zIndex;
-                const zB = getItemGeometry(b).zIndex;
-                return zA - zB;
-              })
-              .map((eq) => renderInteractiveItem(eq))}
+          <defs>
+            <filter id="flatlayDropShadow" x="-30%" y="-30%" width="160%" height="160%">
+              <feDropShadow dx="0" dy="14" stdDeviation="16" floodColor="#1A202C" floodOpacity="0.10" />
+              <feDropShadow dx="0" dy="4" stdDeviation="6" floodColor="#1A202C" floodOpacity="0.06" />
+            </filter>
+          </defs>
 
-            {/* Lớp khung điều khiển của món đang chọn (luôn nằm trên cùng, không bị món khác che khuất) */}
-            {selectedEq && !lockedSlots.includes(selectedEq.slot) && !isExporting && renderSelectionControls(selectedEq)}
-          </g>
+          {/* CHẾ ĐỘ 1: BẢNG PHỐI ĐỒ FLAT-LAY (OOTD COLLAGE) */}
+          {viewMode === "flatlay" ? (
+            <g id="flatlay-outfit-board">
+              {/* Render tất cả các lớp đồ theo thứ tự z-index */}
+              {equippedItems
+                .slice()
+                .sort((a, b) => {
+                  const zA = getItemGeometry(a).zIndex;
+                  const zB = getItemGeometry(b).zIndex;
+                  return zA - zB;
+                })
+                .map((eq) => renderInteractiveItem(eq))}
+
+              {/* Lớp khung điều khiển của món đang chọn (luôn nằm trên cùng, không bị món khác che khuất) */}
+              {selectedEq && !isExporting && renderSelectionControls(selectedEq)}
+            </g>
+          ) : (
+            /* CHẾ ĐỘ 2: NGƯỜI MẪU 2D (AVATAR STUDIO) */
+            <g id="avatar-model-studio">
+              {avatar?.svg_body && (
+                <g id="avatar-base-body" dangerouslySetInnerHTML={{ __html: avatar.svg_body }} />
+              )}
+
+              {layers
+                .slice()
+                .sort((a, b) => a.z_index - b.z_index)
+                .map((layer) => {
+                  if (!layer.svg_content) return null;
+                  const itemConfig = equippedItems.find((it) => it.slot === layer.slot);
+                  const customHex = itemConfig?.colorHex;
+
+                  let processedSvg = layer.svg_content;
+                  if (customHex) {
+                    processedSvg = processedSvg.replaceAll("VAR_COLOR_PRIMARY", customHex);
+                    if (layer.slot === "outerwear" && customHex) {
+                      processedSvg = processedSvg.replaceAll("#1A365D", customHex);
+                    }
+                  }
+
+                  return (
+                    <g
+                      key={layer.id}
+                      id={`layer-${layer.slot}-${layer.item_id}`}
+                      style={{
+                        transform: `translate(${layer.anchor_x}px, ${layer.anchor_y}px) scale(${layer.scale_x}, ${layer.scale_y})`,
+                        ['--layer-color' as any]: customHex || undefined,
+                      }}
+                      dangerouslySetInnerHTML={{ __html: processedSvg }}
+                    />
+                  );
+                })}
+            </g>
+          )}
         </svg>
 
-        {/* Hướng dẫn tương tác (Không dùng backdrop-blur để giữ 60 FPS khi cuộn) */}
-        <div className="absolute bottom-3.5 left-3.5 z-20 flex items-center space-x-2 bg-stone-900/95 text-stone-100 text-xs px-3 py-1.5 rounded-lg font-medium shadow-md pointer-events-none border border-white/10">
-          <Move className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+        {/* Hướng dẫn tương tác */}
+        <div className="absolute bottom-3 left-3 z-20 flex items-center space-x-1.5 bg-stone-900/75 backdrop-blur-md text-white text-[10px] px-2.5 py-1 rounded-lg font-sans pointer-events-none shadow-xs">
+          <Move className="w-3 h-3 text-emerald-400" />
           <span>Kéo để di chuyển • Kéo 4 góc để phóng to/thu nhỏ • Giữ nút tròn để xoay</span>
         </div>
 
         {/* Huy hiệu chế độ */}
-        <div className="absolute bottom-3.5 right-3.5 z-20 flex items-center space-x-2 bg-stone-900/95 text-stone-200 text-xs px-3 py-1.5 rounded-lg font-medium shadow-md pointer-events-none border border-white/10">
-          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-          <span>Bảng Phối Flat-Lay</span>
+        <div className="absolute bottom-3 right-3 z-20 flex items-center space-x-1.5 bg-stone-900/80 backdrop-blur-md text-white text-[10px] px-2.5 py-1 rounded-lg font-mono shadow-xs pointer-events-none">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+          <span>{viewMode === "flatlay" ? "Bảng Phối Flat-Lay" : "Người Mẫu 2D"}</span>
         </div>
       </div>
     );

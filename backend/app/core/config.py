@@ -47,6 +47,7 @@ class Settings(BaseSettings):
     SUPABASE_ANON_KEY: str = ""
     SUPABASE_SERVICE_ROLE_KEY: str = ""
     SUPABASE_JWT_SECRET: str = "your-supabase-jwt-secret-for-local-dev-vietphucremix2026"
+    GOOGLE_CLIENT_ID: str = ""
 
     # Cloudflare R2
     R2_ACCOUNT_ID: str = ""

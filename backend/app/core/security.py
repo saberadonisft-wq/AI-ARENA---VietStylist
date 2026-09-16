@@ -77,7 +77,7 @@ async def get_current_user_optional(authorization: Optional[str] = Header(None))
         return None
 
     # Hỗ trợ dev token cho testing và local
-    if token.startswith("dev-user-"):
+    if settings.ENVIRONMENT == "development" and token.startswith("dev-user-"):
         user_id = token
         roles = ["admin"] if "admin" in user_id else ["user"]
         return AuthenticatedUser(user_id=user_id, email=f"{user_id}@example.com", roles=roles)
@@ -86,6 +86,12 @@ async def get_current_user_optional(authorization: Optional[str] = Header(None))
         payload = verify_supabase_jwt(token)
         user_id = payload.get("sub") or payload.get("user_id")
         if not user_id:
+            return None
+        if settings.ENVIRONMENT != "development" and user_id.startswith("usr_demo_"):
+            return None
+        from app.core.database import Database
+        account = Database.fetch_one("SELECT is_active FROM accounts WHERE id = ?", (user_id,))
+        if account and not account["is_active"]:
             return None
         email = payload.get("email")
         app_metadata = payload.get("app_metadata", {})

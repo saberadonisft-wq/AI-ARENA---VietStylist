@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth/context";
 import { api } from "@/lib/api/client";
 import { OutfitResponse } from "@/lib/types/api";
+import AuthModal from "@/components/AuthModal";
 import {
   User,
   Shield,
@@ -26,11 +27,13 @@ import {
   ArrowRight,
   ShieldAlert,
   Server,
+  Palette,
 } from "lucide-react";
 
 export default function AccountPage() {
   const router = useRouter();
-  const { user, isLoggedIn, isAdmin, isEditor, login, logout, token } = useAuth();
+  const { user, isLoggedIn, isAdmin, isStylist, isEditor, quickDemoLogin, logout, token } = useAuth();
+  const [showAuthModal, setShowAuthModal] = useState(false);
 
   const [activeTab, setActiveTab] = useState<"outfits" | "drafts" | "privacy" | "system">("outfits");
   const [outfits, setOutfits] = useState<OutfitResponse[]>([]);
@@ -216,36 +219,56 @@ export default function AccountPage() {
               </div>
             </div>
 
-            {/* Chuyển đổi tài khoản mô phỏng (Dành cho kiểm thử & đánh giá) */}
-            <div className="bg-stone-50 p-3 rounded-xl border border-stone-200 flex flex-col gap-2">
-              <span className="text-[11px] font-semibold text-stone-500 uppercase tracking-wider">
-                Chuyển đổi vai trò kiểm thử (F13 & F15):
-              </span>
-              <div className="flex items-center space-x-2 flex-wrap gap-y-1">
+            {/* Chuyển đổi vai trò kiểm thử & Đăng nhập (F13 & F15) */}
+            <div className="bg-stone-50 p-3.5 rounded-xl border border-stone-200 flex flex-col gap-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-stone-600 uppercase tracking-wider flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+                  Chuyển đổi vai trò kiểm thử (RBAC):
+                </span>
                 <button
-                  onClick={() => login("user_sinh_vien_01", "user")}
+                  onClick={() => setShowAuthModal(true)}
+                  className="text-xs text-heritage-red font-medium hover:underline flex items-center gap-1"
+                >
+                  <Lock className="w-3 h-3" />
+                  <span>Đăng nhập / Đăng ký</span>
+                </button>
+              </div>
+              <div className="flex items-center space-x-2 flex-wrap gap-y-1.5">
+                <button
+                  onClick={() => quickDemoLogin("user")}
                   className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                    isLoggedIn && !isAdmin
-                      ? "bg-heritage-red text-white shadow-sm"
+                    isLoggedIn && !isAdmin && !isStylist
+                      ? "bg-heritage-red text-white shadow-xs"
                       : "bg-white text-stone-700 hover:bg-stone-100 border border-stone-200"
                   }`}
                 >
-                  Sinh viên (Học viên)
+                  🎓 Sinh viên (Học sinh)
                 </button>
                 <button
-                  onClick={() => login("admin_vietphuc_01", "admin")}
+                  onClick={() => quickDemoLogin("stylist")}
                   className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                    isAdmin
-                      ? "bg-purple-700 text-white shadow-sm"
+                    isLoggedIn && isStylist && !isAdmin
+                      ? "bg-amber-600 text-white shadow-xs"
                       : "bg-white text-stone-700 hover:bg-stone-100 border border-stone-200"
                   }`}
                 >
-                  Quản trị viên (F15)
+                  🎨 Stylist Pro (Tạo mẫu)
+                </button>
+                <button
+                  onClick={() => quickDemoLogin("admin")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                    isAdmin
+                      ? "bg-red-800 text-white shadow-xs"
+                      : "bg-white text-stone-700 hover:bg-stone-100 border border-stone-200"
+                  }`}
+                >
+                  👑 Quản trị viên (Admin F15)
                 </button>
                 {isLoggedIn && (
                   <button
                     onClick={logout}
-                    className="px-3 py-1.5 rounded-lg text-xs font-medium bg-stone-200 text-stone-700 hover:bg-stone-300 transition-all flex items-center space-x-1"
+                    className="px-3 py-1.5 rounded-lg text-xs font-medium bg-stone-200 text-stone-700 hover:bg-stone-300 transition-all flex items-center space-x-1 ml-auto"
                   >
                     <LogOut className="w-3 h-3" />
                     <span>Đăng xuất</span>
@@ -656,6 +679,12 @@ export default function AccountPage() {
           </div>
         )}
       </div>
+
+      {/* Modal Đăng nhập / Phân quyền */}
+      <AuthModal
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+      />
     </div>
   );
 }

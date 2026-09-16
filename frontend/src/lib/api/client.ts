@@ -13,6 +13,8 @@ import {
   HeritageSource,
   Lookbook,
   SolutionForm,
+  AuthUser,
+  AuthResponse,
 } from "../types/api";
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_API_ORIGIN || "http://localhost:4000";
@@ -246,4 +248,22 @@ export const api = {
     body: JSON.stringify(payload),
   }),
   getTryOnJobStatus: (id: string) => apiFetch<any>(`/api/ai/jobs/${id}`),
+
+  // Authentication & Phân quyền RBAC
+  login: (payload: { email: string; password: string }) =>
+    apiFetch<AuthResponse>("/api/auth/login", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  register: (payload: { email: string; password: string; display_name: string; role?: string }) =>
+    apiFetch<AuthResponse>("/api/auth/register", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  googleAuth: (payload: { credential: string }) =>
+    apiFetch<AuthResponse>("/api/auth/google", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  getMe: () => apiFetch<AuthUser>("/api/auth/me"),
 };

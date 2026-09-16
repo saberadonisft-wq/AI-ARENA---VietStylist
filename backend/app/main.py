@@ -30,12 +30,16 @@ from app.modules.media.router import router as media_router
 from app.modules.try_on.router import router as try_on_router
 from app.modules.solution_forms.router import router as solution_forms_router
 from app.modules.admin.router import router as admin_router
+from app.modules.auth.router import router as auth_router
+from app.modules.auth.service import AuthService
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Khởi tạo database và dữ liệu di sản mẫu khi startup
     init_database()
+    # Khởi tạo tài khoản demo phân quyền (Admin, Stylist, Sinh viên)
+    AuthService.seed_default_accounts()
     yield
 
 
@@ -107,6 +111,7 @@ app.include_router(media_router, prefix=api_prefix)
 app.include_router(try_on_router, prefix=api_prefix)
 app.include_router(solution_forms_router, prefix=api_prefix)
 app.include_router(admin_router, prefix=api_prefix)
+app.include_router(auth_router, prefix=api_prefix)
 
 
 if __name__ == "__main__":

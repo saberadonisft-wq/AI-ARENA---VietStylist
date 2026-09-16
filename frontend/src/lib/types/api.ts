@@ -277,3 +277,19 @@ export interface SolutionForm {
   created_at: string;
   updated_at: string;
 }
+
+export interface AuthUser {
+  id: string;
+  email: string;
+  display_name: string;
+  avatar_url?: string | null;
+  roles: string[];
+  auth_provider: string;
+  created_at?: string;
+}
+
+export interface AuthResponse {
+  access_token: string;
+  token_type: string;
+  user: AuthUser;
+}

@@ -77,6 +77,21 @@ class Database:
 
 
 SQLITE_INIT_DDL = """
+-- Accounts (Local & OAuth)
+CREATE TABLE IF NOT EXISTS accounts (
+    id TEXT PRIMARY KEY,
+    email TEXT UNIQUE NOT NULL,
+    password_hash TEXT,
+    salt TEXT,
+    display_name TEXT NOT NULL,
+    avatar_url TEXT,
+    auth_provider TEXT DEFAULT 'local',
+    provider_id TEXT,
+    is_active INTEGER DEFAULT 1,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Profiles & Roles
 CREATE TABLE IF NOT EXISTS profiles (
     id TEXT PRIMARY KEY,
@@ -91,7 +106,7 @@ CREATE TABLE IF NOT EXISTS profiles (
 CREATE TABLE IF NOT EXISTS user_roles (
     id TEXT PRIMARY KEY,
     user_id TEXT NOT NULL,
-    role TEXT NOT NULL CHECK (role IN ('admin', 'editor', 'user')),
+    role TEXT NOT NULL CHECK (role IN ('admin', 'editor', 'user', 'stylist')),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(user_id, role)
 );
@@ -423,6 +438,26 @@ def init_database():
     with get_db_connection() as conn:
         conn.executescript(SQLITE_INIT_DDL)
         conn.commit()
+
+        # CREATE TABLE IF NOT EXISTS does not update constraints on existing databases.
+        role_schema = conn.execute(
+            "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'user_roles'"
+        ).fetchone()[0]
+        if "'stylist'" not in role_schema:
+            conn.execute("BEGIN")
+            conn.execute("""
+                CREATE TABLE user_roles_updated (
+                    id TEXT PRIMARY KEY,
+                    user_id TEXT NOT NULL,
+                    role TEXT NOT NULL CHECK (role IN ('admin', 'editor', 'user', 'stylist')),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(user_id, role)
+                )
+            """)
+            conn.execute("INSERT INTO user_roles_updated SELECT id, user_id, role, created_at FROM user_roles")
+            conn.execute("DROP TABLE user_roles")
+            conn.execute("ALTER TABLE user_roles_updated RENAME TO user_roles")
+            conn.commit()
 
         # Kiểm tra xem đã có dữ liệu heritage_articles chưa
         cur = conn.cursor()

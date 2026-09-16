@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useMemo, useReducer, useCallback } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
   GarmentType,
   Occasion,
@@ -13,7 +13,6 @@ import {
   CulturalCheckResponse,
 } from "@/lib/types/api";
 import { api } from "@/lib/api/client";
-import { DRAFT_KEY, INITIAL_DOCUMENT, studioReducer, parseDraft, sameDocument, mergeUnlockedItems, StudioDraft } from "@/features/studio/state";
 import { useAuth } from "@/lib/auth/context";
 import Canvas2D, { Canvas2DHandle } from "@/features/studio/Canvas2D";
 import SwatchPicker from "@/features/studio/SwatchPicker";
@@ -58,31 +57,33 @@ export default function StudioPage() {
   const [occasions, setOccasions] = useState<Occasion[]>([]);
   const [catalogItems, setCatalogItems] = useState<CatalogItem[]>([]);
   const [avatars, setAvatars] = useState<Avatar[]>([]);
-  const [isInitialLoading, setIsInitialLoading] = useState(true);
-  const [selectedGarmentType, setSelectedGarmentType] = useState("all");
-  const [activeSlot, setActiveSlot] = useState("outerwear");
-  const [history, dispatch] = useReducer(studioReducer, { past: [], present: INITIAL_DOCUMENT, future: [] });
-  const { title: outfitTitle, snapshot } = history.present;
-  const { items: equippedItems, styleMode, overlapDirection } = snapshot;
-  const selectedOccasion = snapshot.occasionId || "ky_yeu";
-  const currentAvatar = avatars.find(avatar => avatar.id === snapshot.avatarId) || null;
-  const lockedSlots = useMemo(() => new Set(snapshot.lockedSlots || []), [snapshot.lockedSlots]);
-  const displayRatio = snapshot.aspectRatio || "9:16";
-  const canvasBackgroundTheme = snapshot.backgroundTheme || "white";
-  const patchSnapshot = (patch: Partial<OutfitSnapshot>) => dispatch({ type: "commit", update: current => ({ ...current, snapshot: { ...current.snapshot, ...patch } }) });
-  const setOutfitTitle = (title: string) => dispatch({ type: "commit", update: current => ({ ...current, title }) });
-  const setSelectedOccasion = (occasionId: string) => patchSnapshot({ occasionId });
-  const setStyleMode = (styleMode: OutfitSnapshot["styleMode"]) => patchSnapshot({ styleMode });
-  const setOverlapDirection = (overlapDirection: OutfitSnapshot["overlapDirection"]) => patchSnapshot({ overlapDirection });
-  const setDisplayRatio = (aspectRatio: "1:1" | "9:16") => patchSnapshot({ aspectRatio });
-  const setCanvasBackgroundTheme = (backgroundTheme: "white" | "dopaper") => patchSnapshot({ backgroundTheme });
-  const [savedOutfit, setSavedOutfit] = useState<{ id: string; revision: number } | null>(null);
-  const [draftReady, setDraftReady] = useState(false);
-  const [studioError, setStudioError] = useState<string | null>(null);
-  const [aiNotice, setAiNotice] = useState<string | null>(null);
-  const saveInFlight = useRef(false);
-  const documentRef = useRef(history.present);
-  documentRef.current = history.present;
+  const [currentAvatar, setCurrentAvatar] = useState<Avatar | null>(null);
+  const [isInitialLoading, setIsInitialLoading] = useState<boolean>(true);
+
+  // Bộ lọc
+  const [selectedGarmentType, setSelectedGarmentType] = useState<string>("all");
+  const [selectedOccasion, setSelectedOccasion] = useState<string>("ky_yeu");
+  const [activeSlot, setActiveSlot] = useState<string>("outerwear");
+
+  // State bộ phối hiện hành (Snapshot F01-F03)
+  const [outfitTitle, setOutfitTitle] = useState<string>("Bản phối Kỷ yếu Cổ phong");
+  const [styleMode, setStyleMode] = useState<"traditional" | "remix">("traditional");
+  const [overlapDirection, setOverlapDirection] = useState<"right_over_left" | "left_over_right">("right_over_left");
+  const [equippedItems, setEquippedItems] = useState<SnapshotItem[]>([
+    { slot: "outerwear", itemId: "item_ngu_than_nam_xanh", variantId: "var_ngu_than_nam_xanh_cham", assetVersion: 1, colorHex: "#1A365D" },
+    { slot: "undergarment", itemId: "item_ao_lot_trang", variantId: "var_ao_lot_trang", assetVersion: 1, colorHex: "#FFFFFF" },
+    { slot: "bottom", itemId: "item_quan_trang_lua", variantId: "var_quan_trang", assetVersion: 1, colorHex: "#FFFFFF" },
+    { slot: "headwear", itemId: "item_khan_van_den", variantId: "var_khan_van_den", assetVersion: 1, colorHex: "#171923" },
+    { slot: "accessory_front", itemId: "item_quat_xep_giay_do", variantId: "var_quat_xep", assetVersion: 1, colorHex: "#9C4221" },
+    { slot: "footwear", itemId: "item_guoc_moc_quai_nhung", variantId: "var_guoc_moc", assetVersion: 1, colorHex: "#4A5568" },
+  ]);
+
+  // Khóa món (Item lock F02)
+  const [lockedSlots, setLockedSlots] = useState<Set<string>>(new Set());
+
+  // Lịch sử Undo/Redo (F02)
+  const [historyStack, setHistoryStack] = useState<SnapshotItem[][]>([]);
+  const [historyIndex, setHistoryIndex] = useState<number>(-1);
 
   // Lớp vẽ render
   const [layers, setLayers] = useState<AssetLayer[]>([]);
@@ -105,8 +106,13 @@ export default function StudioPage() {
   const [aiPrompt, setAiPrompt] = useState("");
   const [isAiLoading, setIsAiLoading] = useState(false);
 
+  // Tỷ lệ khung hình hiển thị
+  const [displayRatio, setDisplayRatio] = useState<"1:1" | "9:16">("9:16");
+
+  const [canvasBackgroundTheme, setCanvasBackgroundTheme] = useState<"white" | "dopaper">("white");
+
   // Thông báo khôi phục bản nháp & giải thích văn hóa Hữu nhậm
-  const [draftNotice, setDraftNotice] = useState<StudioDraft | null>(null);
+  const [draftNotice, setDraftNotice] = useState<any | null>(null);
   const [showHuuNhamInfo, setShowHuuNhamInfo] = useState(false);
 
   // Bảng phối màu Ngũ Hành 1 chạm (Tối ưu trải nghiệm F02/F07)
@@ -165,7 +171,7 @@ export default function StudioPage() {
     Promise.all([
       api.getGarmentTypes(),
       api.getOccasions(),
-      api.getAllCatalogItems(),
+      api.getCatalogItems(),
       api.getAvatars(),
     ])
       .then(([gt, occ, items, avts]) => {
@@ -173,75 +179,114 @@ export default function StudioPage() {
         setOccasions(occ);
         setCatalogItems(items);
         setAvatars(avts);
-
+        if (avts.length > 0) setCurrentAvatar(avts[0]);
       })
-      .catch((err) => setStudioError("Không tải được kho trang phục: " + err.message))
+      .catch((err) => console.error("Lỗi khởi tạo Studio:", err))
       .finally(() => setIsInitialLoading(false));
   }, []);
 
+  // Cập nhật lớp vẽ dựa trên các món đang chọn
   useEffect(() => {
-    setLayers(equippedItems.flatMap(item => {
-      const layer = catalogItems.find(ci => ci.id === item.itemId)?.default_layer;
-      return layer ? [layer] : [];
-    }));
-  }, [equippedItems, catalogItems]);
+    const loadedLayers: AssetLayer[] = [];
+    equippedItems.forEach((it) => {
+      const dbItem = catalogItems.find((ci) => ci.id === it.itemId);
+      if (dbItem?.default_layer) {
+        loadedLayers.push(dbItem.default_layer);
+      }
+    });
+    setLayers(loadedLayers);
 
-  // Ignore stale results when the outfit changes while a request is running.
-  useEffect(() => {
-    let cancelled = false;
-    setCulturalCheck(null);
-    const timer = window.setTimeout(() => {
-      const outerwear = equippedItems.find(item => item.slot === "outerwear");
-      api.checkCulturalCompliance({
-        garment_type_id: catalogItems.find(item => item.id === outerwear?.itemId)?.garment_type_id,
-        occasion_id: selectedOccasion, style_mode: styleMode, overlap_direction: overlapDirection,
-        items: equippedItems.map(item => ({ slot: item.slot, item_id: item.itemId, variant_id: item.variantId, color_hex: item.colorHex })),
-      }).then(result => { if (!cancelled) setCulturalCheck(result); })
-        .catch(() => { if (!cancelled) setCulturalCheck(null); });
-    }, 200);
-    return () => { cancelled = true; window.clearTimeout(timer); };
-  }, [equippedItems, catalogItems, selectedOccasion, styleMode, overlapDirection]);
+    // Chạy kiểm tra quy chuẩn văn hóa thời gian thực (F10)
+    api
+      .checkCulturalCompliance({
+        garment_type_id: selectedGarmentType === "all" ? undefined : selectedGarmentType,
+        occasion_id: selectedOccasion,
+        style_mode: styleMode,
+        overlap_direction: overlapDirection,
+        items: equippedItems.map((it) => ({
+          slot: it.slot,
+          item_id: it.itemId,
+          variant_id: it.variantId,
+          color_hex: it.colorHex,
+        })),
+      })
+      .then((res) => setCulturalCheck(res))
+      .catch((err) => console.error("Lỗi kiểm tra văn hóa:", err));
 
-  useEffect(() => {
-    let cancelled = false;
-    const loadId = new URLSearchParams(window.location.search).get("loadOutfit");
-    let localDraft: StudioDraft | null = null;
-    try { localDraft = parseDraft(localStorage.getItem(DRAFT_KEY)); } catch { /* Storage unavailable. */ }
-    if (loadId) {
-      api.getOutfit(loadId).then(saved => {
-        if (cancelled) return;
-        if (!saved.current_snapshot) throw new Error("Bộ phối chưa có dữ liệu để mở.");
-        dispatch({ type: "replace", document: { title: saved.title, snapshot: saved.current_snapshot } });
-        setSavedOutfit({ id: saved.id, revision: saved.revision });
-        if (localDraft?.outfitId === saved.id &&
-            !sameDocument(localDraft, parseDraft(JSON.stringify({ title: saved.title, snapshot: saved.current_snapshot }))!)) {
-          setDraftNotice(localDraft);
-        }
-        setDraftReady(true);
-      }).catch(err => { if (!cancelled) setStudioError("Không mở được bộ phối: " + err.message); });
-    } else {
-      setDraftNotice(localDraft);
-      setDraftReady(true);
+    // Tự động lưu bản nháp Studio cục bộ (F13 - khách vãng lai)
+    try {
+      if (typeof window !== "undefined") {
+        localStorage.setItem(
+          "viet_stylist_current_draft",
+          JSON.stringify({
+            title: outfitTitle,
+            occasionId: selectedOccasion,
+            styleMode: styleMode,
+            overlapDirection: overlapDirection,
+            snapshot: {
+              schemaVersion: 1,
+              avatarId: currentAvatar?.id || "avatar_nam_chuan",
+              poseId: "front_01",
+              occasionId: selectedOccasion,
+              styleMode: styleMode,
+              overlapDirection: overlapDirection,
+              items: equippedItems,
+            },
+          })
+        );
+      }
+    } catch {
+      // Bỏ qua lỗi quota
     }
-    return () => { cancelled = true; };
+  }, [equippedItems, catalogItems, selectedGarmentType, selectedOccasion, styleMode, overlapDirection, outfitTitle, currentAvatar]);
+
+  // Kiểm tra tham số tải bộ phối từ URL (?loadOutfit=id)
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const loadId = params.get("loadOutfit");
+      if (loadId) {
+        api.getOutfit(loadId)
+          .then((saved) => {
+            if (saved) {
+              setOutfitTitle(saved.title);
+              if (saved.occasion_id) setSelectedOccasion(saved.occasion_id);
+              if (saved.style_mode) setStyleMode(saved.style_mode as any);
+              if (saved.current_snapshot?.items) {
+                setEquippedItems(saved.current_snapshot.items);
+              }
+              if (saved.current_snapshot?.overlapDirection) {
+                setOverlapDirection(saved.current_snapshot.overlapDirection as any);
+              }
+            }
+          })
+          .catch((err) => console.warn("Không tải được outfit từ link:", err));
+      }
+    }
   }, []);
 
-  useEffect(() => {
-    if (!draftReady || draftNotice) return;
-    try {
-      localStorage.setItem(DRAFT_KEY, JSON.stringify({ ...history.present,
-        occasionId: snapshot.occasionId, styleMode: snapshot.styleMode,
-        overlapDirection: snapshot.overlapDirection,
-        outfitId: savedOutfit?.id, revision: savedOutfit?.revision }));
-    } catch { setStudioError("Không thể lưu bản nháp trên thiết bị. Hãy lưu bộ phối trước khi đóng trang."); }
-  }, [history.present, snapshot, savedOutfit, draftReady, draftNotice]);
+  // Lưu lịch sử Undo/Redo khi đổi đồ
+  const pushHistory = (newItems: SnapshotItem[]) => {
+    const nextStack = historyStack.slice(0, historyIndex + 1);
+    nextStack.push(newItems);
+    setHistoryStack(nextStack);
+    setHistoryIndex(nextStack.length - 1);
+    setEquippedItems(newItems);
+  };
 
-  const pushHistory = (items: SnapshotItem[]) => dispatch({ type: "commit", update: current => ({
-    ...current, snapshot: { ...current.snapshot,
-      items: mergeUnlockedItems(current.snapshot.items, items, current.snapshot.lockedSlots || []) },
-  }) });
-  const handleUndo = useCallback(() => dispatch({ type: "undo" }), []);
-  const handleRedo = useCallback(() => dispatch({ type: "redo" }), []);
+  const handleUndo = () => {
+    if (historyIndex > 0) {
+      setHistoryIndex(historyIndex - 1);
+      setEquippedItems(historyStack[historyIndex - 1]);
+    }
+  };
+
+  const handleRedo = () => {
+    if (historyIndex < historyStack.length - 1) {
+      setHistoryIndex(historyIndex + 1);
+      setEquippedItems(historyStack[historyIndex + 1]);
+    }
+  };
 
   // Lắng nghe phím tắt: Ctrl+Z, Ctrl+Y, Esc, Phím số 1-6 đổi slot
   useEffect(() => {
@@ -268,19 +313,43 @@ export default function StudioPage() {
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleUndo, handleRedo]);
+  }, [historyIndex, historyStack]);
+
+  // Kiểm tra xem có bản nháp từ phiên trước không
+  useEffect(() => {
+    try {
+      if (typeof window !== "undefined") {
+        const saved = localStorage.getItem("viet_stylist_current_draft");
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed?.snapshot?.items && parsed.snapshot.items.length > 0) {
+            setDraftNotice(parsed);
+          }
+        }
+      }
+    } catch {
+      // Bỏ qua
+    }
+  }, []);
 
   const handleRestoreDraft = () => {
     if (!draftNotice) return;
-    dispatch({ type: "replace", document: { title: draftNotice.title, snapshot: draftNotice.snapshot } });
-    setSavedOutfit(draftNotice.outfitId && draftNotice.revision ? { id: draftNotice.outfitId, revision: draftNotice.revision } : null);
+    if (draftNotice.title) setOutfitTitle(draftNotice.title);
+    if (draftNotice.occasionId) setSelectedOccasion(draftNotice.occasionId);
+    if (draftNotice.styleMode) setStyleMode(draftNotice.styleMode);
+    if (draftNotice.overlapDirection) setOverlapDirection(draftNotice.overlapDirection);
+    if (draftNotice.snapshot?.items) {
+      setEquippedItems(draftNotice.snapshot.items);
+      pushHistory(draftNotice.snapshot.items);
+    }
     setDraftNotice(null);
   };
 
   const toggleLockSlot = (slot: string) => {
     const next = new Set(lockedSlots);
-    if (next.has(slot)) next.delete(slot); else next.add(slot);
-    patchSnapshot({ lockedSlots: Array.from(next) });
+    if (next.has(slot)) next.delete(slot);
+    else next.add(slot);
+    setLockedSlots(next);
   };
 
   // Chọn món từ catalog
@@ -302,7 +371,7 @@ export default function StudioPage() {
   // Chọn biến thể màu
   const handleSelectVariant = (variant: ItemVariant) => {
     const activeItemConfig = equippedItems.find((it) => it.slot === activeSlot);
-    if (!activeItemConfig || lockedSlots.has(activeSlot) || variant.item_id !== activeItemConfig.itemId) return;
+    if (!activeItemConfig) return;
 
     const newItems = equippedItems.map((it) => {
       if (it.slot === activeSlot) {
@@ -330,7 +399,9 @@ export default function StudioPage() {
 
   // Nạp Starter Outfit (F01)
   const handleLoadStarter = (starter: any) => {
+    setSelectedOccasion(starter.occasion_id);
     setSelectedGarmentType(starter.garment_type_id);
+    setOutfitTitle(starter.title);
 
     const newItems: SnapshotItem[] = starter.items.map((it: any) => {
       const dbItem = catalogItems.find((ci) => ci.id === it.item_id);
@@ -343,39 +414,42 @@ export default function StudioPage() {
         colorHex: chosenVar?.hex_color,
       };
     });
-    dispatch({ type: "commit", update: current => ({ title: starter.title, snapshot: {
-      ...current.snapshot, occasionId: starter.occasion_id, avatarId: starter.avatar_id,
-      items: mergeUnlockedItems(current.snapshot.items, newItems, current.snapshot.lockedSlots || []),
-    } }) });
+    pushHistory(newItems);
   };
 
   // Lưu bộ phối vào database (F08, F13)
   const handleSaveOutfit = async () => {
-    if (saveInFlight.current || !draftReady || draftNotice) return;
-    saveInFlight.current = true;
     setIsSaving(true);
     try {
-      const payload = { title: outfitTitle, occasion_id: snapshot.occasionId, style_mode: styleMode, snapshot };
-      const saved = savedOutfit
-        ? await api.updateOutfit(savedOutfit.id, { ...payload, revision: savedOutfit.revision })
-        : await api.createOutfit(payload);
-      setSavedOutfit({ id: saved.id, revision: saved.revision });
-      window.history.replaceState(null, "", `?loadOutfit=${encodeURIComponent(saved.id)}`);
+      const currentSnapshot: OutfitSnapshot = {
+        schemaVersion: 1,
+        avatarId: currentAvatar?.id || "avatar_nam_chuan",
+        poseId: "front_01",
+        occasionId: selectedOccasion,
+        styleMode: styleMode,
+        overlapDirection: overlapDirection,
+        items: equippedItems,
+      };
+
+      await api.createOutfit({
+        title: outfitTitle,
+        occasion_id: selectedOccasion,
+        style_mode: styleMode,
+        snapshot: currentSnapshot,
+      });
 
       setSaveSuccessMessage("Đã lưu bộ phối thành công!");
       setTimeout(() => setSaveSuccessMessage(null), 3000);
     } catch (err: any) {
       alert("Lỗi khi lưu bộ phối: " + err.message);
     } finally {
-      saveInFlight.current = false;
       setIsSaving(false);
     }
   };
 
   // Trợ lý AI Gemini gợi ý phối đồ (F11)
   const handleAskAIStylist = async () => {
-    if (!aiPrompt.trim() || isAiLoading) return;
-    const requestedDocument = documentRef.current;
+    if (!aiPrompt.trim()) return;
     setIsAiLoading(true);
     try {
       const lockedList = Array.from(lockedSlots).map((slot) => {
@@ -390,14 +464,9 @@ export default function StudioPage() {
         locked_items: lockedList,
       });
 
-      if (documentRef.current !== requestedDocument) {
-        setAiNotice("Bộ phối đã thay đổi trong lúc chờ. Hãy yêu cầu gợi ý lại để giữ chỉnh sửa mới nhất.");
-        return;
-      }
-      setAiNotice(res.source === "gemini" ? "Gợi ý từ Gemini." : "Đang dùng gợi ý có sẵn vì Gemini chưa sẵn sàng.");
       if (res.outfits && res.outfits.length > 0) {
         const recOutfit = res.outfits[0];
-
+        setOutfitTitle(recOutfit.title);
 
         const newItems: SnapshotItem[] = recOutfit.items.map((it: any) => ({
           slot: it.slot,
@@ -406,9 +475,7 @@ export default function StudioPage() {
           assetVersion: 1,
           colorHex: it.hex_color,
         }));
-        dispatch({ type: "commit", update: current => ({ title: recOutfit.title, snapshot: { ...current.snapshot,
-          items: mergeUnlockedItems(current.snapshot.items, newItems, current.snapshot.lockedSlots || []),
-        } }) });
+        pushHistory(newItems);
       }
     } catch (err: any) {
       alert("Trợ lý AI bận: " + err.message);
@@ -448,11 +515,9 @@ export default function StudioPage() {
 
   return (
     <div className="max-w-[1720px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-      {studioError && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-800">{studioError}</p>}
-      {aiNotice && <p role="status" className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">{aiNotice}</p>}
       {/* Banner thông báo khôi phục bản nháp */}
       {draftNotice && (
-        <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200/90 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3 shadow-sm">
+        <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200/90 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3 shadow-xs">
           <div className="flex items-center space-x-3">
             <div className="w-8 h-8 rounded-full bg-amber-200/60 flex items-center justify-center text-amber-800 shrink-0">
               <Sparkles className="w-4 h-4" />
@@ -469,7 +534,7 @@ export default function StudioPage() {
           <div className="flex items-center space-x-2">
             <button
               onClick={handleRestoreDraft}
-              className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold rounded-lg transition-colors shadow-sm"
+              className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold rounded-lg transition-colors shadow-xs"
             >
               Khôi phục bản phối
             </button>
@@ -484,7 +549,7 @@ export default function StudioPage() {
       )}
 
       {/* Top Toolbar: Tên bộ phối, Chế độ, Undo/Redo, Nút Lưu & Xuất */}
-      <div className="bg-white rounded-2xl border border-stone-200/80 p-4 shadow-sm flex flex-wrap items-center justify-between gap-3">
+      <div className="bg-white rounded-2xl border border-stone-200/80 p-4 shadow-xs flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center space-x-3">
           <input
             type="text"
@@ -499,7 +564,7 @@ export default function StudioPage() {
               onClick={() => setStyleMode("traditional")}
               className={`px-3 py-1 rounded-lg transition-all ${
                 styleMode === "traditional"
-                  ? "bg-white text-stone-900 shadow-sm"
+                  ? "bg-white text-stone-900 shadow-xs"
                   : "text-stone-500 hover:text-stone-800"
               }`}
             >
@@ -509,7 +574,7 @@ export default function StudioPage() {
               onClick={() => setStyleMode("remix")}
               className={`px-3 py-1 rounded-lg transition-all ${
                 styleMode === "remix"
-                  ? "bg-heritage-red text-white shadow-sm"
+                  ? "bg-heritage-red text-white shadow-xs"
                   : "text-stone-500 hover:text-stone-800"
               }`}
             >
@@ -525,7 +590,7 @@ export default function StudioPage() {
             <div className="flex items-center bg-stone-100 rounded-lg p-0.5 border border-stone-200">
               <button
                 onClick={handleUndo}
-                disabled={!history.past.length}
+                disabled={historyIndex <= 0}
                 className="p-1.5 rounded-md hover:bg-white text-stone-700 disabled:opacity-30 transition-all"
                 title="Hoàn tác (Ctrl+Z)"
               >
@@ -533,7 +598,7 @@ export default function StudioPage() {
               </button>
               <button
                 onClick={handleRedo}
-                disabled={!history.future.length}
+                disabled={historyIndex >= historyStack.length - 1}
                 className="p-1.5 rounded-md hover:bg-white text-stone-700 disabled:opacity-30 transition-all"
                 title="Làm lại (Ctrl+Y)"
               >
@@ -560,7 +625,15 @@ export default function StudioPage() {
           <button
             onClick={() => {
               if (!pinnedSnapshotA) {
-                setPinnedSnapshotA(structuredClone(snapshot));
+                setPinnedSnapshotA({
+                  schemaVersion: 1,
+                  avatarId: currentAvatar?.id || "avatar_nam_chuan",
+                  poseId: "front_01",
+                  occasionId: selectedOccasion,
+                  styleMode: styleMode,
+                  overlapDirection: overlapDirection,
+                  items: equippedItems,
+                });
               } else {
                 setIsCompareOpen(true);
               }
@@ -587,7 +660,7 @@ export default function StudioPage() {
           {/* Xuất ảnh 2D */}
           <button
             onClick={() => setIsExportOpen(true)}
-            className="flex items-center space-x-1 px-3.5 py-1.5 rounded-lg bg-stone-800 hover:bg-stone-900 text-white text-xs font-semibold transition-all shadow-sm"
+            className="flex items-center space-x-1 px-3.5 py-1.5 rounded-lg bg-stone-800 hover:bg-stone-900 text-white text-xs font-semibold transition-all shadow-xs"
           >
             <Download className="w-3.5 h-3.5" />
             <span>Xuất ảnh (F03)</span>
@@ -596,8 +669,8 @@ export default function StudioPage() {
           {/* Lưu bộ phối */}
           <button
             onClick={handleSaveOutfit}
-            disabled={isSaving || !draftReady || !!draftNotice}
-            className="flex items-center space-x-1 px-3.5 py-1.5 rounded-lg bg-heritage-red hover:bg-heritage-red-dark text-white text-xs font-semibold transition-all shadow-sm disabled:opacity-50"
+            disabled={isSaving}
+            className="flex items-center space-x-1 px-3.5 py-1.5 rounded-lg bg-heritage-red hover:bg-heritage-red-dark text-white text-xs font-semibold transition-all shadow-xs disabled:opacity-50"
           >
             <Save className="w-3.5 h-3.5" />
             <span>{isSaving ? "Đang lưu..." : "Lưu bộ phối"}</span>
@@ -617,7 +690,7 @@ export default function StudioPage() {
         {/* CỘT TRÁI (3 cols): Bối cảnh sự kiện & Kho đồ */}
         <div className="lg:col-span-3 xl:col-span-3 space-y-4">
           {/* Lọc Sự Kiện & Bối Cảnh (F01) */}
-          <div className="bg-white p-4 rounded-2xl border border-stone-200/80 shadow-sm space-y-3">
+          <div className="bg-white p-4 rounded-2xl border border-stone-200/80 shadow-xs space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-stone-500 uppercase tracking-wider">
                 Hoàn cảnh sử dụng
@@ -634,7 +707,7 @@ export default function StudioPage() {
                     onClick={() => setSelectedOccasion(occ.id)}
                     className={`p-2.5 rounded-xl border text-left transition-all ${
                       selectedOccasion === occ.id
-                        ? "border-heritage-red bg-heritage-red/10 text-heritage-red font-semibold shadow-sm"
+                        ? "border-heritage-red bg-heritage-red/10 text-heritage-red font-semibold shadow-xs"
                         : "border-stone-200 hover:border-stone-300 text-stone-700 bg-stone-50/50"
                     }`}
                   >
@@ -647,7 +720,7 @@ export default function StudioPage() {
           </div>
 
           {/* Lọc Nhóm Áo & Slot */}
-          <div className="bg-white p-4 rounded-2xl border border-stone-200/80 shadow-sm space-y-3">
+          <div className="bg-white p-4 rounded-2xl border border-stone-200/80 shadow-xs space-y-3">
             {/* Tiêu đề mục phân loại */}
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-stone-700 uppercase tracking-wider">
@@ -677,7 +750,7 @@ export default function StudioPage() {
                     onClick={() => setActiveSlot(s.slot)}
                     className={`group relative px-2.5 py-2 rounded-xl text-xs font-semibold text-center transition-all border select-none ${
                       isSelected
-                        ? "bg-stone-900 text-white border-stone-900 shadow-sm"
+                        ? "bg-stone-900 text-white border-stone-900 shadow-xs"
                         : "bg-stone-50 text-stone-700 border-stone-200/80 hover:bg-stone-100 hover:border-stone-300"
                     }`}
                   >
@@ -723,7 +796,7 @@ export default function StudioPage() {
                     overlapDirection === "right_over_left" ? "left_over_right" : "right_over_left"
                   )
                 }
-                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all flex items-center space-x-1.5 border shadow-sm ${
+                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all flex items-center space-x-1.5 border shadow-2xs ${
                   overlapDirection === "right_over_left"
                     ? "bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100"
                     : "bg-red-50 text-red-800 border-red-200 hover:bg-red-100"
@@ -752,7 +825,7 @@ export default function StudioPage() {
                       onClick={() => handleSelectItem(item)}
                       className={`p-2.5 rounded-xl border flex items-center space-x-3 cursor-pointer transition-colors duration-150 ${
                         isEquipped
-                          ? "border-heritage-red bg-heritage-red/5 ring-[1.5px] ring-heritage-red shadow-sm"
+                          ? "border-heritage-red bg-heritage-red/5 ring-1.5 ring-heritage-red shadow-xs"
                           : "border-stone-200 hover:border-stone-400 bg-white hover:bg-[#FAF8F5]"
                       }`}
                     >
@@ -795,7 +868,7 @@ export default function StudioPage() {
                                 {item.variants.map((v) => (
                                   <div
                                     key={v.id}
-                                    className="w-2.5 h-2.5 rounded-full border border-white shadow-sm"
+                                    className="w-2.5 h-2.5 rounded-full border border-white shadow-xs"
                                     style={{ backgroundColor: v.hex_color }}
                                     title={v.color_name}
                                   />
@@ -822,7 +895,7 @@ export default function StudioPage() {
         {/* CỘT GIỮA (6 cols): Vùng Artboard Canvas 2D (F03) - Trọng tâm thiết kế */}
         <div className="lg:col-span-6 xl:col-span-6 space-y-3">
           {/* Thanh công cụ Artboard: Chế độ Flat-lay, Nền, Tỉ lệ */}
-          <div className="bg-white p-2.5 rounded-2xl border border-stone-200 shadow-sm space-y-2">
+          <div className="bg-white p-2.5 rounded-2xl border border-stone-200 shadow-xs space-y-2">
             <div className="flex items-center justify-between">
               {/* Tiêu đề Bảng phối Flat-lay OOTD */}
               <div className="flex items-center space-x-2">
@@ -837,7 +910,7 @@ export default function StudioPage() {
                 <button
                   onClick={() => setDisplayRatio("9:16")}
                   className={`px-2.5 py-1 rounded-lg font-mono font-semibold text-xs transition-all ${
-                    displayRatio === "9:16" ? "bg-stone-900 text-white shadow-sm" : "bg-stone-100 text-stone-600 hover:bg-stone-200"
+                    displayRatio === "9:16" ? "bg-stone-900 text-white shadow-xs" : "bg-stone-100 text-stone-600 hover:bg-stone-200"
                   }`}
                   title="Tỉ lệ dọc (Story / TikTok / Reels)"
                 >
@@ -846,7 +919,7 @@ export default function StudioPage() {
                 <button
                   onClick={() => setDisplayRatio("1:1")}
                   className={`px-2.5 py-1 rounded-lg font-mono font-semibold text-xs transition-all ${
-                    displayRatio === "1:1" ? "bg-stone-900 text-white shadow-sm" : "bg-stone-100 text-stone-600 hover:bg-stone-200"
+                    displayRatio === "1:1" ? "bg-stone-900 text-white shadow-xs" : "bg-stone-100 text-stone-600 hover:bg-stone-200"
                   }`}
                   title="Tỉ lệ vuông (Instagram / Feed)"
                 >
@@ -863,7 +936,7 @@ export default function StudioPage() {
                   onClick={() => setCanvasBackgroundTheme("white")}
                   className={`px-2.5 py-1 rounded-md text-xs font-medium border transition-colors ${
                     canvasBackgroundTheme === "white"
-                      ? "bg-stone-900 text-white border-stone-900 shadow-sm"
+                      ? "bg-stone-900 text-white border-stone-900 shadow-xs"
                       : "bg-white text-stone-700 border-stone-200 hover:bg-stone-50"
                   }`}
                 >
@@ -873,7 +946,7 @@ export default function StudioPage() {
                   onClick={() => setCanvasBackgroundTheme("dopaper")}
                   className={`px-2.5 py-1 rounded-md text-xs font-medium border transition-colors ${
                     canvasBackgroundTheme === "dopaper"
-                      ? "bg-heritage-red text-white border-heritage-red shadow-sm"
+                      ? "bg-heritage-red text-white border-heritage-red shadow-xs"
                       : "bg-[#FAF8F5] text-stone-700 border-stone-200 hover:bg-stone-100"
                   }`}
                 >
@@ -903,13 +976,11 @@ export default function StudioPage() {
             backgroundTheme={canvasBackgroundTheme}
             selectedSlot={activeSlot}
             onSelectItem={(slot) => setActiveSlot(slot)}
-            lockedSlots={snapshot.lockedSlots || []}
-            onItemsChange={pushHistory}
             className="w-full"
           />
 
           {/* Trợ lý Gemini gợi ý nhanh */}
-          <div className="bg-white p-3.5 rounded-2xl border border-stone-200 shadow-sm space-y-2">
+          <div className="bg-white p-3.5 rounded-2xl border border-stone-200 shadow-xs space-y-2">
             <div className="flex items-center space-x-1.5 text-xs font-semibold text-stone-900">
               <Sparkles className="w-3.5 h-3.5 text-heritage-red" />
               <span>Trợ lý Gemini Styling (F11)</span>
@@ -948,7 +1019,7 @@ export default function StudioPage() {
           />
 
           {/* Bảng phối màu Ngũ Hành 1 chạm (Tối ưu trải nghiệm F02/F07) */}
-          <div className="bg-white p-4 rounded-2xl border border-stone-200/80 shadow-sm space-y-2.5">
+          <div className="bg-white p-4 rounded-2xl border border-stone-200/80 shadow-xs space-y-2.5">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-stone-500 uppercase tracking-wider flex items-center space-x-1.5">
                 <Sparkles className="w-3.5 h-3.5 text-heritage-gold" />
@@ -965,7 +1036,7 @@ export default function StudioPage() {
                   title={`${pal.name} (${pal.desc}) - Bấm để áp dụng`}
                 >
                   <div
-                    className="w-4 h-4 rounded-full mx-auto mb-1 border border-black/10 shadow-sm"
+                    className="w-4 h-4 rounded-full mx-auto mb-1 border border-black/10 shadow-xs"
                     style={{ backgroundColor: pal.colors.outerwear }}
                   ></div>
                   <div className="text-xs font-bold">{pal.name}</div>
@@ -976,7 +1047,7 @@ export default function StudioPage() {
 
           {/* Bộ chọn Biến thể màu sắc & Chất liệu cho món đang chọn (F02) */}
           {isInitialLoading ? (
-            <div className="bg-white p-4 rounded-2xl border border-stone-200/80 shadow-sm space-y-3">
+            <div className="bg-white p-4 rounded-2xl border border-stone-200/80 shadow-xs space-y-3">
               <div className="flex items-center justify-between">
                 <Skeleton className="h-4 w-32 rounded-md" />
                 <Skeleton className="h-4 w-12 rounded-md" />
@@ -988,12 +1059,10 @@ export default function StudioPage() {
               </div>
             </div>
           ) : activeCatalogItem && activeCatalogItem.variants.length > 0 ? (
-            <div className="bg-white p-4 rounded-2xl border border-stone-200/80 shadow-sm">
+            <div className="bg-white p-4 rounded-2xl border border-stone-200/80 shadow-xs">
               <SwatchPicker
                 variants={activeCatalogItem.variants}
                 selectedVariantId={activeEquippedItem?.variantId}
-                selectedColorHex={activeEquippedItem?.colorHex}
-                disabled={lockedSlots.has(activeSlot)}
                 onSelectVariant={handleSelectVariant}
               />
             </div>
@@ -1019,18 +1088,9 @@ export default function StudioPage() {
           {/* Dự báo Thời tiết & Lời khuyên bối cảnh (F06) */}
           <WeatherWidget
             onApplyWeatherSuggestion={(accessories) => {
-              const normalize = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-              const suggestions = accessories.map(name => catalogItems.find(item =>
-                normalize(item.name).includes(normalize(name).split(" ").slice(0, 2).join(" "))
-              )).filter((item): item is CatalogItem => !!item);
-              const items = new Map(equippedItems.map(item => [item.slot, item]));
-              suggestions.forEach(item => {
-                if (lockedSlots.has(item.slot)) return;
-                const variant = item.variants[0];
-                items.set(item.slot, { slot: item.slot, itemId: item.id, assetVersion: 1, variantId: variant?.id, colorHex: variant?.hex_color });
-              });
-              pushHistory(Array.from(items.values()));
-              if (!suggestions.length) setAiNotice("Kho đồ hiện chưa có phụ kiện khớp gợi ý thời tiết này.");
+              // Tìm phụ kiện tương ứng trong catalog
+              const fan = catalogItems.find((ci) => ci.id === "item_quat_xep_giay_do");
+              if (fan) handleSelectItem(fan);
             }}
           />
         </div>
@@ -1048,12 +1108,24 @@ export default function StudioPage() {
           isOpen={isCompareOpen}
           onClose={() => setIsCompareOpen(false)}
           snapshotA={pinnedSnapshotA}
-          snapshotB={snapshot}
-          onSelectOutfit={(chosen) => dispatch({ type: "commit", update: current => ({ ...current, snapshot: chosen }) })}
+          snapshotB={{
+            schemaVersion: 1,
+            avatarId: currentAvatar?.id || "avatar_nam_chuan",
+            poseId: "front_01",
+            occasionId: selectedOccasion,
+            styleMode: styleMode,
+            overlapDirection: overlapDirection,
+            items: equippedItems,
+          }}
+          onSelectOutfit={(chosen) => {
+            setEquippedItems(chosen.items);
+            setStyleMode(chosen.styleMode as any);
+            setOverlapDirection(chosen.overlapDirection as any);
+          }}
         />
       )}
 
-      {isExportOpen && <ExportModal
+      <ExportModal
         isOpen={isExportOpen}
         onClose={() => setIsExportOpen(false)}
         onExport={async (ratio) => {
@@ -1061,18 +1133,26 @@ export default function StudioPage() {
           return canvasRef.current.exportToDataUrl(ratio);
         }}
         outfitTitle={outfitTitle}
-      />}
+      />
 
       <AITryOnModal
         isOpen={isTryOnOpen}
         onClose={() => setIsTryOnOpen(false)}
-        snapshot={snapshot}
+        snapshot={{
+          schemaVersion: 1,
+          avatarId: currentAvatar?.id || "avatar_nam_chuan",
+          poseId: "front_01",
+          occasionId: selectedOccasion,
+          styleMode: styleMode,
+          overlapDirection: overlapDirection,
+          items: equippedItems,
+        }}
         outfitTitle={outfitTitle}
       />
 
       {/* Modal Giới thiệu Quy chuẩn Văn hóa Hữu Nhậm */}
       {showHuuNhamInfo && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-stone-200">
             <div className="flex items-start justify-between">
               <div className="flex items-center space-x-2.5">

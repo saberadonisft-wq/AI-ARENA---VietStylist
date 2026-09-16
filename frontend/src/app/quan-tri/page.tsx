@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth/context";
 import { apiFetch } from "@/lib/api/client";
+import AuthModal from "@/components/AuthModal";
 import {
   ShieldCheck,
   Plus,
@@ -14,10 +15,12 @@ import {
   AlertTriangle,
   CheckCircle2,
   Check,
+  Lock,
 } from "lucide-react";
 
 export default function QuanTriPage() {
-  const { user, isLoggedIn, isAdmin, login } = useAuth();
+  const { user, isLoggedIn, isAdmin, quickDemoLogin } = useAuth();
+  const [showAuthModal, setShowAuthModal] = useState(false);
   const [activeTab, setActiveTab] = useState<"items" | "rules" | "articles">("items");
 
   // Form thêm item mới
@@ -127,22 +130,51 @@ export default function QuanTriPage() {
 
   if (!isLoggedIn || !isAdmin) {
     return (
-      <div className="max-w-md mx-auto px-4 py-24 text-center space-y-4">
-        <div className="w-12 h-12 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center mx-auto">
-          <ShieldCheck className="w-6 h-6" />
+      <div className="max-w-md mx-auto px-4 py-20 text-center space-y-5">
+        <div className="w-14 h-14 rounded-2xl bg-red-100 text-heritage-red flex items-center justify-center mx-auto shadow-sm">
+          <ShieldCheck className="w-7 h-7" />
         </div>
-        <h2 className="text-xl font-serif font-bold text-stone-900">
-          Khu Vực Quản Trị Viên (Admin Portal F15)
-        </h2>
-        <p className="text-xs text-stone-600 leading-relaxed">
-          Chức năng thêm hiện vật, quản trị kho đồ và duyệt bài viết di sản yêu cầu tài khoản Ban Quản Trị / Biên tập viên.
-        </p>
-        <button
-          onClick={() => login("admin_heritage_editor", "admin")}
-          className="px-5 py-2.5 bg-heritage-red hover:bg-heritage-red-dark text-white rounded-xl text-xs font-semibold shadow-sm transition-all"
-        >
-          Đăng nhập bằng Quyền Admin
-        </button>
+        <div className="space-y-1.5">
+          <h2 className="text-xl font-serif font-bold text-stone-900">
+            Cổng Quản Trị Viên (Admin Portal F15)
+          </h2>
+          <p className="text-xs text-stone-600 leading-relaxed">
+            {isLoggedIn ? (
+              <>
+                Bạn đang đăng nhập với tài khoản <strong>{user?.displayName}</strong> ({user?.roles.join(", ")}).
+                Trang này yêu cầu quyền <strong>Admin / Biên tập viên Di sản</strong>.
+              </>
+            ) : (
+              <>
+                Chức năng quản trị kho đồ, duyệt bài viết và cấu hình quy tắc văn hóa yêu cầu quyền Ban Quản Trị (Admin).
+              </>
+            )}
+          </p>
+        </div>
+
+        <div className="flex flex-col gap-2.5 pt-2">
+          <button
+            onClick={() => quickDemoLogin("admin")}
+            className="w-full py-2.5 px-4 bg-heritage-red hover:bg-heritage-red-dark text-white rounded-xl text-xs font-semibold shadow-sm transition-all flex items-center justify-center space-x-2"
+          >
+            <ShieldCheck className="w-4 h-4" />
+            <span>Kích hoạt Quyền Admin (1-chạm Demo)</span>
+          </button>
+
+          <button
+            onClick={() => setShowAuthModal(true)}
+            className="w-full py-2 px-4 bg-white hover:bg-stone-50 text-stone-700 rounded-xl text-xs font-medium border border-stone-300 transition-all flex items-center justify-center space-x-1.5"
+          >
+            <Lock className="w-3.5 h-3.5" />
+            <span>Đăng nhập tài khoản khác</span>
+          </button>
+        </div>
+
+        <AuthModal
+          isOpen={showAuthModal}
+          onClose={() => setShowAuthModal(false)}
+          defaultRole="admin"
+        />
       </div>
     );
   }
