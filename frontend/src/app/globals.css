@@ -1,0 +1,80 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html, body {
+    scroll-behavior: auto !important;
+    overscroll-behavior-y: none;
+  }
+
+  body {
+    @apply bg-[#FAF8F5] text-[#1A202C] font-sans antialiased selection:bg-heritage-gold/30 selection:text-heritage-red;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: auto;
+  }
+
+  h1, h2, h3, h4, .font-serif-cophong {
+    font-family: 'Noto Serif', 'Playfair Display', Georgia, serif;
+    letter-spacing: -0.015em;
+  }
+}
+
+/* Hiệu ứng Skeleton Shimmer mượt mà cho trải nghiệm nạp dữ liệu */
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.animate-shimmer {
+  animation: shimmer 1.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #F0EAE1;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #C4B5A5;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #9B2C2C;
+}
+
+/* CSS Paged Media phục vụ in ấn / xuất PDF form giải pháp F12 */
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+
+  header, nav, footer, .no-print {
+    display: none !important;
+  }
+
+  .print-page {
+    page-break-after: always;
+    box-shadow: none !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  @page {
+    size: A4;
+    margin: 1.5cm;
+  }
+}

@@ -1,0 +1,70 @@
+# Node / Frontend dependencies
+node_modules/
+*/node_modules/
+.pnp
+.pnp.js
+
+# Next.js build output & caches
+.next/
+*/.next/
+out/
+build/
+dist/
+
+# Python / Backend
+__pycache__/
+*/__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+*/.venv/
+ENV/
+.pytest_cache/
+*.egg-info/
+.coverage
+htmlcov/
+
+# Local databases & media uploads
+backend/*.db
+backend/*.sqlite3
+*.db-journal
+*.db-wal
+*.db-shm
+media_storage/
+backend/local_media/
+*/local_media/
+
+# Environment files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+backend/.env
+frontend/.env.local
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS and Editor files
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+
+# Isolated build and browser test outputs
+.next-test/
+.next-build/
+test-results/
+playwright-report/
+!.vscode/settings.json
