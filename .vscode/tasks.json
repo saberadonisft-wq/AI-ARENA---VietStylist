@@ -1,0 +1,94 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Start VietStylist (Backend + Frontend)",
+      "dependsOn": [
+        "Start Backend (FastAPI)",
+        "Start Frontend (Next.js)"
+      ],
+      "dependsOrder": "parallel",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Start Backend (FastAPI)",
+      "type": "shell",
+      "command": "$pythonExe = Join-Path '${workspaceFolder}' '.venv\\Scripts\\python.exe'; if (-not (Test-Path -LiteralPath $pythonExe)) { $pythonExe = 'python' }; & $pythonExe -m uvicorn app.main:app --app-dir '${workspaceFolder}\\backend' --env-file '${workspaceFolder}\\backend\\.env' --host 127.0.0.1 --port 4000 --reload",
+      "options": {
+        "cwd": "${workspaceFolder}",
+        "shell": {
+          "executable": "powershell.exe",
+          "args": [
+            "-NoProfile",
+            "-Command"
+          ]
+        }
+      },
+      "isBackground": true,
+      "problemMatcher": {
+        "owner": "custom",
+        "pattern": {
+          "regexp": "^$"
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": "^.*$",
+          "endsPattern": "^.*Application startup complete.*$"
+        }
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "group": "vietstylist"
+      },
+      "runOptions": {
+        "instanceLimit": 1
+      }
+    },
+    {
+      "label": "Start Frontend (Next.js)",
+      "type": "process",
+      "command": "npm.cmd",
+      "args": [
+        "run",
+        "dev"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}\\frontend"
+      },
+      "isBackground": true,
+      "problemMatcher": {
+        "owner": "custom",
+        "pattern": {
+          "regexp": "^$"
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": "^.*$",
+          "endsPattern": "^.*Ready in.*$"
+        }
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "group": "vietstylist"
+      },
+      "runOptions": {
+        "instanceLimit": 1
+      }
+    },
+    {
+      "label": "Stop VietStylist",
+      "type": "shell",
+      "command": ".\\stop_dev.bat",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always"
+      }
+    }
+  ]
+}
