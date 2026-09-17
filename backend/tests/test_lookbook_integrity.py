@@ -175,3 +175,4 @@ def test_r08_update_entries_omitted_vs_cleared(isolated_runtime):
 
     fetch_res2 = client.get(f"/api/lookbooks/{lb_id}", headers={"Authorization": f"Bearer {token}"})
     assert len(fetch_res2.json()["entries"]) == 0
+

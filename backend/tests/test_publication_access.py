@@ -75,3 +75,4 @@ def test_r09_draft_heritage_article_is_hidden(isolated_runtime):
     detail_draft = client.get(f"/api/heritage/articles/{draft_slug}")
     assert detail_draft.status_code == 404
     assert detail_draft.json()["error"]["code"] == "ARTICLE_NOT_FOUND"
+

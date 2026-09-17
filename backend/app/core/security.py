@@ -90,18 +90,25 @@ def create_access_token(user_id: str, email: Optional[str] = None, roles: Option
     return jwt.encode(payload, secret, algorithm="HS256")
 
 
-async def get_current_user_optional(authorization: Optional[str] = Header(None)) -> Optional[AuthenticatedUser]:
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+
+bearer_scheme = HTTPBearer(auto_error=False)
+
+
+async def get_current_user_optional(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer_scheme),
+    authorization: Optional[str] = Header(None),
+) -> Optional[AuthenticatedUser]:
     """
     Dependency lấy user nếu có token hợp lệ.
     - Không gửi token: trả về None (Guest).
     - Có gửi token nhưng token sai/hết hạn: trả về lỗi 401, KHÔNG âm thầm hạ quyền xuống Guest.
     """
-    if not authorization:
-        return None
-
-    token = parse_bearer_token(authorization)
+    token = credentials.credentials if credentials else parse_bearer_token(authorization)
     if not token:
-        raise AppError(code="INVALID_TOKEN", message="Header Authorization phải có định dạng 'Bearer <token>'", status_code=status.HTTP_401_UNAUTHORIZED)
+        if authorization:
+            raise AppError(code="INVALID_TOKEN", message="Header Authorization phải có định dạng 'Bearer <token>'", status_code=status.HTTP_401_UNAUTHORIZED)
+        return None
 
     # Dev token chỉ chấp nhận ở môi trường development/test, tuyệt đối cấm ở production
     if token.startswith("dev-user-"):

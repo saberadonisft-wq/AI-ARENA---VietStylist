@@ -754,7 +754,7 @@ Việc tiếp theo:
 - [x] R07: lookbook không gắn version người khác, share projection không lộ thông tin riêng.
 - [x] R08: lookbook create/update atomic, fault injection không mất entry/metadata.
 - [x] R09: draft/unpublished không lộ qua detail/nested/cache; lịch sử owner xử lý đúng.
-- [ ] R10: OpenAPI canonical có đủ routes/schemas/security/errors và drift test.
+- [x] R10: OpenAPI canonical có đủ routes/schemas/security/errors và drift test.
 - [x] R11: origin cấu hình, TTL validated, revoke link và expiry đúng.
 - [x] O01: close connection, transaction API, batch queries/index, số đo query/memory/lock.
 - [ ] O02: sync work không chặn event loop, client reuse, timeout/concurrency có giới hạn.

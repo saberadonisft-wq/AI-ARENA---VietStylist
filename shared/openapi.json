@@ -326,22 +326,149 @@
     "/api/heritage/articles": {
       "get": {
         "tags": [
-          "Heritage Knowledge"
+          "Heritage Knowledge & Stylist Blog"
         ],
         "summary": "List Articles",
-        "description": "Lấy danh sách các bài viết di sản văn hóa đã được thẩm định (F04).",
+        "description": "Lấy danh sách các bài viết / câu chuyện di sản và góc sáng tạo của Stylist.",
         "operationId": "list_articles_api_heritage_articles_get",
+        "parameters": [
+          {
+            "name": "era",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Lọc theo triều đại (Triều Nguyễn, Triều Lê, Lý - Trần, Đương đại Remix)",
+              "title": "Era"
+            },
+            "description": "Lọc theo triều đại (Triều Nguyễn, Triều Lê, Lý - Trần, Đương đại Remix)"
+          },
+          {
+            "name": "category",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Lọc theo chủ đề/thể loại",
+              "title": "Category"
+            },
+            "description": "Lọc theo chủ đề/thể loại"
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Tìm kiếm từ khóa trong tiêu đề hoặc tóm tắt",
+              "title": "Search"
+            },
+            "description": "Tìm kiếm từ khóa trong tiêu đề hoặc tóm tắt"
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
+                  "type": "array",
                   "items": {
                     "$ref": "#/components/schemas/HeritageArticleSummaryResponse"
                   },
-                  "type": "array",
                   "title": "Response List Articles Api Heritage Articles Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Heritage Knowledge & Stylist Blog"
+        ],
+        "summary": "Create Story",
+        "description": "Dành riêng cho Stylist hoặc Admin: Đăng tải câu chuyện / bài viết mới về trang phục truyền thống.",
+        "operationId": "create_story_api_heritage_articles_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateStoryRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -352,10 +479,10 @@
     "/api/heritage/articles/{slug_or_id}": {
       "get": {
         "tags": [
-          "Heritage Knowledge"
+          "Heritage Knowledge & Stylist Blog"
         ],
         "summary": "Get Article Detail",
-        "description": "Xem chi tiết bài viết di sản, cấu trúc may mặc, lịch sử và trích dẫn nguồn.",
+        "description": "Xem chi tiết câu chuyện trang phục, cấu trúc may mặc, lịch sử và trích dẫn nguồn.",
         "operationId": "get_article_detail_api_heritage_articles__slug_or_id__get",
         "parameters": [
           {
@@ -392,10 +519,72 @@
         }
       }
     },
+    "/api/heritage/articles/{id_or_slug}": {
+      "delete": {
+        "tags": [
+          "Heritage Knowledge & Stylist Blog"
+        ],
+        "summary": "Delete Story",
+        "description": "Xóa bài viết câu chuyện trang phục (chỉ dành cho tác giả hoặc Admin).",
+        "operationId": "delete_story_api_heritage_articles__id_or_slug__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id_or_slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Id Or Slug"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/heritage/sources": {
       "get": {
         "tags": [
-          "Heritage Knowledge"
+          "Heritage Knowledge & Stylist Blog"
         ],
         "summary": "List Sources",
         "description": "Lấy danh sách các nguồn thư tịch cổ và tài liệu nghiên cứu học thuật được trích dẫn.",
@@ -676,6 +865,11 @@
         "summary": "List User Outfits",
         "description": "Lấy danh sách các bộ phối của người dùng đã đăng nhập.",
         "operationId": "list_user_outfits_api_outfits_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "authorization",
@@ -726,8 +920,13 @@
           "Outfits & Versions"
         ],
         "summary": "Create Outfit",
-        "description": "Lưu bộ phối mới (hỗ trợ cả khách và người dùng đã đăng nhập).",
+        "description": "Lưu bộ phối mới của người dùng đã đăng nhập (R04).",
         "operationId": "create_outfit_api_outfits_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "authorization",
@@ -786,8 +985,13 @@
           "Outfits & Versions"
         ],
         "summary": "Get Outfit",
-        "description": "Xem thông tin chi tiết và snapshot hiện hành của bộ phối.",
+        "description": "Xem thông tin chi tiết và snapshot hiện hành của bộ phối thuộc sở hữu (R04).",
         "operationId": "get_outfit_api_outfits__outfit_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "outfit_id",
@@ -796,6 +1000,22 @@
             "schema": {
               "type": "string",
               "title": "Outfit Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
             }
           }
         ],
@@ -827,8 +1047,13 @@
           "Outfits & Versions"
         ],
         "summary": "Update Outfit",
-        "description": "Cập nhật bộ phối kèm kiểm tra xung đột revision phiên bản (Optimistic Concurrency).",
+        "description": "Cập nhật bộ phối kèm kiểm tra quyền sở hữu và xung đột revision phiên bản (R04, O03).",
         "operationId": "update_outfit_api_outfits__outfit_id__put",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "outfit_id",
@@ -894,8 +1119,13 @@
           "Outfits & Versions"
         ],
         "summary": "Delete Outfit",
-        "description": "Xóa bộ phối (Soft delete).",
+        "description": "Xóa bộ phối của chính mình (Soft delete, R04).",
         "operationId": "delete_outfit_api_outfits__outfit_id__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "outfit_id",
@@ -995,6 +1225,11 @@
         "summary": "List Lookbooks",
         "description": "Lấy danh sách lookbooks cá nhân của người dùng đã đăng nhập.",
         "operationId": "list_lookbooks_api_lookbooks_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "authorization",
@@ -1047,6 +1282,11 @@
         "summary": "Create Lookbook",
         "description": "Tạo mới một bộ sưu tập Lookbook (F09).",
         "operationId": "create_lookbook_api_lookbooks_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "authorization",
@@ -1107,6 +1347,11 @@
         "summary": "Get Lookbook",
         "description": "Xem chi tiết lookbook và danh sách các bộ phối đính kèm.",
         "operationId": "get_lookbook_api_lookbooks__lookbook_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "lookbook_id",
@@ -1164,6 +1409,11 @@
         "summary": "Update Lookbook",
         "description": "Cập nhật tiêu đề, mô tả hoặc danh sách bộ phối trong lookbook.",
         "operationId": "update_lookbook_api_lookbooks__lookbook_id__put",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "lookbook_id",
@@ -1231,6 +1481,11 @@
         "summary": "Delete Lookbook",
         "description": "Xóa lookbook.",
         "operationId": "delete_lookbook_api_lookbooks__lookbook_id__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "lookbook_id",
@@ -1288,6 +1543,11 @@
         "summary": "Share Lookbook",
         "description": "Tạo liên kết chia sẻ công khai hoặc unlisted với token băm ngẫu nhiên bảo mật cao (F09).",
         "operationId": "share_lookbook_api_lookbooks__lookbook_id__share_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "lookbook_id",
@@ -1333,6 +1593,68 @@
                 "schema": {
                   "$ref": "#/components/schemas/ShareLinkResponse"
                 }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/lookbooks/{lookbook_id}/shares": {
+      "delete": {
+        "tags": [
+          "Lookbooks"
+        ],
+        "summary": "Revoke Lookbook Shares",
+        "description": "Thu hồi toàn bộ liên kết chia sẻ của lookbook.",
+        "operationId": "revoke_lookbook_shares_api_lookbooks__lookbook_id__shares_delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "lookbook_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Lookbook Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
               }
             }
           },
@@ -1398,8 +1720,13 @@
           "Cloudflare R2 Media Management"
         ],
         "summary": "Request Upload Url",
-        "description": "Tạo phiên tải lên file ảnh/video và cấp URL upload có hạn (Direct to R2) (F14).",
+        "description": "Tạo phiên tải lên file ảnh/video và cấp URL upload có hạn (Direct to R2) (F14, R04).",
         "operationId": "request_upload_url_api_media_uploads_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "authorization",
@@ -1458,8 +1785,13 @@
           "Cloudflare R2 Media Management"
         ],
         "summary": "Complete Upload",
-        "description": "Xác nhận hoàn tất upload, kiểm tra HEAD và metadata trên storage trước khi chuyển trạng thái 'ready'.",
+        "description": "Xác nhận hoàn tất upload bởi chính chủ sở hữu phiên tải lên (R04).",
         "operationId": "complete_upload_api_media__media_id__complete_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "media_id",
@@ -1527,8 +1859,13 @@
           "Cloudflare R2 Media Management"
         ],
         "summary": "Get Media Access",
-        "description": "Cấp URL truy cập ngắn hạn cho file riêng tư sau khi xác thực quyền người dùng.",
+        "description": "Cấp URL truy cập ngắn hạn cho file riêng tư sau khi xác thực quyền người dùng (R04, R05).",
         "operationId": "get_media_access_api_media__media_id__access_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "media_id",
@@ -1586,8 +1923,13 @@
           "Cloudflare R2 Media Management"
         ],
         "summary": "Delete Media",
-        "description": "Xóa file khỏi R2 và Supabase.",
+        "description": "Xóa file thuộc sở hữu của người dùng (R04).",
         "operationId": "delete_media_api_media__media_id__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "media_id",
@@ -1637,13 +1979,73 @@
         }
       }
     },
+    "/api/media/local-upload/{media_id}": {
+      "post": {
+        "tags": [
+          "Cloudflare R2 Media Management"
+        ],
+        "summary": "Handle Local Upload By Id",
+        "description": "Upload file cục bộ qua media_id và signed grant (R01, R05).",
+        "operationId": "handle_local_upload_by_id_api_media_local_upload__media_id__post",
+        "parameters": [
+          {
+            "name": "media_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Media Id"
+            }
+          },
+          {
+            "name": "grant",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Grant"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_handle_local_upload_by_id_api_media_local_upload__media_id__post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/media/local-upload": {
       "post": {
         "tags": [
           "Cloudflare R2 Media Management"
         ],
         "summary": "Handle Local Upload",
-        "description": "Endpoint dev lưu file cục bộ khi chạy offline.",
+        "description": "Endpoint dev lưu file cục bộ (chỉ nhận key thuộc pending session hợp lệ, R01).",
         "operationId": "handle_local_upload_api_media_local_upload_post",
         "parameters": [
           {
@@ -1704,7 +2106,7 @@
           "Cloudflare R2 Media Management"
         ],
         "summary": "Serve Local File",
-        "description": "Endpoint dev phục vụ file tĩnh cục bộ.",
+        "description": "Endpoint dev phục vụ file tĩnh cục bộ có kiểm tra grant cho private media (R01, R05).",
         "operationId": "serve_local_file_api_media_files__bucket___file_path__get",
         "parameters": [
           {
@@ -1723,6 +2125,22 @@
             "schema": {
               "type": "string",
               "title": "File Path"
+            }
+          },
+          {
+            "name": "grant",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Grant"
             }
           }
         ],
@@ -1754,8 +2172,13 @@
           "AI Virtual Try-On"
         ],
         "summary": "Create Try On Job",
-        "description": "Tạo tác vụ thử đồ Việt phục trên ảnh người dùng bằng AI (F05).\nTác vụ được đưa vào hàng đợi xử lý bất đồng bộ bởi Worker.",
+        "description": "Tạo tác vụ thử đồ Việt phục trên ảnh người dùng bằng AI (F05).\nHiện chưa tích hợp mô hình sinh ảnh: trả về 503 TRY_ON_UNAVAILABLE (R04, O06).",
         "operationId": "create_try_on_job_api_ai_try_on_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "authorization",
@@ -1814,8 +2237,13 @@
           "AI Virtual Try-On"
         ],
         "summary": "Get Job Status",
-        "description": "Truy vấn trạng thái tác vụ AI (queued -> running -> succeeded/failed) và ảnh kết quả.",
+        "description": "Truy vấn trạng thái tác vụ AI thuộc sở hữu của người dùng (R04).",
         "operationId": "get_job_status_api_ai_jobs__job_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "job_id",
@@ -1873,8 +2301,13 @@
           "Solution Form F12"
         ],
         "summary": "Get Solution Form",
-        "description": "Lấy nội dung form trình bày giải pháp của đội (F12).\nNếu chưa có, tự động khởi tạo bản nháp mẫu với đầy đủ các mục nghiên cứu và văn hóa.",
+        "description": "Lấy nội dung form trình bày giải pháp của người dùng đã đăng nhập (R04).\nNếu chưa có, tự động khởi tạo bản nháp mẫu với đầy đủ các mục nghiên cứu và văn hóa.",
         "operationId": "get_solution_form_api_solution_form_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "authorization",
@@ -1921,8 +2354,13 @@
           "Solution Form F12"
         ],
         "summary": "Update Solution Form",
-        "description": "Cập nhật nội dung form giải pháp, phát hiện xung đột khi mở nhiều tab (F12).",
+        "description": "Cập nhật nội dung form giải pháp, phát hiện xung đột khi mở nhiều tab qua CAS (R04, O03).",
         "operationId": "update_solution_form_api_solution_form_put",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "authorization",
@@ -1983,6 +2421,11 @@
         "summary": "Create Item",
         "description": "Thêm mới trang phục vào kho đồ (Quyền Admin/Editor) (F15).",
         "operationId": "create_item_api_admin_items_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "authorization",
@@ -2041,6 +2484,11 @@
         "summary": "Create Variant",
         "description": "Thêm biến thể màu sắc và chất liệu cho trang phục (F15).",
         "operationId": "create_variant_api_admin_variants_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "authorization",
@@ -2099,6 +2547,11 @@
         "summary": "Create Cultural Rule",
         "description": "Thêm quy tắc kiểm tra văn hóa di sản có trích dẫn nguồn (F15).",
         "operationId": "create_cultural_rule_api_admin_cultural_rules_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "authorization",
@@ -2157,6 +2610,11 @@
         "summary": "Create Heritage Article",
         "description": "Thêm bài viết di sản văn hóa đã thẩm định (F15).",
         "operationId": "create_heritage_article_api_admin_heritage_articles_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "authorization",
@@ -2191,6 +2649,183 @@
             "content": {
               "application/json": {
                 "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/register": {
+      "post": {
+        "tags": [
+          "Authentication & Phân Quyền RBAC"
+        ],
+        "summary": "Đăng ký tài khoản mới bằng Email/Mật khẩu",
+        "operationId": "register_api_auth_register_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/login": {
+      "post": {
+        "tags": [
+          "Authentication & Phân Quyền RBAC"
+        ],
+        "summary": "Đăng nhập bằng Email/Mật khẩu",
+        "operationId": "login_api_auth_login_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/google": {
+      "post": {
+        "tags": [
+          "Authentication & Phân Quyền RBAC"
+        ],
+        "summary": "Đăng nhập hoặc đăng ký nhanh qua Google Auth",
+        "operationId": "google_auth_api_auth_google_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GoogleAuthRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/me": {
+      "get": {
+        "tags": [
+          "Authentication & Phân Quyền RBAC"
+        ],
+        "summary": "Lấy thông tin tài khoản và vai trò của phiên đăng nhập hiện tại",
+        "operationId": "get_me_api_auth_me_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
               }
             }
           },
@@ -2413,6 +3048,28 @@
         ],
         "title": "AssetLayerResponse"
       },
+      "AuthResponse": {
+        "properties": {
+          "access_token": {
+            "type": "string",
+            "title": "Access Token"
+          },
+          "token_type": {
+            "type": "string",
+            "title": "Token Type",
+            "default": "bearer"
+          },
+          "user": {
+            "$ref": "#/components/schemas/UserResponse"
+          }
+        },
+        "type": "object",
+        "required": [
+          "access_token",
+          "user"
+        ],
+        "title": "AuthResponse"
+      },
       "AvatarResponse": {
         "properties": {
           "id": {
@@ -2497,6 +3154,20 @@
           "file"
         ],
         "title": "Body_handle_local_upload_api_media_local_upload_post"
+      },
+      "Body_handle_local_upload_by_id_api_media_local_upload__media_id__post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "format": "binary",
+            "title": "File"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_handle_local_upload_by_id_api_media_local_upload__media_id__post"
       },
       "CityLocation": {
         "properties": {
@@ -3147,6 +3818,124 @@
         "type": "object",
         "title": "CreateShareLinkRequest"
       },
+      "CreateStoryRequest": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 3,
+            "title": "Title"
+          },
+          "short_summary": {
+            "type": "string",
+            "minLength": 10,
+            "title": "Short Summary"
+          },
+          "full_content": {
+            "type": "string",
+            "minLength": 20,
+            "title": "Full Content"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category",
+            "default": "Điển tích Cổ phục"
+          },
+          "era": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Era",
+            "default": "Triều Nguyễn"
+          },
+          "related_garment_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Related Garment Id"
+          },
+          "historical_context": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Historical Context"
+          },
+          "modern_interpretation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Modern Interpretation"
+          },
+          "structural_description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Structural Description"
+          },
+          "cover_image_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image Url"
+          },
+          "read_time_minutes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Read Time Minutes",
+            "default": 5
+          }
+        },
+        "type": "object",
+        "required": [
+          "title",
+          "short_summary",
+          "full_content"
+        ],
+        "title": "CreateStoryRequest"
+      },
       "CreateTryOnJobRequest": {
         "properties": {
           "user_photo_url": {
@@ -3458,6 +4247,21 @@
         ],
         "title": "GarmentTypeResponse"
       },
+      "GoogleAuthRequest": {
+        "properties": {
+          "credential": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Credential",
+            "description": "Google OAuth ID Token JWT"
+          }
+        },
+        "type": "object",
+        "required": [
+          "credential"
+        ],
+        "title": "GoogleAuthRequest"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -3541,6 +4345,121 @@
             "type": "integer",
             "title": "Version"
           },
+          "author_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Author Id"
+          },
+          "author_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Author Name"
+          },
+          "author_role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Author Role",
+            "default": "stylist"
+          },
+          "cover_image_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image Url"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category",
+            "default": "Điển tích Cổ phục"
+          },
+          "era": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Era",
+            "default": "Triều Nguyễn"
+          },
+          "related_garment_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Related Garment Id"
+          },
+          "read_time_minutes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Read Time Minutes",
+            "default": 5
+          },
+          "likes_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Likes Count",
+            "default": 0
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
           "sources": {
             "items": {
               "$ref": "#/components/schemas/ArticleSourceCitation"
@@ -3586,6 +4505,121 @@
           "version": {
             "type": "integer",
             "title": "Version"
+          },
+          "author_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Author Id"
+          },
+          "author_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Author Name"
+          },
+          "author_role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Author Role",
+            "default": "stylist"
+          },
+          "cover_image_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image Url"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category",
+            "default": "Điển tích Cổ phục"
+          },
+          "era": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Era",
+            "default": "Triều Nguyễn"
+          },
+          "related_garment_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Related Garment Id"
+          },
+          "read_time_minutes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Read Time Minutes",
+            "default": 5
+          },
+          "likes_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Likes Count",
+            "default": 0
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
           }
         },
         "type": "object",
@@ -3997,6 +5031,26 @@
           "item_id"
         ],
         "title": "LockedItemInput"
+      },
+      "LoginRequest": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "title": "Email",
+            "description": "Email hoặc tên đăng nhập"
+          },
+          "password": {
+            "type": "string",
+            "title": "Password",
+            "description": "Mật khẩu đăng nhập"
+          }
+        },
+        "type": "object",
+        "required": [
+          "email",
+          "password"
+        ],
+        "title": "LoginRequest"
       },
       "LookbookEntryDetail": {
         "properties": {
@@ -4704,6 +5758,43 @@
           "items"
         ],
         "title": "RecommendedOutfitOutput"
+      },
+      "RegisterRequest": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "title": "Email",
+            "description": "Email đăng ký của người dùng"
+          },
+          "password": {
+            "type": "string",
+            "minLength": 6,
+            "title": "Password",
+            "description": "Mật khẩu (tối thiểu 6 ký tự)"
+          },
+          "display_name": {
+            "type": "string",
+            "minLength": 2,
+            "title": "Display Name",
+            "description": "Tên hiển thị"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "user",
+              "stylist"
+            ],
+            "title": "Role",
+            "default": "user"
+          }
+        },
+        "type": "object",
+        "required": [
+          "email",
+          "password",
+          "display_name"
+        ],
+        "title": "RegisterRequest"
       },
       "RequestUploadUrlInput": {
         "properties": {
@@ -5475,6 +6566,66 @@
         ],
         "title": "UploadUrlResponse"
       },
+      "UserResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "email": {
+            "type": "string",
+            "title": "Email"
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name"
+          },
+          "avatar_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avatar Url"
+          },
+          "roles": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Roles",
+            "default": [
+              "user"
+            ]
+          },
+          "auth_provider": {
+            "type": "string",
+            "title": "Auth Provider",
+            "default": "local"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "email",
+          "display_name"
+        ],
+        "title": "UserResponse"
+      },
       "ValidationError": {
         "properties": {
           "loc": {
@@ -5606,6 +6757,12 @@
           "cached"
         ],
         "title": "WeatherResponse"
+      }
+    },
+    "securitySchemes": {
+      "HTTPBearer": {
+        "type": "http",
+        "scheme": "bearer"
       }
     }
   }
