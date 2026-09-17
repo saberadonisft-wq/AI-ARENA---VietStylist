@@ -71,20 +71,25 @@ class GeminiClient:
         }
 
         try:
-            async with httpx.AsyncClient(timeout=25.0) as client:
-                resp = await client.post(url, json=payload)
-                if resp.status_code == 200:
-                    data = resp.json()
-                    candidates = data.get("candidates", [])
-                    if candidates:
-                        text_response = candidates[0]["content"]["parts"][0]["text"]
-                        parsed = json.loads(text_response)
+            from app.core.http_client import get_shared_async_client
+            client = get_shared_async_client(timeout=25.0)
+            resp = await client.post(url, json=payload)
+            if resp.status_code == 200:
+                data = resp.json()
+                candidates = data.get("candidates", [])
+                if candidates:
+                    text_response = candidates[0]["content"]["parts"][0]["text"]
+                    parsed = json.loads(text_response)
+                    recs = parsed.get("outfits", parsed.get("recommendations", [parsed] if isinstance(parsed, dict) else []))
+                    if isinstance(recs, list) and len(recs) > 0:
                         return {
                             "source": "gemini",
                             "model": self.text_model,
-                            "recommendations": parsed.get("outfits", parsed.get("recommendations", [parsed])),
+                            "recommendations": recs,
                         }
-                logger.warning(f"Gemini API returned status {resp.status_code}, activating fallback")
+                    else:
+                        logger.warning("Gemini output structure invalid (empty recommendations), activating fallback")
+            logger.warning(f"Gemini API returned status {resp.status_code}, activating fallback")
         except Exception as e:
             logger.warning(f"Gemini API call failed: {e}, activating fallback")
 

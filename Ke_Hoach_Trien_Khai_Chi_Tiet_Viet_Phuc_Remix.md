@@ -757,13 +757,13 @@ Việc tiếp theo:
 - [x] R10: OpenAPI canonical có đủ routes/schemas/security/errors và drift test.
 - [x] R11: origin cấu hình, TTL validated, revoke link và expiry đúng.
 - [x] O01: close connection, transaction API, batch queries/index, số đo query/memory/lock.
-- [ ] O02: sync work không chặn event loop, client reuse, timeout/concurrency có giới hạn.
+- [x] O02: sync work không chặn event loop, client reuse, timeout/concurrency có giới hạn.
 - [x] O03: outfit/account atomic, solution form unique+CAS, concurrency tests.
-- [ ] O04: validation/body size/rate limit/error envelope/cache privacy.
-- [ ] O05: Gemini output validation/fallback/quota; weather cache recovery; chất lượng AI báo riêng.
-- [ ] O06: cleanup staging/job an toàn, try-on trung thực unavailable, không xóa rộng.
-- [ ] O07: settings fail closed, unsupported DB scheme rõ lỗi, readiness/metrics/shutdown.
-- [ ] O08: reproducible install/build, versions, fixture trước import, deny outbound test.
+- [x] O04: validation/body size/rate limit/error envelope/cache privacy.
+- [x] O05: Gemini output validation/fallback/quota; weather cache recovery; chất lượng AI báo riêng.
+- [x] O06: cleanup staging/job an toàn, try-on trung thực unavailable, không xóa rộng.
+- [x] O07: settings fail closed, unsupported DB scheme rõ lỗi, readiness/metrics/shutdown.
+- [x] O08: reproducible install/build, versions, fixture trước import, deny outbound test.
 - [ ] FE01–FE05: Frontend tích hợp sau contract, giữ guest draft và xử lý session/privacy đúng.
 - [ ] A7: full tests, end-to-end, benchmark trước/sau, migration restore và smoke staging.
 - [ ] A9: gói bàn giao, backup/rollback, owner review và release gate.

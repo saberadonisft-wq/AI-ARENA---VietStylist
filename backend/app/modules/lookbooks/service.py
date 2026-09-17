@@ -22,9 +22,32 @@ class LookbookService:
     @staticmethod
     def list_user_lookbooks(owner_id: str) -> List[LookbookResponse]:
         rows = LookbookRepository.get_user_lookbooks(owner_id)
+        if not rows:
+            return []
+
+        lookbook_ids = [r["id"] for r in rows]
+        raw_entries = LookbookRepository.get_entries_by_lookbook_ids(lookbook_ids)
+
+        entries_by_lb: Dict[str, List[LookbookEntryDetail]] = {}
+        for e in raw_entries:
+            snap = e.get("snapshot_json")
+            parsed_snap = OutfitSnapshot(**snap) if isinstance(snap, dict) else (OutfitSnapshot(**json.loads(snap)) if isinstance(snap, str) else None)
+            detail = LookbookEntryDetail(
+                id=e["id"],
+                outfit_id=e["outfit_id"],
+                outfit_version_id=e["outfit_version_id"],
+                version_number=e["version_number"],
+                outfit_title=e["outfit_title"],
+                snapshot=parsed_snap or OutfitSnapshot(),
+                preview_image_url=e.get("preview_image_url"),
+                sort_order=e["sort_order"],
+                notes=e.get("notes"),
+            )
+            entries_by_lb.setdefault(e["lookbook_id"], []).append(detail)
+
         result = []
         for r in rows:
-            entries = LookbookService._get_formatted_entries(r["id"])
+            entries = entries_by_lb.get(r["id"], [])
             result.append(LookbookResponse(
                 id=r["id"],
                 owner_id=r["owner_id"],

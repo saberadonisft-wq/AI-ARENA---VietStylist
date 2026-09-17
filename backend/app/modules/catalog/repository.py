@@ -65,8 +65,30 @@ class CatalogRepository:
         return Database.fetch_all("SELECT * FROM item_variants WHERE item_id = ? ORDER BY is_default DESC", (item_id,))
 
     @staticmethod
+    def get_variants_by_item_ids(item_ids: List[str]) -> List[Dict[str, Any]]:
+        if not item_ids:
+            return []
+        placeholders = ", ".join(["?"] * len(item_ids))
+        return Database.fetch_all(f"""
+            SELECT * FROM item_variants
+            WHERE item_id IN ({placeholders})
+            ORDER BY item_id, is_default DESC
+        """, tuple(item_ids))
+
+    @staticmethod
     def get_layers_by_item_id(item_id: str) -> List[Dict[str, Any]]:
         return Database.fetch_all("SELECT * FROM asset_layers WHERE item_id = ? ORDER BY z_index ASC", (item_id,))
+
+    @staticmethod
+    def get_layers_by_item_ids(item_ids: List[str]) -> List[Dict[str, Any]]:
+        if not item_ids:
+            return []
+        placeholders = ", ".join(["?"] * len(item_ids))
+        return Database.fetch_all(f"""
+            SELECT * FROM asset_layers
+            WHERE item_id IN ({placeholders})
+            ORDER BY item_id, z_index ASC
+        """, tuple(item_ids))
 
     @staticmethod
     def get_occasions_by_item_id(item_id: str) -> List[Dict[str, Any]]:

@@ -25,6 +25,26 @@
         }
       }
     },
+    "/ready": {
+      "get": {
+        "tags": [
+          "System"
+        ],
+        "summary": "Ready Check",
+        "description": "Kiểm tra tính sẵn sàng (readiness probe) của database và storage (O07).",
+        "operationId": "ready_check_ready_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/catalog/garment-types": {
       "get": {
         "tags": [

@@ -32,11 +32,27 @@ class CatalogService:
             offset=offset,
         )
 
-        # Attach variants and default layer
+        # Batch fetch variants and layers to eliminate N+1 queries (O01)
+        if not items:
+            return []
+
+        item_ids = [item["id"] for item in items]
+        all_variants = CatalogRepository.get_variants_by_item_ids(item_ids)
+        all_layers = CatalogRepository.get_layers_by_item_ids(item_ids)
+
+        variants_by_item: Dict[str, List[Dict[str, Any]]] = {}
+        for v in all_variants:
+            variants_by_item.setdefault(v["item_id"], []).append(v)
+
+        layers_by_item: Dict[str, List[Dict[str, Any]]] = {}
+        for l in all_layers:
+            layers_by_item.setdefault(l["item_id"], []).append(l)
+
         result = []
         for item in items:
-            variants = CatalogRepository.get_variants_by_item_id(item["id"])
-            layers = CatalogRepository.get_layers_by_item_id(item["id"])
+            item_id = item["id"]
+            variants = variants_by_item.get(item_id, [])
+            layers = layers_by_item.get(item_id, [])
             item_dict = dict(item)
             item_dict["variants"] = variants
             item_dict["default_layer"] = layers[0] if layers else None

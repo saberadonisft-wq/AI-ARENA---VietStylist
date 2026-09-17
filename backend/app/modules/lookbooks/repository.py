@@ -174,6 +174,20 @@ class LookbookRepository:
         """, (lookbook_id,))
 
     @staticmethod
+    def get_entries_by_lookbook_ids(lookbook_ids: List[str]) -> List[Dict[str, Any]]:
+        if not lookbook_ids:
+            return []
+        placeholders = ", ".join(["?"] * len(lookbook_ids))
+        return Database.fetch_all(f"""
+            SELECT e.*, v.snapshot_json, v.preview_image_url, v.version_number, o.id as outfit_id, o.title as outfit_title
+            FROM lookbook_entries e
+            JOIN outfit_versions v ON e.outfit_version_id = v.id
+            JOIN outfits o ON v.outfit_id = o.id
+            WHERE e.lookbook_id IN ({placeholders})
+            ORDER BY e.lookbook_id, e.sort_order ASC
+        """, tuple(lookbook_ids))
+
+    @staticmethod
     def create_share_link(
         link_id: str,
         lookbook_id: Optional[str],

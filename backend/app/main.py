@@ -34,11 +34,17 @@ from app.modules.auth.router import router as auth_router
 from app.modules.auth.service import AuthService
 
 
+from app.core.http_client import close_shared_async_client
+from fastapi.responses import JSONResponse
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Khởi tạo database và dữ liệu di sản mẫu khi startup
     init_database()
     yield
+    # Dọn dẹp tài nguyên khi shutdown (O02, O07)
+    await close_shared_async_client()
 
 
 app = FastAPI(
@@ -77,10 +83,26 @@ app.add_middleware(
 )
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
-# Exception Handlers chuẩn hóa phản hồi lỗi thống nhất
+# Exception Handlers chuẩn hóa phản hồi lỗi thống nhất (O04)
 app.add_exception_handler(AppError, app_error_handler)
 app.add_exception_handler(StarletteHTTPException, http_exception_handler)
 app.add_exception_handler(RequestValidationError, validation_exception_handler)
+
+
+@app.exception_handler(Exception)
+async def generic_exception_handler(request: Request, exc: Exception):
+    request_id = getattr(request.state, "request_id", f"req_{uuid.uuid4().hex[:12]}")
+    return JSONResponse(
+        status_code=500,
+        content={
+            "error": {
+                "code": "INTERNAL_SERVER_ERROR",
+                "message": "Đã xảy ra lỗi hệ thống không mong muốn. Vui lòng liên hệ quản trị viên.",
+                "status_code": 500,
+                "request_id": request_id,
+            }
+        },
+    )
 
 
 # Health check endpoint (an toàn, không lộ thông tin nhạy cảm)
@@ -92,6 +114,37 @@ async def health_check():
         "version": "1.0.0",
         "environment": settings.ENVIRONMENT,
     }
+
+
+# Readiness probe endpoint (O07)
+@app.get("/ready", tags=["System"])
+async def ready_check():
+    """Kiểm tra tính sẵn sàng (readiness probe) của database và storage (O07)."""
+    checks = {}
+    is_ready = True
+
+    try:
+        from app.core.database import Database
+        Database.fetch_one("SELECT 1")
+        checks["database"] = "ok"
+    except Exception as e:
+        checks["database"] = f"error: {str(e)}"
+        is_ready = False
+
+    if settings.is_local_media_enabled():
+        checks["media_storage"] = "local"
+    else:
+        checks["media_storage"] = "r2" if settings.R2_ACCOUNT_ID else "not_configured"
+
+    status_code = 200 if is_ready else 503
+    return JSONResponse(
+        status_code=status_code,
+        content={
+            "status": "ready" if is_ready else "not_ready",
+            "checks": checks,
+            "environment": settings.ENVIRONMENT,
+        },
+    )
 
 
 # Đăng ký các APIRouter theo tiền tố /api

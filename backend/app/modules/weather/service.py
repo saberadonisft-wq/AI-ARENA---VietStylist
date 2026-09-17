@@ -4,6 +4,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Optional, Dict, Any
 import httpx
 from app.core.database import Database
+from app.core.http_client import get_shared_async_client
 from app.modules.weather.schemas import (
     CityLocation,
     WeatherData,
@@ -50,9 +51,9 @@ class WeatherService:
         weather_info = None
         try:
             url = f"https://api.open-meteo.com/v1/forecast?latitude={location.latitude}&longitude={location.longitude}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m"
-            async with httpx.AsyncClient(timeout=5.0) as client:
-                res = await client.get(url)
-                if res.status_code == 200:
+            client = get_shared_async_client(timeout=5.0)
+            res = await client.get(url)
+            if res.status_code == 200:
                     api_data = res.json().get("current", {})
                     temp = api_data.get("temperature_2m", 26.0)
                     app_temp = api_data.get("apparent_temperature", temp)
