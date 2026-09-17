@@ -44,6 +44,7 @@ import {
   SlidersHorizontal,
   BookmarkPlus,
   Compass,
+  ChevronDown,
   X,
   Info,
 } from "lucide-react";
@@ -731,48 +732,36 @@ export default function StudioPage() {
               </span>
             </div>
 
-            {/* Tabs Slot sắp xếp lưới 3 cột x 2 hàng đều đặn, khóa slot tinh gọn */}
-            <div className="grid grid-cols-3 gap-1.5">
-              {[
-                { slot: "outerwear", label: "Áo ngoài" },
-                { slot: "undergarment", label: "Áo lót trong" },
-                { slot: "bottom", label: "Quần" },
-                { slot: "headwear", label: "Khăn vấn" },
-                { slot: "accessory_front", label: "Phụ kiện" },
-                { slot: "footwear", label: "Giày/Guốc" },
-              ].map((s) => {
-                const isLocked = lockedSlots.has(s.slot);
-                const isSelected = activeSlot === s.slot;
-                return (
-                  <button
-                    key={s.slot}
-                    type="button"
-                    onClick={() => setActiveSlot(s.slot)}
-                    className={`group relative px-2.5 py-2 rounded-xl text-xs font-semibold text-center transition-all border select-none ${
-                      isSelected
-                        ? "bg-stone-900 text-white border-stone-900 shadow-xs"
-                        : "bg-stone-50 text-stone-700 border-stone-200/80 hover:bg-stone-100 hover:border-stone-300"
-                    }`}
-                  >
-                    <span className="truncate block">{s.label}</span>
-                    {/* Nút khóa slot tinh tế ở góc, chỉ hiện rõ khi đã khóa hoặc khi rê chuột */}
-                    <span
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        toggleLockSlot(s.slot);
-                      }}
-                      className={`absolute top-1 right-1 p-0.5 rounded cursor-pointer transition-all ${
-                        isLocked
-                          ? "text-amber-500 opacity-100 bg-amber-50 rounded-full"
-                          : "opacity-0 group-hover:opacity-40 hover:!opacity-100 text-current"
-                      }`}
-                      title={isLocked ? "Đã khóa - Giữ nguyên khi tạo ngẫu nhiên" : "Nhấn để khóa món này"}
-                    >
-                      {isLocked ? <Lock className="w-2.5 h-2.5" /> : <Unlock className="w-2.5 h-2.5" />}
-                    </span>
-                  </button>
-                );
-              })}
+            <div className="flex items-center gap-2">
+              <div className="relative min-w-0 flex-1">
+                <select
+                  aria-label="Phân loại trang phục"
+                  value={activeSlot}
+                  onChange={(event) => setActiveSlot(event.target.value)}
+                  className="w-full appearance-none rounded-lg border border-heritage-red bg-white py-2 pl-3 pr-9 text-sm font-medium text-stone-800 cursor-pointer focus:outline-none focus:ring-2 focus:ring-heritage-red/20"
+                >
+                  <option value="outerwear">Áo ngoài</option>
+                  <option value="undergarment">Áo lót trong</option>
+                  <option value="bottom">Quần</option>
+                  <option value="headwear">Khăn vấn</option>
+                  <option value="accessory_front">Phụ kiện</option>
+                  <option value="footwear">Giày/Guốc</option>
+                </select>
+                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-700" />
+              </div>
+              <button
+                type="button"
+                onClick={() => toggleLockSlot(activeSlot)}
+                aria-label={lockedSlots.has(activeSlot) ? "Mở khóa danh mục đang chọn" : "Khóa danh mục đang chọn"}
+                title={lockedSlots.has(activeSlot) ? "Đã khóa - Giữ nguyên khi tạo ngẫu nhiên" : "Khóa danh mục khi tạo ngẫu nhiên"}
+                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border transition-colors ${
+                  lockedSlots.has(activeSlot)
+                    ? "border-amber-300 bg-amber-50 text-amber-600"
+                    : "border-stone-200 bg-white text-stone-500 hover:border-stone-300 hover:text-stone-800"
+                }`}
+              >
+                {lockedSlots.has(activeSlot) ? <Lock className="h-4 w-4" /> : <Unlock className="h-4 w-4" />}
+              </button>
             </div>
 
             {/* Quy cách Cài vạt Cổ phục (Hữu nhậm vs Tả nhậm) gọn gàng */}
