@@ -104,7 +104,7 @@ class HeritageService:
 
     @staticmethod
     def delete_story(story_id: str, user: Dict[str, Any]) -> Dict[str, Any]:
-        article = HeritageRepository.get_article_by_slug_or_id(story_id)
+        article = HeritageRepository.get_article_by_slug_or_id(story_id, published_only=False)
         if not article:
             raise AppError(code="ARTICLE_NOT_FOUND", message="Không tìm thấy bài viết để xóa", status_code=404)
 

@@ -1,4 +1,4 @@
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Literal
 from pydantic import BaseModel, Field
 from app.modules.outfits.schemas import OutfitSnapshot
 
@@ -13,7 +13,9 @@ class CreateLookbookRequest(BaseModel):
     title: str = "Lookbook Cổ Phục"
     description: Optional[str] = None
     cover_image_url: Optional[str] = None
-    visibility: str = "private" # private, unlisted, public
+    visibility: Literal["public", "private", "unlisted"] = (
+        "private"  # private, unlisted, public
+    )
     entries: List[LookbookEntryInput] = []
 
 
@@ -21,7 +23,7 @@ class UpdateLookbookRequest(BaseModel):
     title: Optional[str] = None
     description: Optional[str] = None
     cover_image_url: Optional[str] = None
-    visibility: Optional[str] = None
+    visibility: Optional[Literal["public", "private", "unlisted"]] = None
     entries: Optional[List[LookbookEntryInput]] = None
 
 

@@ -1,5 +1,6 @@
 import json
 import uuid
+import sqlite3
 from typing import Optional, Dict, Any
 from app.modules.solution_forms.schemas import (
     SolutionFormResponse,
@@ -21,42 +22,40 @@ class SolutionFormService:
             default_sol = "Cung cấp Studio phối đồ 2D trực quan trên nền tảng web, tích hợp công cụ kiểm tra quy chuẩn văn hóa có nguồn thư tịch uy tín, gợi ý bối cảnh thời tiết và tạo lookbook chia sẻ."
             default_safe = "Mọi thẻ bài viết đều trích nguồn khảo cứu học thuật (Ngàn năm áo mũ, Khâm định Đại Nam hội điển sự lệ); hệ thống cảnh báo tức thì khi cài sai vạt áo hoặc thiếu khăn vấn lễ phục."
 
-            SolutionFormRepository.create_form(
-                form_id=form_id,
-                owner_id=owner_id,
-                team_name="Đội thi Việt phục Remix",
-                product_name="Việt Dáng Remix (VietStylist)",
-                target_audience=default_target,
-                problem_statement=default_prob,
-                proposed_solution=default_sol,
-                cultural_safeguards=default_safe,
-                lookbook_references_json="[]",
-            )
+            try:
+                SolutionFormRepository.create_form(
+                    form_id=form_id,
+                    owner_id=owner_id,
+                    team_name="Đội thi Việt phục Remix",
+                    product_name="Việt Dáng Remix (VietStylist)",
+                    target_audience=default_target,
+                    problem_statement=default_prob,
+                    proposed_solution=default_sol,
+                    cultural_safeguards=default_safe,
+                    lookbook_references_json="[]",
+                )
+            except sqlite3.IntegrityError:
+                # Tránh race condition khi 2 request cùng tạo form lần đầu
+                pass
+
             form = SolutionFormRepository.get_by_owner_id(owner_id)
 
         return SolutionFormService._format_response(form)
 
     @staticmethod
     def update_form(owner_id: str, req: UpdateSolutionFormRequest) -> SolutionFormResponse:
+        # Đảm bảo form đã tồn tại trước khi cập nhật
         current = SolutionFormRepository.get_by_owner_id(owner_id)
         if not current:
-            # Tạo mới nếu chưa có
             SolutionFormService.get_or_create_form(owner_id)
             current = SolutionFormRepository.get_by_owner_id(owner_id)
 
-        # Kiểm tra xung đột phiên bản
-        if current["revision"] != req.revision:
-            raise AppError(
-                code="REVISION_CONFLICT",
-                message=f"Form giải pháp đã được cập nhật ở phiên làm việc khác (phiên bản {current['revision']}, bạn đang lưu {req.revision}). Vui lòng tải lại trang.",
-                status_code=409,
-            )
-
-        new_rev = current["revision"] + 1
         refs_json = json.dumps([ref.model_dump() for ref in req.lookbook_references], ensure_ascii=False)
 
-        SolutionFormRepository.update_form(
-            form_id=current["id"],
+        # Atomic Compare-And-Swap (CAS) update
+        updated = SolutionFormRepository.update_form_cas(
+            owner_id=owner_id,
+            expected_revision=req.revision,
             team_name=req.team_name,
             product_name=req.product_name,
             target_audience=req.target_audience,
@@ -64,33 +63,43 @@ class SolutionFormService:
             proposed_solution=req.proposed_solution,
             cultural_safeguards=req.cultural_safeguards,
             lookbook_references_json=refs_json,
-            new_revision=new_rev,
             status=req.status,
         )
 
-        updated = SolutionFormRepository.get_by_owner_id(owner_id)
-        return SolutionFormService._format_response(updated)
+        if not updated:
+            latest = SolutionFormRepository.get_by_owner_id(owner_id)
+            latest_rev = latest["revision"] if latest else "unknown"
+            raise AppError(
+                code="REVISION_CONFLICT",
+                message=f"Form giải pháp đã được cập nhật ở phiên làm việc khác (phiên bản hiện tại: {latest_rev}, bạn đang lưu: {req.revision}). Vui lòng tải lại trang trước khi lưu.",
+                status_code=409,
+            )
+
+        latest_form = SolutionFormRepository.get_by_owner_id(owner_id)
+        return SolutionFormService._format_response(latest_form)
 
     @staticmethod
-    def _format_response(r: Dict[str, Any]) -> SolutionFormResponse:
-        refs_raw = r.get("lookbook_references")
-        parsed_refs = []
-        if refs_raw:
-            data = json.loads(refs_raw) if isinstance(refs_raw, str) else refs_raw
-            parsed_refs = [LookbookRef(**item) for item in data]
+    def _format_response(row: Dict[str, Any]) -> SolutionFormResponse:
+        refs = []
+        if row.get("lookbook_references"):
+            try:
+                raw_refs = row["lookbook_references"] if isinstance(row["lookbook_references"], list) else json.loads(row["lookbook_references"])
+                refs = [LookbookRef(**r) for r in raw_refs]
+            except Exception:
+                refs = []
 
         return SolutionFormResponse(
-            id=r["id"],
-            owner_id=r["owner_id"],
-            team_name=r["team_name"],
-            product_name=r["product_name"],
-            target_audience=r.get("target_audience"),
-            problem_statement=r.get("problem_statement"),
-            proposed_solution=r.get("proposed_solution"),
-            cultural_safeguards=r.get("cultural_safeguards"),
-            lookbook_references=parsed_refs,
-            revision=r["revision"],
-            status=r["status"],
-            created_at=str(r["created_at"]),
-            updated_at=str(r["updated_at"]),
+            id=row["id"],
+            owner_id=row["owner_id"],
+            team_name=row["team_name"],
+            product_name=row["product_name"],
+            target_audience=row.get("target_audience"),
+            problem_statement=row.get("problem_statement"),
+            proposed_solution=row.get("proposed_solution"),
+            cultural_safeguards=row.get("cultural_safeguards"),
+            lookbook_references=refs,
+            revision=row["revision"],
+            status=row["status"],
+            created_at=str(row["created_at"]),
+            updated_at=str(row["updated_at"]),
         )

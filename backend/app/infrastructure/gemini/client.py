@@ -1,3 +1,5 @@
+import anyio
+from app.infrastructure.gemini.schemas import parse_recommendations
 import json
 import logging
 from typing import Any, Dict, List, Optional
@@ -5,6 +7,7 @@ import httpx
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
+_provider_slots = anyio.CapacityLimiter(4)
 
 
 class GeminiClient:
@@ -38,7 +41,9 @@ class GeminiClient:
         ]
 
         if not self.is_configured:
-            return self._fallback_styling(prompt, occasion_id, available_items, locked_items)
+            return self._fallback_styling(
+                prompt, occasion_id, available_items, locked_items
+            )
 
         system_instruction = (
             "Bạn là chuyên gia cố vấn thời trang Việt phục (Việt phục Remix Stylist). "
@@ -71,24 +76,53 @@ class GeminiClient:
         }
 
         try:
-            async with httpx.AsyncClient(timeout=25.0) as client:
+            _provider_slots.acquire_nowait()
+        except anyio.WouldBlock:
+            return self._fallback_styling(
+                prompt, occasion_id, available_items, locked_items
+            )
+        try:
+            from app.core.http_client import get_shared_async_client
+
+            client = get_shared_async_client(timeout=25.0)
+            with anyio.fail_after(30):
                 resp = await client.post(url, json=payload)
-                if resp.status_code == 200:
-                    data = resp.json()
-                    candidates = data.get("candidates", [])
-                    if candidates:
-                        text_response = candidates[0]["content"]["parts"][0]["text"]
-                        parsed = json.loads(text_response)
+            if resp.status_code == 200:
+                data = resp.json()
+                candidates = data.get("candidates", [])
+                if candidates:
+                    text_response = candidates[0]["content"]["parts"][0]["text"]
+                    parsed = json.loads(text_response)
+                    recs = parsed.get(
+                        "outfits",
+                        parsed.get(
+                            "recommendations",
+                            [parsed] if isinstance(parsed, dict) else [],
+                        ),
+                    )
+                    if isinstance(recs, list) and len(recs) > 0:
                         return {
                             "source": "gemini",
                             "model": self.text_model,
-                            "recommendations": parsed.get("outfits", parsed.get("recommendations", [parsed])),
+                            "recommendations": parse_recommendations(recs),
                         }
-                logger.warning(f"Gemini API returned status {resp.status_code}, activating fallback")
+                    else:
+                        logger.warning(
+                            "Gemini output structure invalid (empty recommendations), activating fallback"
+                        )
+            logger.warning(
+                f"Gemini API returned status {resp.status_code}, activating fallback"
+            )
         except Exception as e:
-            logger.warning(f"Gemini API call failed: {e}, activating fallback")
+            logger.warning(
+                "Gemini call failed (%s), activating fallback", type(e).__name__
+            )
+        finally:
+            _provider_slots.release()
 
-        return self._fallback_styling(prompt, occasion_id, available_items, locked_items)
+        return self._fallback_styling(
+            prompt, occasion_id, available_items, locked_items
+        )
 
     def _fallback_styling(
         self,
@@ -113,16 +147,28 @@ class GeminiClient:
         # Chọn outerwear phù hợp dịp
         if "outerwear" not in locked_slots and outerwear:
             if occasion_id == "cuoi_hoi":
-                chosen_outer = next((i for i in outerwear if "tac" in i["id"] or "nhat_binh" in i["id"]), outerwear[0])
+                chosen_outer = next(
+                    (
+                        i
+                        for i in outerwear
+                        if "tac" in i["id"] or "nhat_binh" in i["id"]
+                    ),
+                    outerwear[0],
+                )
             elif occasion_id == "tet":
-                chosen_outer = next((i for i in outerwear if "vang" in i["id"] or "do" in i["id"]), outerwear[0])
+                chosen_outer = next(
+                    (i for i in outerwear if "vang" in i["id"] or "do" in i["id"]),
+                    outerwear[0],
+                )
             else:
                 chosen_outer = outerwear[0]
             selected_items.append({"slot": "outerwear", "itemId": chosen_outer["id"]})
 
         # Áo lót trắng cổ đứng
         if "undergarment" not in locked_slots and undergarments:
-            selected_items.append({"slot": "undergarment", "itemId": undergarments[0]["id"]})
+            selected_items.append(
+                {"slot": "undergarment", "itemId": undergarments[0]["id"]}
+            )
 
         # Quần ống suông
         if "bottom" not in locked_slots and bottoms:
@@ -134,7 +180,9 @@ class GeminiClient:
 
         # Phụ kiện quạt hoặc kiềng
         if "accessory_front" not in locked_slots and accessories:
-            selected_items.append({"slot": "accessory_front", "itemId": accessories[0]["id"]})
+            selected_items.append(
+                {"slot": "accessory_front", "itemId": accessories[0]["id"]}
+            )
 
         # Guốc mộc hoặc giày
         if "footwear" not in locked_slots and footwear:

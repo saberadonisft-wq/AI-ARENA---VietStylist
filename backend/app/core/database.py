@@ -3,6 +3,7 @@ import sqlite3
 import json
 import uuid
 import re
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 from app.core.config import settings
@@ -16,18 +17,65 @@ else:
     SQLITE_DB_PATH = "viet_phuc_remix.db"
 
 if not os.path.isabs(SQLITE_DB_PATH):
-    SQLITE_DB_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", SQLITE_DB_PATH))
+    SQLITE_DB_PATH = os.path.abspath(
+        os.path.join(os.path.dirname(__file__), "..", "..", SQLITE_DB_PATH)
+    )
 
 
-def get_db_connection() -> sqlite3.Connection:
-    conn = sqlite3.connect(SQLITE_DB_PATH, check_same_thread=False)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA foreign_keys = ON;")
-    conn.execute("PRAGMA journal_mode = WAL;")
-    conn.execute("PRAGMA synchronous = NORMAL;")
-    conn.execute("PRAGMA cache_size = -64000;")
-    conn.execute("PRAGMA temp_store = MEMORY;")
-    return conn
+def _create_raw_connection() -> sqlite3.Connection:
+    conn = sqlite3.connect(SQLITE_DB_PATH, check_same_thread=False, timeout=10.0)
+    try:
+        conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA foreign_keys = ON;")
+        conn.execute("PRAGMA synchronous = NORMAL;")
+        conn.execute("PRAGMA temp_store = MEMORY;")
+        conn.execute("PRAGMA busy_timeout = 5000;")
+        return conn
+    except Exception:
+        conn.close()
+        raise
+
+
+@contextmanager
+def get_db_connection():
+    """
+    Context manager cung cấp kết nối SQLite và đảm bảo LUÔN đóng kết nối (close) sau khi dùng xong (O01).
+    """
+    conn = _create_raw_connection()
+    try:
+        yield conn
+    finally:
+        conn.close()
+
+
+@contextmanager
+def db_transaction(conn: Optional[sqlite3.Connection] = None):
+    """
+    Context manager cho giao dịch (Transaction) nguyên tử.
+    - Nếu được truyền `conn`, dùng giao dịch trên kết nối đó mà không đóng sớm.
+    - Nếu không được truyền `conn`, mở kết nối mới, quản lý commit/rollback và đóng kết nối ở finally.
+    """
+    if conn is not None:
+        if not conn.in_transaction:
+            conn.execute("BEGIN IMMEDIATE")
+        savepoint = "nested_" + uuid.uuid4().hex
+        conn.execute(f"SAVEPOINT {savepoint}")
+        try:
+            yield conn
+            conn.execute(f"RELEASE SAVEPOINT {savepoint}")
+        except Exception:
+            conn.execute(f"ROLLBACK TO SAVEPOINT {savepoint}")
+            conn.execute(f"RELEASE SAVEPOINT {savepoint}")
+            raise
+    else:
+        with get_db_connection() as new_conn:
+            try:
+                new_conn.execute("BEGIN IMMEDIATE")
+                yield new_conn
+                new_conn.commit()
+            except Exception:
+                new_conn.rollback()
+                raise
 
 
 def row_to_dict(row: Optional[sqlite3.Row]) -> Optional[Dict[str, Any]]:
@@ -44,44 +92,72 @@ def row_to_dict(row: Optional[sqlite3.Row]) -> Optional[Dict[str, Any]]:
 
 
 def rows_to_dicts(rows: List[sqlite3.Row]) -> List[Dict[str, Any]]:
-    return [row_to_dict(r) for r in rows] # type: ignore
+    return [row_to_dict(r) for r in rows]  # type: ignore
 
 
 class Database:
     @staticmethod
-    def fetch_one(query: str, params: tuple = ()) -> Optional[Dict[str, Any]]:
-        with get_db_connection() as conn:
+    def fetch_one(
+        query: str, params: tuple = (), conn: Optional[sqlite3.Connection] = None
+    ) -> Optional[Dict[str, Any]]:
+        if conn is not None:
             cursor = conn.cursor()
             cursor.execute(query, params)
-            row = cursor.fetchone()
-            return row_to_dict(row)
+            return row_to_dict(cursor.fetchone())
+        with get_db_connection() as connection:
+            cursor = connection.cursor()
+            cursor.execute(query, params)
+            return row_to_dict(cursor.fetchone())
 
     @staticmethod
-    def fetch_all(query: str, params: tuple = ()) -> List[Dict[str, Any]]:
-        with get_db_connection() as conn:
+    def fetch_all(
+        query: str, params: tuple = (), conn: Optional[sqlite3.Connection] = None
+    ) -> List[Dict[str, Any]]:
+        if conn is not None:
             cursor = conn.cursor()
             cursor.execute(query, params)
-            rows = cursor.fetchall()
-            return rows_to_dicts(rows)
+            return rows_to_dicts(cursor.fetchall())
+        with get_db_connection() as connection:
+            cursor = connection.cursor()
+            cursor.execute(query, params)
+            return rows_to_dicts(cursor.fetchall())
 
     @staticmethod
-    def execute(query: str, params: tuple = ()) -> int:
-        with get_db_connection() as conn:
+    def execute(
+        query: str, params: tuple = (), conn: Optional[sqlite3.Connection] = None
+    ) -> int:
+        if conn is not None:
             cursor = conn.cursor()
             cursor.execute(query, params)
-            conn.commit()
+            return cursor.rowcount
+        with get_db_connection() as connection:
+            cursor = connection.cursor()
+            cursor.execute(query, params)
+            connection.commit()
             return cursor.rowcount
 
     @staticmethod
-    def execute_many(query: str, param_list: List[tuple]) -> int:
-        with get_db_connection() as conn:
+    def execute_many(
+        query: str, param_list: List[tuple], conn: Optional[sqlite3.Connection] = None
+    ) -> int:
+        if conn is not None:
             cursor = conn.cursor()
             cursor.executemany(query, param_list)
-            conn.commit()
+            return cursor.rowcount
+        with get_db_connection() as connection:
+            cursor = connection.cursor()
+            cursor.executemany(query, param_list)
+            connection.commit()
             return cursor.rowcount
 
 
 SQLITE_INIT_DDL = """
+CREATE TABLE IF NOT EXISTS schema_migrations (
+    version TEXT PRIMARY KEY,
+    description TEXT NOT NULL,
+    applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Accounts (Local & OAuth)
 CREATE TABLE IF NOT EXISTS accounts (
     id TEXT PRIMARY KEY,
@@ -116,14 +192,14 @@ CREATE TABLE IF NOT EXISTS user_roles (
     UNIQUE(user_id, role)
 );
 
--- Catalog
+-- Garment Types & Occasions
 CREATE TABLE IF NOT EXISTS garment_types (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
     description TEXT,
-    gender_compatibility TEXT NOT NULL DEFAULT 'unisex',
-    era TEXT NOT NULL DEFAULT 'Nguyễn',
-    slot_schema TEXT DEFAULT '["outerwear", "undergarment", "bottom", "footwear", "headwear", "accessory_front", "accessory_back"]',
+    gender_compatibility TEXT DEFAULT 'unisex',
+    era TEXT DEFAULT 'Nguyễn',
+    slot_schema TEXT DEFAULT '[]',
     is_active INTEGER DEFAULT 1,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -132,21 +208,25 @@ CREATE TABLE IF NOT EXISTS occasions (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
     description TEXT,
-    formality_level TEXT NOT NULL DEFAULT 'medium',
-    season TEXT NOT NULL DEFAULT 'all',
+    formality_level TEXT DEFAULT 'casual',
+    season TEXT DEFAULT 'all',
     criteria TEXT DEFAULT '{}',
     icon_name TEXT,
+    is_active INTEGER DEFAULT 1,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Items & Variants
 CREATE TABLE IF NOT EXISTS items (
     id TEXT PRIMARY KEY,
-    garment_type_id TEXT REFERENCES garment_types(id) ON DELETE SET NULL,
-    slot TEXT NOT NULL,
+    garment_type_id TEXT NOT NULL REFERENCES garment_types(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
-    gender TEXT NOT NULL DEFAULT 'unisex',
+    slot TEXT NOT NULL,
+    gender TEXT DEFAULT 'unisex',
     description TEXT,
-    era TEXT,
+    era TEXT DEFAULT 'Nguyễn',
+    cultural_notes TEXT,
+    is_signature INTEGER DEFAULT 0,
     is_published INTEGER DEFAULT 1,
     metadata TEXT DEFAULT '{}',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -437,62 +517,23 @@ def split_sql_statements(sql: str) -> List[str]:
     return statements
 
 
-def init_database():
-    """Khởi tạo bảng và nạp seed data nếu database chưa có dữ liệu."""
+from app.core.migrations import run_migrations, verify_schema
+
+
+def init_database(seed=True):
+    """Development/test initialization. Production runs migrate.py explicitly."""
     os.makedirs(os.path.dirname(SQLITE_DB_PATH), exist_ok=True)
     with get_db_connection() as conn:
-        conn.executescript(SQLITE_INIT_DDL)
-        conn.commit()
+        run_migrations(conn)
+        if seed:
+            from importlib.resources import files
 
-        # CREATE TABLE IF NOT EXISTS does not update constraints on existing databases.
-        role_schema = conn.execute(
-            "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'user_roles'"
-        ).fetchone()[0]
-        if "'stylist'" not in role_schema:
-            conn.execute("BEGIN")
-            conn.execute("""
-                CREATE TABLE user_roles_updated (
-                    id TEXT PRIMARY KEY,
-                    user_id TEXT NOT NULL,
-                    role TEXT NOT NULL CHECK (role IN ('admin', 'editor', 'user', 'stylist')),
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    UNIQUE(user_id, role)
-                )
-            """)
-            conn.execute("INSERT INTO user_roles_updated SELECT id, user_id, role, created_at FROM user_roles")
-            conn.execute("DROP TABLE user_roles")
-            conn.execute("ALTER TABLE user_roles_updated RENAME TO user_roles")
-            conn.commit()
-
-        # Kiểm tra xem đã có dữ liệu heritage_articles chưa
-        cur = conn.cursor()
-        cur.execute("SELECT COUNT(*) FROM heritage_articles")
-        count = cur.fetchone()[0]
-        if count == 0:
-            seed_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "supabase", "seed.sql"))
-            if os.path.exists(seed_path):
-                with open(seed_path, "r", encoding="utf-8") as f:
-                    seed_sql = f.read()
-
-                seed_sql = seed_sql.replace("TRUE", "1").replace("FALSE", "0")
-                seed_sql = seed_sql.replace("ON CONFLICT (id) DO NOTHING", "ON CONFLICT (id) DO NOTHING")
-                seed_sql = seed_sql.replace("ON CONFLICT (item_id, occasion_id) DO NOTHING", "ON CONFLICT (item_id, occasion_id) DO NOTHING")
-                seed_sql = seed_sql.replace("ON CONFLICT DO NOTHING", "-- ON CONFLICT DO NOTHING")
-
-                statements = split_sql_statements(seed_sql)
-                for stmt in statements:
-                    try:
-                        if "INSERT INTO article_sources (article_id, source_id" in stmt:
-                            stmt = stmt.replace(
-                                "INSERT INTO article_sources (article_id, source_id, page_reference, quote) VALUES",
-                                "INSERT INTO article_sources (id, article_id, source_id, page_reference, quote) VALUES"
-                            )
-                            pattern = r"\('([^']+)',\s*'([^']+)',\s*'([^']+)',\s*'([^']+)'\)"
-                            def repl(m):
-                                return f"('{uuid.uuid4()}', '{m.group(1)}', '{m.group(2)}', '{m.group(3)}', '{m.group(4)}')"
-                            stmt = re.sub(pattern, repl, stmt)
-
-                        conn.execute(stmt)
-                    except Exception as e:
-                        pass
+            sql = files("app.data").joinpath("seed.sql").read_text(encoding="utf-8")
+            try:
+                conn.execute("BEGIN IMMEDIATE")
+                for statement in split_sql_statements(sql):
+                    conn.execute(statement)
                 conn.commit()
+            except Exception:
+                conn.rollback()
+                raise

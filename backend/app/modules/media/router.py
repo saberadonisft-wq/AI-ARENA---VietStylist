@@ -1,9 +1,13 @@
-import os
 from typing import Optional
-from fastapi import APIRouter, Depends, UploadFile, File, Query, status
-from fastapi.responses import FileResponse
+from fastapi import APIRouter, Depends, UploadFile, File, Query
+from fastapi.responses import Response
 from app.core.config import settings
-from app.core.security import get_current_user_optional, AuthenticatedUser
+from app.core.security import (
+    get_current_user_optional,
+    require_current_user,
+    AuthenticatedUser,
+)
+from app.core.errors import AppError
 from app.modules.media.schemas import (
     RequestUploadUrlInput,
     UploadUrlResponse,
@@ -12,84 +16,90 @@ from app.modules.media.schemas import (
     AccessUrlResponse,
 )
 from app.modules.media.service import MediaService
-from app.core.errors import AppError
+from app.modules.media.repository import MediaRepository
+from app.modules.media.grant_utils import verify_media_grant
+from app.infrastructure.r2.client import r2_client
+from app.modules.media.validation import byte_limit
 
 router = APIRouter(prefix="/media", tags=["Cloudflare R2 Media Management"])
+local_router = APIRouter(
+    prefix="/media", tags=["Development media"], include_in_schema=False
+)
 
 
 @router.post("/uploads", response_model=UploadUrlResponse)
-async def request_upload_url(
-    req: RequestUploadUrlInput,
-    user: Optional[AuthenticatedUser] = Depends(get_current_user_optional),
+def request_upload_url(
+    req: RequestUploadUrlInput, user: AuthenticatedUser = Depends(require_current_user)
 ):
-    """
-    Tạo phiên tải lên file ảnh/video và cấp URL upload có hạn (Direct to R2) (F14).
-    """
-    user_id = user.user_id if user else None
-    return MediaService.create_upload_session(user_id, req)
+    return MediaService.create_upload_session(user.user_id, req, user.roles)
 
 
 @router.post("/{media_id}/complete", response_model=MediaAssetResponse)
-async def complete_upload(
+def complete_upload(
     media_id: str,
     req: CompleteUploadRequest,
-    user: Optional[AuthenticatedUser] = Depends(get_current_user_optional),
+    user: AuthenticatedUser = Depends(require_current_user),
 ):
-    """
-    Xác nhận hoàn tất upload, kiểm tra HEAD và metadata trên storage trước khi chuyển trạng thái 'ready'.
-    """
-    user_id = user.user_id if user else None
-    return MediaService.complete_upload(media_id, user_id, req)
+    return MediaService.complete_upload(media_id, user.user_id, req)
 
 
 @router.get("/{media_id}/access", response_model=AccessUrlResponse)
-async def get_media_access(
+def get_media_access(
     media_id: str,
     user: Optional[AuthenticatedUser] = Depends(get_current_user_optional),
 ):
-    """
-    Cấp URL truy cập ngắn hạn cho file riêng tư sau khi xác thực quyền người dùng.
-    """
-    user_id = user.user_id if user else None
-    return MediaService.get_access_url(media_id, user_id)
+    return MediaService.get_access_url(media_id, user.user_id if user else None)
 
 
 @router.delete("/{media_id}")
-async def delete_media(
-    media_id: str,
-    user: Optional[AuthenticatedUser] = Depends(get_current_user_optional),
+def delete_media(
+    media_id: str, user: AuthenticatedUser = Depends(require_current_user)
 ):
-    """Xóa file khỏi R2 và Supabase."""
-    user_id = user.user_id if user else None
-    MediaService.delete_media(media_id, user_id)
-    return {"message": "Đã xóa file thành công"}
+    MediaService.delete_media(media_id, user.user_id)
+    return {"message": "Đã xóa file thành công", "status": "deleted"}
 
 
-# --- Local Development Endpoints (Khi chưa cấu hình R2 credentials) ---
-
-@router.post("/local-upload")
-async def handle_local_upload(
-    file: UploadFile = File(...),
-    key: str = Query(...),
-    bucket: str = Query("viet-phuc-public"),
+@local_router.post("/local-upload/{media_id}")
+def handle_local_upload_by_id(
+    media_id: str, file: UploadFile = File(...), grant: str = Query(...)
 ):
-    """Endpoint dev lưu file cục bộ khi chạy offline."""
-    base_dir = os.path.abspath(settings.LOCAL_MEDIA_DIR)
-    target_path = os.path.join(base_dir, bucket, key)
-    os.makedirs(os.path.dirname(target_path), exist_ok=True)
-
-    content = await file.read()
-    with open(target_path, "wb") as f:
-        f.write(content)
-
-    return {"status": "success", "size": len(content), "key": key}
+    return MediaService.local_upload(media_id, grant, file.file)
 
 
-@router.get("/files/{bucket}/{file_path:path}")
-async def serve_local_file(bucket: str, file_path: str):
-    """Endpoint dev phục vụ file tĩnh cục bộ."""
-    base_dir = os.path.abspath(settings.LOCAL_MEDIA_DIR)
-    full_path = os.path.join(base_dir, bucket, file_path)
-    if not os.path.exists(full_path):
-        raise AppError(code="FILE_NOT_FOUND", message="Không tìm thấy file trên ổ đĩa", status_code=404)
-    return FileResponse(full_path)
+@local_router.post("/local-upload")
+def handle_legacy_upload():
+    if not settings.is_local_media_enabled():
+        raise AppError("ENDPOINT_NOT_FOUND", "Endpoint local không khả dụng", 404)
+    raise AppError(
+        "LEGACY_UPLOAD_DISABLED", "Tạo phiên upload mới bằng /media/uploads", 410
+    )
+
+
+@local_router.get("/files/{bucket}/{file_path:path}")
+def serve_local_file(bucket: str, file_path: str, grant: Optional[str] = Query(None)):
+    if not settings.is_local_media_enabled() or r2_client.is_configured:
+        raise AppError("ENDPOINT_NOT_FOUND", "Endpoint local không khả dụng", 404)
+    from app.modules.media.path_utils import safe_join_media_path
+
+    safe_join_media_path(settings.LOCAL_MEDIA_DIR, bucket, file_path)
+    asset = MediaRepository.get_media_by_bucket_and_key(bucket, file_path)
+    if not asset:
+        raise AppError("FILE_NOT_FOUND", "Không tìm thấy file", 404)
+    if asset["status"] != "ready":
+        raise AppError("MEDIA_NOT_READY", "File chưa sẵn sàng", 409)
+    if asset["visibility"] != "public" or bucket != settings.R2_BUCKET_PUBLIC:
+        if not verify_media_grant(grant, asset["id"], "read"):
+            raise AppError("FORBIDDEN", "Cần grant truy cập hợp lệ", 403)
+    try:
+        data = r2_client.read_object(bucket, file_path, byte_limit(asset["media_type"]))
+    except FileNotFoundError:
+        raise AppError("FILE_NOT_FOUND", "Không tìm thấy file", 404)
+    return Response(
+        data,
+        media_type=asset["mime_type"],
+        headers={
+            "X-Content-Type-Options": "nosniff",
+            "Content-Security-Policy": "default-src 'none'; sandbox",
+            "Cache-Control": "private, no-store",
+        },
+    )

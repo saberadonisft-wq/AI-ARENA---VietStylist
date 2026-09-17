@@ -18,13 +18,10 @@ class TryOnService:
         )
 
     @staticmethod
-    def get_job_status(job_id: str, owner_id: Optional[str]) -> TryOnJobResponse:
+    def get_job_status(job_id: str, owner_id: str) -> TryOnJobResponse:
         job = TryOnRepository.get_job_by_id(job_id)
-        if not job:
+        if not job or job.get("owner_id") != owner_id:
             raise AppError(code="JOB_NOT_FOUND", message="Không tìm thấy tác vụ thử đồ AI", status_code=404)
-
-        if owner_id and job["owner_id"] and job["owner_id"] != owner_id:
-            raise AppError(code="FORBIDDEN", message="Bạn không có quyền xem tác vụ này", status_code=403)
 
         return TryOnService._format_job_response(job)
 

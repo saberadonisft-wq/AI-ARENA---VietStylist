@@ -9,7 +9,7 @@ router = APIRouter(prefix="/color-analysis", tags=["Color Harmony Analysis"])
 
 
 @router.post("", response_model=ColorAnalysisResponse)
-async def analyze_outfit_colors(req: ColorAnalysisRequest):
+def analyze_outfit_colors(req: ColorAnalysisRequest):
     """
     Phân tích độ hài hòa màu sắc, tương phản và đề xuất biến thể màu thay thế (F07).
     """

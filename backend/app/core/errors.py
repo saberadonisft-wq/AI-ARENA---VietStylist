@@ -30,6 +30,11 @@ def create_error_response(
 ) -> JSONResponse:
     return JSONResponse(
         status_code=status_code,
+        headers=(
+            {"Retry-After": str(details["retry_after"])}
+            if status_code == 429 and details and "retry_after" in details
+            else None
+        ),
         content={
             "error": {
                 "code": code,
@@ -53,7 +58,9 @@ async def app_error_handler(request: Request, exc: AppError) -> JSONResponse:
     )
 
 
-async def http_exception_handler(request: Request, exc: StarletteHTTPException) -> JSONResponse:
+async def http_exception_handler(
+    request: Request, exc: StarletteHTTPException
+) -> JSONResponse:
     request_id = getattr(request.state, "request_id", str(uuid.uuid4()))
     code_map = {
         400: "BAD_REQUEST",
@@ -75,16 +82,20 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException) 
     )
 
 
-async def validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
+async def validation_exception_handler(
+    request: Request, exc: RequestValidationError
+) -> JSONResponse:
     request_id = getattr(request.state, "request_id", str(uuid.uuid4()))
     formatted_errors = []
     for error in exc.errors():
         loc = " -> ".join(str(l) for l in error.get("loc", []))
-        formatted_errors.append({
-            "field": loc,
-            "message": error.get("msg"),
-            "type": error.get("type"),
-        })
+        formatted_errors.append(
+            {
+                "field": loc,
+                "message": error.get("msg"),
+                "type": error.get("type"),
+            }
+        )
     return create_error_response(
         code="VALIDATION_ERROR",
         message="Dữ liệu yêu cầu không hợp lệ",
@@ -92,3 +103,18 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         request_id=request_id,
         details={"validation_errors": formatted_errors},
     )
+
+
+from pydantic import BaseModel, Field
+
+
+class ErrorBody(BaseModel):
+    code: str
+    message: str
+    status_code: int
+    request_id: str
+    details: Dict[str, Any] = Field(default_factory=dict)
+
+
+class ErrorEnvelope(BaseModel):
+    error: ErrorBody

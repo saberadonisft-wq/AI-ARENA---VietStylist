@@ -6,7 +6,7 @@ router = APIRouter(prefix="/shares", tags=["Public Sharing"])
 
 
 @router.get("/{token}", response_model=SharedLookbookViewResponse)
-async def view_shared_lookbook(token: str):
+def view_shared_lookbook(token: str):
     """
     Xem bản chia sẻ lookbook công khai bằng token (không cần đăng nhập tài khoản).
     """

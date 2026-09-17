@@ -9,7 +9,7 @@ router = APIRouter(prefix="/cultural-check", tags=["Cultural Rules Engine"])
 
 
 @router.post("", response_model=CulturalCheckResponse)
-async def check_cultural_compliance(req: CulturalCheckRequest):
+def check_cultural_compliance(req: CulturalCheckRequest):
     """
     Kiểm tra độ tuân thủ quy chuẩn văn hóa của bộ phối (F10).
     Trả về các cảnh báo (hướng cài vạt áo, lễ phục, khăn vấn), trích dẫn nguồn lịch sử và gợi ý 1-click sửa nhanh.

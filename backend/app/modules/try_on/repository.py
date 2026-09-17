@@ -29,22 +29,23 @@ class TryOnRepository:
 
     @staticmethod
     def claim_queued_job(worker_lease_seconds: int = 60) -> Optional[Dict[str, Any]]:
-        with closing(get_db_connection()) as conn, conn:
-            conn.execute("BEGIN IMMEDIATE")
-            row = conn.execute("""
-                SELECT id FROM ai_jobs
-                WHERE status = 'queued' OR (status = 'running' AND lease_until < CURRENT_TIMESTAMP)
-                ORDER BY created_at ASC LIMIT 1
-            """).fetchone()
-            if not row:
-                return None
-            job_id = row["id"]
-            conn.execute("""
-                UPDATE ai_jobs SET status = 'running',
-                lease_until = datetime('now', '+' || ? || ' seconds'), updated_at = CURRENT_TIMESTAMP
-                WHERE id = ?
-            """, (worker_lease_seconds, job_id))
-            return row_to_dict(conn.execute("SELECT * FROM ai_jobs WHERE id = ?", (job_id,)).fetchone())
+        with get_db_connection() as conn:
+            with conn:
+                conn.execute("BEGIN IMMEDIATE")
+                row = conn.execute("""
+                    SELECT id FROM ai_jobs
+                    WHERE status = 'queued' OR (status = 'running' AND lease_until < CURRENT_TIMESTAMP)
+                    ORDER BY created_at ASC LIMIT 1
+                """).fetchone()
+                if not row:
+                    return None
+                job_id = row["id"]
+                conn.execute("""
+                    UPDATE ai_jobs SET status = 'running',
+                    lease_until = datetime('now', '+' || ? || ' seconds'), updated_at = CURRENT_TIMESTAMP
+                    WHERE id = ?
+                """, (worker_lease_seconds, job_id))
+                return row_to_dict(conn.execute("SELECT * FROM ai_jobs WHERE id = ?", (job_id,)).fetchone())
 
     @staticmethod
     def update_job_success(job_id: str, result_data_json: str) -> None:
