@@ -1,3 +1,4 @@
+import logging
 import time
 import uuid
 from contextlib import asynccontextmanager
@@ -8,7 +9,7 @@ from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.core.config import settings
-from app.core.database import init_database
+from app.core.database import init_database, get_db_connection, verify_schema
 from app.core.errors import (
     AppError,
     app_error_handler,
@@ -26,7 +27,7 @@ from app.modules.recommendations.router import router as recommendations_router
 from app.modules.outfits.router import router as outfits_router
 from app.modules.lookbooks.router import router as lookbooks_router
 from app.modules.shares.router import router as shares_router
-from app.modules.media.router import router as media_router
+from app.modules.media.router import router as media_router, local_router
 from app.modules.try_on.router import router as try_on_router
 from app.modules.solution_forms.router import router as solution_forms_router
 from app.modules.admin.router import router as admin_router
@@ -41,130 +42,193 @@ from fastapi.responses import JSONResponse
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Khởi tạo database và dữ liệu di sản mẫu khi startup
-    init_database()
-    yield
-    # Dọn dẹp tài nguyên khi shutdown (O02, O07)
-    await close_shared_async_client()
-
-
-app = FastAPI(
-    title=settings.PROJECT_NAME,
-    description="Backend REST API phục vụ nền tảng phối đồ Việt phục Remix (VietStylist)",
-    version="1.0.0",
-    lifespan=lifespan,
-    docs_url="/docs",
-    redoc_url="/redoc",
-    openapi_url="/openapi.json",
-)
-
-# Middleware gắn Request ID và tính toán thời gian xử lý
-@app.middleware("http")
-async def request_context_middleware(request: Request, call_next):
-    request_id = request.headers.get("X-Request-ID") or f"req_{uuid.uuid4().hex[:12]}"
-    request.state.request_id = request_id
-
-    start_time = time.time()
-    response = await call_next(request)
-    process_time = time.time() - start_time
-
-    response.headers["X-Request-ID"] = request_id
-    response.headers["X-Process-Time"] = f"{process_time:.4f}s"
-    return response
-
-
-# CORS Configuration
-origins = settings.CORS_ORIGINS if isinstance(settings.CORS_ORIGINS, list) else [settings.CORS_ORIGINS]
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-app.add_middleware(GZipMiddleware, minimum_size=1000)
-
-# Exception Handlers chuẩn hóa phản hồi lỗi thống nhất (O04)
-app.add_exception_handler(AppError, app_error_handler)
-app.add_exception_handler(StarletteHTTPException, http_exception_handler)
-app.add_exception_handler(RequestValidationError, validation_exception_handler)
-
-
-@app.exception_handler(Exception)
-async def generic_exception_handler(request: Request, exc: Exception):
-    request_id = getattr(request.state, "request_id", f"req_{uuid.uuid4().hex[:12]}")
-    return JSONResponse(
-        status_code=500,
-        content={
-            "error": {
-                "code": "INTERNAL_SERVER_ERROR",
-                "message": "Đã xảy ra lỗi hệ thống không mong muốn. Vui lòng liên hệ quản trị viên.",
-                "status_code": 500,
-                "request_id": request_id,
-            }
-        },
-    )
-
-
-# Health check endpoint (an toàn, không lộ thông tin nhạy cảm)
-@app.get("/health", tags=["System"])
-async def health_check():
-    return {
-        "status": "healthy",
-        "service": "viet-phuc-remix-backend",
-        "version": "1.0.0",
-        "environment": settings.ENVIRONMENT,
-    }
-
-
-# Readiness probe endpoint (O07)
-@app.get("/ready", tags=["System"])
-async def ready_check():
-    """Kiểm tra tính sẵn sàng (readiness probe) của database và storage (O07)."""
-    checks = {}
-    is_ready = True
-
+    if settings.ENVIRONMENT in ("development", "test"):
+        init_database()
     try:
-        from app.core.database import Database
-        Database.fetch_one("SELECT 1")
-        checks["database"] = "ok"
-    except Exception as e:
-        checks["database"] = f"error: {str(e)}"
-        is_ready = False
+        yield
+    finally:
+        await close_shared_async_client()
+        from starlette.concurrency import run_in_threadpool
+        from app.infrastructure.r2.client import r2_client
 
-    if settings.is_local_media_enabled():
-        checks["media_storage"] = "local"
-    else:
-        checks["media_storage"] = "r2" if settings.R2_ACCOUNT_ID else "not_configured"
+        await run_in_threadpool(r2_client.close)
 
-    status_code = 200 if is_ready else 503
-    return JSONResponse(
-        status_code=status_code,
-        content={
-            "status": "ready" if is_ready else "not_ready",
-            "checks": checks,
-            "environment": settings.ENVIRONMENT,
+
+from app.core.errors import ErrorEnvelope
+
+from typing import Literal
+from pydantic import BaseModel
+
+
+class ReadinessResponse(BaseModel):
+    status: Literal["ready", "not_ready"]
+    checks: dict[str,str]
+    environment: str
+
+
+def create_app():
+    app = FastAPI(
+        title=settings.PROJECT_NAME,
+        description="Backend REST API phục vụ nền tảng phối đồ Việt phục Remix (VietStylist)",
+        version="1.0.0",
+        lifespan=lifespan,
+        responses={
+            code: {"model": ErrorEnvelope}
+            for code in (400, 401, 403, 404, 409, 410, 413, 422, 429, 500, 503)
         },
+        docs_url="/docs",
+        redoc_url="/redoc",
+        openapi_url="/openapi.json",
     )
 
+    # Middleware gắn Request ID và tính toán thời gian xử lý
+    @app.middleware("http")
+    async def request_context_middleware(request: Request, call_next):
+        request_id = f"req_{uuid.uuid4().hex[:12]}"
+        request.state.request_id = request_id
+        if not settings.is_local_media_enabled() and (
+            request.url.path.startswith("/api/media/local-upload")
+            or request.url.path.startswith("/api/media/files/")
+        ):
+            from app.core.errors import create_error_response
 
-# Đăng ký các APIRouter theo tiền tố /api
-api_prefix = "/api"
-app.include_router(catalog_router, prefix=api_prefix)
-app.include_router(heritage_router, prefix=api_prefix)
-app.include_router(cultural_rules_router, prefix=api_prefix)
-app.include_router(color_analysis_router, prefix=api_prefix)
-app.include_router(weather_router, prefix=api_prefix)
-app.include_router(recommendations_router, prefix=api_prefix)
-app.include_router(outfits_router, prefix=api_prefix)
-app.include_router(lookbooks_router, prefix=api_prefix)
-app.include_router(shares_router, prefix=api_prefix)
-app.include_router(media_router, prefix=api_prefix)
-app.include_router(try_on_router, prefix=api_prefix)
-app.include_router(solution_forms_router, prefix=api_prefix)
-app.include_router(admin_router, prefix=api_prefix)
-app.include_router(auth_router, prefix=api_prefix)
+            return create_error_response(
+                "ENDPOINT_NOT_FOUND", "Endpoint local không khả dụng", 404, request_id
+            )
+
+        start_time = time.time()
+        response = await call_next(request)
+        process_time = time.time() - start_time
+
+        response.headers["X-Request-ID"] = request_id
+        response.headers["X-Process-Time"] = f"{process_time:.4f}s"
+        return response
+
+    # CORS Configuration
+    origins = (
+        settings.CORS_ORIGINS
+        if isinstance(settings.CORS_ORIGINS, list)
+        else [settings.CORS_ORIGINS]
+    )
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=origins,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+    app.add_middleware(GZipMiddleware, minimum_size=1000)
+    from app.core.body_limit import LocalUploadBodyLimit
+
+    app.add_middleware(LocalUploadBodyLimit)
+
+    # Exception Handlers chuẩn hóa phản hồi lỗi thống nhất (O04)
+    app.add_exception_handler(AppError, app_error_handler)
+    app.add_exception_handler(StarletteHTTPException, http_exception_handler)
+    app.add_exception_handler(RequestValidationError, validation_exception_handler)
+
+    @app.exception_handler(Exception)
+    async def generic_exception_handler(request: Request, exc: Exception):
+        request_id = getattr(
+            request.state, "request_id", f"req_{uuid.uuid4().hex[:12]}"
+        )
+        logging.getLogger(__name__).error(
+            "Unhandled request error request_id=%s type=%s",
+            request_id,
+            type(exc).__name__,
+        )
+        return JSONResponse(
+            status_code=500,
+            content={
+                "error": {
+                    "code": "INTERNAL_SERVER_ERROR",
+                    "message": "Đã xảy ra lỗi hệ thống không mong muốn. Vui lòng liên hệ quản trị viên.",
+                    "status_code": 500,
+                    "request_id": request_id,
+                    "details": {},
+                }
+            },
+        )
+
+    # Health check endpoint (an toàn, không lộ thông tin nhạy cảm)
+    @app.get("/health", tags=["System"])
+    async def health_check():
+        return {
+            "status": "healthy",
+            "service": "viet-phuc-remix-backend",
+            "version": "1.0.0",
+            "environment": settings.ENVIRONMENT,
+        }
+
+    # Readiness probe endpoint (O07)
+    @app.get("/ready", tags=["System"], response_model=ReadinessResponse, responses={503: {"model": ReadinessResponse}})
+    def ready_check():
+        """Kiểm tra tính sẵn sàng (readiness probe) của database và storage (O07)."""
+        checks = {}
+        is_ready = True
+
+        try:
+            from app.core.database import Database
+
+            with get_db_connection() as conn:
+                schema_ok = verify_schema(conn)
+            checks["database"] = "ok" if schema_ok else "migration_required"
+            is_ready = schema_ok
+        except Exception as e:
+            checks["database"] = "unavailable"
+            is_ready = False
+
+        from app.infrastructure.r2.client import r2_client
+
+        try:
+            storage_ready = r2_client.check_ready()
+            checks["media_storage"] = (
+                ("r2" if r2_client.is_configured else "local")
+                if storage_ready
+                else "unavailable"
+            )
+            is_ready = is_ready and storage_ready
+        except Exception:
+            checks["media_storage"] = "unavailable"
+            is_ready = False
+
+        status_code = 200 if is_ready else 503
+        return JSONResponse(
+            status_code=status_code,
+            content={
+                "status": "ready" if is_ready else "not_ready",
+                "checks": checks,
+                "environment": settings.ENVIRONMENT,
+            },
+        )
+
+    # Đăng ký các APIRouter theo tiền tố /api
+    api_prefix = "/api"
+    app.include_router(catalog_router, prefix=api_prefix)
+    app.include_router(heritage_router, prefix=api_prefix)
+    app.include_router(cultural_rules_router, prefix=api_prefix)
+    app.include_router(color_analysis_router, prefix=api_prefix)
+    app.include_router(weather_router, prefix=api_prefix)
+    app.include_router(recommendations_router, prefix=api_prefix)
+    app.include_router(outfits_router, prefix=api_prefix)
+    app.include_router(lookbooks_router, prefix=api_prefix)
+    app.include_router(shares_router, prefix=api_prefix)
+    app.include_router(media_router, prefix=api_prefix)
+    if settings.is_local_media_enabled():
+        app.include_router(local_router, prefix=api_prefix)
+    app.include_router(try_on_router, prefix=api_prefix)
+    app.include_router(solution_forms_router, prefix=api_prefix)
+    app.include_router(admin_router, prefix=api_prefix)
+    app.include_router(auth_router, prefix=api_prefix)
+    return app
+
+
+app = create_app()
 
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("app.main:app", host=settings.HOST, port=settings.PORT, reload=settings.DEBUG)
+
+    uvicorn.run(
+        "app.main:app", host=settings.HOST, port=settings.PORT, reload=settings.DEBUG
+    )

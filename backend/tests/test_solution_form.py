@@ -1,3 +1,4 @@
+from conftest import auth_header
 import pytest
 from fastapi.testclient import TestClient
 from app.main import app
@@ -6,7 +7,7 @@ client = TestClient(app)
 
 
 def test_solution_form_get_default_and_update():
-    headers = {"Authorization": "Bearer dev-user-form-1"}
+    headers = {"Authorization": auth_header("dev-user-form-1")}
     # 1. Lấy form giải pháp
     res = client.get("/api/solution-form", headers=headers)
     assert res.status_code == 200
@@ -26,7 +27,7 @@ def test_solution_form_get_default_and_update():
         "cultural_safeguards": "Trích dẫn nguồn Ngàn năm áo mũ và Đại Nam hội điển sự lệ",
         "lookbook_references": [],
         "revision": current_rev,
-        "status": "draft"
+        "status": "draft",
     }
     update_res = client.put("/api/solution-form", json=update_payload, headers=headers)
     assert update_res.status_code == 200

@@ -10,42 +10,70 @@ from app.modules.media.repository import MediaRepository
 client = TestClient(app)
 
 
-def test_media_delete_storage_failure_preserves_deleting_state(tmp_path, monkeypatch):
+def test_media_delete_storage_failure_preserves_deleting_state(
+    tmp_path, monkeypatch, png_bytes
+):
     """R05 & O06: Nếu xóa storage thất bại, trạng thái 'deleting' được giữ lại để retry, không bị xóa mất metadata"""
     media_dir = tmp_path / "media"
     media_dir.mkdir(parents=True, exist_ok=True)
     monkeypatch.setattr(settings, "LOCAL_MEDIA_DIR", str(media_dir))
     monkeypatch.setattr(settings, "LOCAL_MEDIA_ENABLED", True)
 
-    reg = client.post("/api/auth/register", json={"email": "del@test.com", "password": "Password123!", "display_name": "Del", "role": "user"}).json()
+    reg = client.post(
+        "/api/auth/register",
+        json={
+            "email": "del@test.com",
+            "password": "Password123!",
+            "display_name": "Del",
+            "role": "user",
+        },
+    ).json()
     headers = {"Authorization": f"Bearer {reg['access_token']}"}
 
     # 1. Tạo session upload
-    session_res = client.post("/api/media/uploads", json={
-        "filename": "test_del.png",
-        "media_type": "image",
-        "mime_type": "image/png",
-        "size_bytes": 50,
-        "visibility": "private"
-    }, headers=headers)
+    session_res = client.post(
+        "/api/media/uploads",
+        json={
+            "filename": "test_del.png",
+            "media_type": "image",
+            "mime_type": "image/png",
+            "size_bytes": 50,
+            "visibility": "private",
+        },
+        headers=headers,
+    )
     assert session_res.status_code == 200
     media_id = session_res.json()["media_id"]
     object_key = session_res.json()["object_key"]
     bucket = session_res.json()["bucket"]
 
     # Viết file giả lập
-    file_path = media_dir / bucket / object_key
-    file_path.parent.mkdir(parents=True, exist_ok=True)
-    file_path.write_bytes(b"DATA_TO_DELETE")
+    assert (
+        client.post(
+            session_res.json()["upload_url"],
+            files={"file": ("p.png", png_bytes, "image/png")},
+        ).status_code
+        == 200
+    )
 
-    client.post(f"/api/media/{media_id}/complete", json={"width": 10, "height": 10}, headers=headers)
+    client.post(
+        f"/api/media/{media_id}/complete",
+        json={"width": 10, "height": 10},
+        headers=headers,
+    )
 
     # 2. Giả lập storage delete lỗi (trả False)
     monkeypatch.setattr(r2_client, "delete_object", lambda b, k: False)
 
     # 3. Gọi DELETE endpoint
     del_res = client.delete(f"/api/media/{media_id}", headers=headers)
-    assert del_res.status_code == 200
+    assert del_res.status_code == 503
+    assert (
+        client.post(
+            f"/api/media/{media_id}/complete", json={}, headers=headers
+        ).status_code
+        == 409
+    )
 
     # 4. Do storage delete lỗi, asset vẫn tồn tại trong DB với trạng thái 'deleting'
     asset = MediaRepository.get_media_by_id(media_id)
@@ -63,4 +91,4 @@ def test_media_delete_storage_failure_preserves_deleting_state(tmp_path, monkeyp
     assert del_retry.status_code == 200
 
     # Sau khi storage thành công, record đã được xóa hoàn tất
-    assert MediaRepository.get_media_by_id(media_id) is None
+    assert MediaRepository.get_media_by_id(media_id)["status"] == "deleted"

@@ -4,6 +4,7 @@ CLI script để xuất tài liệu OpenAPI schema canonical từ FastAPI applic
 Hỗ trợ:
   python backend/scripts/export_openapi.py [--check] [--output shared/openapi.json]
 """
+
 import argparse
 import json
 import os
@@ -17,13 +18,24 @@ if hasattr(sys.stderr, "reconfigure"):
     sys.stderr.reconfigure(encoding="utf-8")
 
 # Cấu hình môi trường an toàn trước khi import app, không chạm DB/storage thật hay network
-os.environ.setdefault("DATABASE_URL", "sqlite:///:memory:")
-os.environ.setdefault("ENVIRONMENT", "production")
-os.environ.setdefault("DEBUG", "false")
-os.environ.setdefault("LOCAL_MEDIA_ENABLED", "false")
-os.environ.setdefault("SUPABASE_JWT_SECRET", "super-secret-production-jwt-signing-key-minimum-32-chars-ok")
-os.environ.setdefault("FRONTEND_PUBLIC_ORIGIN", "https://vietstylist.vn")
-os.environ.setdefault("API_PUBLIC_ORIGIN", "https://api.vietstylist.vn")
+import secrets
+
+os.environ.update(
+    {
+        "VIETSTYLIST_IGNORE_DOTENV": "1",
+        "DATABASE_URL": "sqlite:///:memory:",
+        "ENVIRONMENT": "production",
+        "DEBUG": "false",
+        "LOCAL_MEDIA_ENABLED": "false",
+        "JWT_SIGNING_SECRET": secrets.token_urlsafe(48),
+        "FRONTEND_PUBLIC_ORIGIN": "https://example.invalid",
+        "API_PUBLIC_ORIGIN": "https://api.example.invalid",
+        "R2_ACCOUNT_ID": "",
+        "R2_ACCESS_KEY_ID": "",
+        "R2_SECRET_ACCESS_KEY": "",
+        "GEMINI_API_KEY": "",
+    }
+)
 
 # Đảm bảo backend root nằm trong sys.path
 backend_dir = Path(__file__).resolve().parent.parent
@@ -65,7 +77,10 @@ def main():
 
     if args.check:
         if not target_path.exists():
-            print(f"[DRIFT ERROR] File OpenAPI target không tồn tại: {target_path}", file=sys.stderr)
+            print(
+                f"[DRIFT ERROR] File OpenAPI target không tồn tại: {target_path}",
+                file=sys.stderr,
+            )
             sys.exit(1)
 
         with open(target_path, "r", encoding="utf-8") as f:
@@ -74,13 +89,22 @@ def main():
         try:
             existing_json = json.loads(existing_content)
         except Exception as e:
-            print(f"[DRIFT ERROR] File OpenAPI hiện tại không hợp lệ JSON: {e}", file=sys.stderr)
+            print(
+                f"[DRIFT ERROR] File OpenAPI hiện tại không hợp lệ JSON: {e}",
+                file=sys.stderr,
+            )
             sys.exit(1)
 
         # So sánh cấu trúc JSON
         if existing_json != schema:
-            print(f"[DRIFT ERROR] OpenAPI contract bị lệch so với mã nguồn runtime!", file=sys.stderr)
-            print(f"Chạy 'python backend/scripts/export_openapi.py' để cập nhật.", file=sys.stderr)
+            print(
+                f"[DRIFT ERROR] OpenAPI contract bị lệch so với mã nguồn runtime!",
+                file=sys.stderr,
+            )
+            print(
+                f"Chạy 'python backend/scripts/export_openapi.py' để cập nhật.",
+                file=sys.stderr,
+            )
             sys.exit(1)
 
         print(f"[OK] OpenAPI contract đồng bộ hoàn toàn với runtime (không có drift).")
@@ -89,7 +113,9 @@ def main():
         target_path.parent.mkdir(parents=True, exist_ok=True)
         with open(target_path, "w", encoding="utf-8", newline="\n") as f:
             f.write(formatted_schema)
-        print(f"[SUCCESS] Đã xuất OpenAPI canonical schema thành công vào: {target_path}")
+        print(
+            f"[SUCCESS] Đã xuất OpenAPI canonical schema thành công vào: {target_path}"
+        )
         sys.exit(0)
 
 

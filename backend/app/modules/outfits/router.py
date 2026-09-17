@@ -14,13 +14,13 @@ router = APIRouter(prefix="/outfits", tags=["Outfits & Versions"])
 
 
 @router.get("", response_model=List[OutfitResponse])
-async def list_user_outfits(user: AuthenticatedUser = Depends(require_current_user)):
+def list_user_outfits(user: AuthenticatedUser = Depends(require_current_user)):
     """Lấy danh sách các bộ phối của người dùng đã đăng nhập."""
     return OutfitService.list_user_outfits(user.user_id)
 
 
 @router.post("", response_model=OutfitResponse)
-async def create_outfit(
+def create_outfit(
     req: CreateOutfitRequest,
     user: AuthenticatedUser = Depends(require_current_user),
 ):
@@ -29,7 +29,7 @@ async def create_outfit(
 
 
 @router.get("/{outfit_id}", response_model=OutfitResponse)
-async def get_outfit(
+def get_outfit(
     outfit_id: str,
     user: AuthenticatedUser = Depends(require_current_user),
 ):
@@ -38,7 +38,7 @@ async def get_outfit(
 
 
 @router.put("/{outfit_id}", response_model=OutfitResponse)
-async def update_outfit(
+def update_outfit(
     outfit_id: str,
     req: UpdateOutfitRequest,
     user: AuthenticatedUser = Depends(require_current_user),
@@ -48,7 +48,7 @@ async def update_outfit(
 
 
 @router.delete("/{outfit_id}")
-async def delete_outfit(
+def delete_outfit(
     outfit_id: str,
     user: AuthenticatedUser = Depends(require_current_user),
 ):
@@ -58,6 +58,6 @@ async def delete_outfit(
 
 
 @router.post("/compare", response_model=CompareResponse)
-async def compare_outfits(req: CompareRequest):
+def compare_outfits(req: CompareRequest):
     """So sánh độc lập hai phương án A/B và hiển thị các điểm khác biệt (F08)."""
     return OutfitService.compare_snapshots(req)

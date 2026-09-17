@@ -8,9 +8,12 @@ router = APIRouter(prefix="/weather", tags=["Weather Integration"])
 
 @router.get("", response_model=WeatherResponse)
 async def get_weather(
-    city: str = Query("hanoi", description="Mã thành phố (hanoi, hue, danang, hoian, hcm, sapa, dalat, cantho)"),
-    lat: Optional[float] = Query(None, description="Vĩ độ tùy chọn"),
-    lon: Optional[float] = Query(None, description="Kinh độ tùy chọn"),
+    city: str = Query(
+        "hanoi",
+        description="Mã thành phố (hanoi, hue, danang, hoian, hcm, sapa, dalat, cantho)",
+    ),
+    lat: Optional[float] = Query(None, ge=-90, le=90, description="Vĩ độ tùy chọn"),
+    lon: Optional[float] = Query(None, ge=-180, le=180, description="Kinh độ tùy chọn"),
 ):
     """
     Lấy thông tin thời tiết địa phương và lời khuyên chất liệu/phụ kiện Việt phục phù hợp (F06).

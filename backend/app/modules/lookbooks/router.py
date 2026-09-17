@@ -1,6 +1,10 @@
 from typing import List, Optional
 from fastapi import APIRouter, Depends
-from app.core.security import require_current_user, get_current_user_optional, AuthenticatedUser
+from app.core.security import (
+    require_current_user,
+    get_current_user_optional,
+    AuthenticatedUser,
+)
 from app.modules.lookbooks.schemas import (
     CreateLookbookRequest,
     UpdateLookbookRequest,
@@ -14,13 +18,13 @@ router = APIRouter(prefix="/lookbooks", tags=["Lookbooks"])
 
 
 @router.get("", response_model=List[LookbookResponse])
-async def list_lookbooks(user: AuthenticatedUser = Depends(require_current_user)):
+def list_lookbooks(user: AuthenticatedUser = Depends(require_current_user)):
     """Lấy danh sách lookbooks cá nhân của người dùng đã đăng nhập."""
     return LookbookService.list_user_lookbooks(user.user_id)
 
 
 @router.post("", response_model=LookbookResponse)
-async def create_lookbook(
+def create_lookbook(
     req: CreateLookbookRequest,
     user: AuthenticatedUser = Depends(require_current_user),
 ):
@@ -29,7 +33,7 @@ async def create_lookbook(
 
 
 @router.get("/{lookbook_id}", response_model=LookbookResponse)
-async def get_lookbook(
+def get_lookbook(
     lookbook_id: str,
     user: Optional[AuthenticatedUser] = Depends(get_current_user_optional),
 ):
@@ -39,7 +43,7 @@ async def get_lookbook(
 
 
 @router.put("/{lookbook_id}", response_model=LookbookResponse)
-async def update_lookbook(
+def update_lookbook(
     lookbook_id: str,
     req: UpdateLookbookRequest,
     user: AuthenticatedUser = Depends(require_current_user),
@@ -49,7 +53,7 @@ async def update_lookbook(
 
 
 @router.delete("/{lookbook_id}")
-async def delete_lookbook(
+def delete_lookbook(
     lookbook_id: str,
     user: AuthenticatedUser = Depends(require_current_user),
 ):
@@ -59,7 +63,7 @@ async def delete_lookbook(
 
 
 @router.post("/{lookbook_id}/share", response_model=ShareLinkResponse)
-async def share_lookbook(
+def share_lookbook(
     lookbook_id: str,
     req: CreateShareLinkRequest,
     user: AuthenticatedUser = Depends(require_current_user),
@@ -70,10 +74,9 @@ async def share_lookbook(
 
 
 @router.delete("/{lookbook_id}/shares")
-async def revoke_lookbook_shares(
+def revoke_lookbook_shares(
     lookbook_id: str,
     user: AuthenticatedUser = Depends(require_current_user),
 ):
     """Thu hồi toàn bộ liên kết chia sẻ của lookbook."""
     return LookbookService.revoke_shares(lookbook_id, user.user_id)
-

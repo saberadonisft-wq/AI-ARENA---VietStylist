@@ -1,13 +1,15 @@
-from typing import Optional
-from pydantic import BaseModel
+from typing import Optional, Literal
+from pydantic import BaseModel, Field
 
 
 class RequestUploadUrlInput(BaseModel):
-    filename: str
-    media_type: str = "image" # image, video
+    filename: str = Field(min_length=1, max_length=255)
+    media_type: Literal["image", "video"] = "image"  # image, video
     mime_type: str = "image/png"
-    size_bytes: Optional[int] = None
-    visibility: str = "private" # public, private, unlisted
+    size_bytes: Optional[int] = Field(default=None, gt=0)
+    visibility: Literal["public", "private", "unlisted"] = (
+        "private"  # public, private, unlisted
+    )
 
 
 class UploadUrlResponse(BaseModel):
@@ -17,7 +19,7 @@ class UploadUrlResponse(BaseModel):
     object_key: str
     bucket: str
     expires_in: int
-    storage_type: str # r2 or local
+    storage_type: str  # r2 or local
 
 
 class CompleteUploadRequest(BaseModel):

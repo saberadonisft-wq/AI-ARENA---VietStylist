@@ -1,34 +1,40 @@
 import os
+from pathlib import Path
 from app.core.config import settings
 from app.core.errors import AppError
 
 
 def safe_join_media_path(base_dir: str, bucket: str, key_or_path: str) -> str:
-    """
-    Kiểm tra và chuẩn hóa đường dẫn lưu trữ media:
-    - Bucket phải thuộc allowlist (R2_BUCKET_PUBLIC, R2_BUCKET_PRIVATE)
-    - Key không được chứa ký tự điều khiển, NUL, ':', '\\', hoặc đoạn '..'
-    - Đường dẫn tuyệt đối đích bắt buộc phải nằm bên trong thư mục bucket/base_dir
-    """
-    allowed_buckets = {settings.R2_BUCKET_PUBLIC, settings.R2_BUCKET_PRIVATE}
-    if bucket not in allowed_buckets:
-        raise AppError(code="INVALID_BUCKET", message=f"Bucket '{bucket}' không được phép.", status_code=400)
-
-    if not key_or_path:
-        raise AppError(code="INVALID_PATH", message="Đường dẫn không được rỗng.", status_code=400)
-
-    if "\0" in key_or_path or ":" in key_or_path or "\\" in key_or_path:
-        raise AppError(code="INVALID_PATH", message="Đường dẫn chứa ký tự không hợp lệ.", status_code=400)
-
-    parts = [p for p in key_or_path.strip("/").split("/") if p]
-    if not parts or any(p in (".", "..") for p in parts):
-        raise AppError(code="INVALID_PATH", message="Đường dẫn chứa thành phần không an toàn.", status_code=400)
-
-    base_abs = os.path.abspath(base_dir)
-    bucket_abs = os.path.abspath(os.path.join(base_abs, bucket))
-    target_abs = os.path.abspath(os.path.join(bucket_abs, *parts))
-
-    if not (target_abs == bucket_abs or target_abs.startswith(bucket_abs + os.sep)):
-        raise AppError(code="PATH_TRAVERSAL_DETECTED", message="Phát hiện đường dẫn vượt cấp ngoài thư mục media.", status_code=403)
-
-    return target_abs
+    if bucket not in {settings.R2_BUCKET_PUBLIC, settings.R2_BUCKET_PRIVATE}:
+        raise AppError("INVALID_BUCKET", "Bucket không hợp lệ", 400)
+    parts = key_or_path.split("/")
+    reserved = {
+        "CON",
+        "PRN",
+        "AUX",
+        "NUL",
+        *(f"COM{i}" for i in range(1, 10)),
+        *(f"LPT{i}" for i in range(1, 10)),
+    }
+    for part in [bucket, *parts]:
+        if (
+            not part
+            or part in (".", "..")
+            or part.endswith((".", " "))
+            or any(ord(c) < 32 or c in ':\\/<>"|?*' for c in part)
+            or part.split(".")[0].upper() in reserved
+        ):
+            raise AppError("INVALID_PATH", "Đường dẫn không an toàn", 400)
+    base = Path(os.path.abspath(base_dir))
+    target = base.joinpath(bucket, *parts)
+    # Resolve containment AND reject links/reparse points, including Windows junctions.
+    for candidate in [target, *target.parents]:
+        if candidate.is_symlink() or (
+            hasattr(candidate, "is_junction") and candidate.is_junction()
+        ):
+            raise AppError("INVALID_PATH", "Không cho phép liên kết filesystem", 400)
+    try:
+        target.resolve().relative_to((base / bucket).resolve())
+    except (ValueError, OSError):
+        raise AppError("INVALID_PATH", "Đường dẫn vượt ngoài vùng media", 400)
+    return str(target)

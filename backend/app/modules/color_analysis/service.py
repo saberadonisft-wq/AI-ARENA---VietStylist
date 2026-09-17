@@ -29,6 +29,7 @@ def rgb_to_hsl(r: float, g: float, b: float) -> Tuple[float, float, float]:
 def get_luminance(r: float, g: float, b: float) -> float:
     def channel_lum(c: float) -> float:
         return c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4
+
     return 0.2126 * channel_lum(r) + 0.7152 * channel_lum(g) + 0.0722 * channel_lum(b)
 
 
@@ -67,10 +68,18 @@ class ColorAnalysisService:
 
         # Tính toán tỷ lệ tương phản giữa áo và quần (nếu có) hoặc màu thứ 2
         bottom_item = next((c for c in colors if c.slot == "bottom"), None)
-        contrast_hex = bottom_item.hex_color if bottom_item else (accent_hexes[0] if accent_hexes else "#FFFFFF")
+        contrast_hex = (
+            bottom_item.hex_color
+            if bottom_item
+            else (accent_hexes[0] if accent_hexes else "#FFFFFF")
+        )
         contrast_ratio = calculate_contrast_ratio(dominant_hex, contrast_hex)
 
-        contrast_rating = "good" if contrast_ratio >= 4.5 else ("moderate" if contrast_ratio >= 3.0 else "low")
+        contrast_rating = (
+            "good"
+            if contrast_ratio >= 4.5
+            else ("moderate" if contrast_ratio >= 3.0 else "low")
+        )
 
         # Xác định loại bảng màu
         palette_type = "neutral_balance"
@@ -93,7 +102,9 @@ class ColorAnalysisService:
                 palette_type = "triadic"
                 comment = "Bảng màu tam giác màu sinh động, phong phú nhưng vẫn giữ được sự cân đối truyền thống."
             else:
-                palette_type = "monochromatic" if s_dom < 0.2 or s_acc < 0.2 else "neutral_balance"
+                palette_type = (
+                    "monochromatic" if s_dom < 0.2 or s_acc < 0.2 else "neutral_balance"
+                )
 
         if contrast_rating == "good":
             comment += f" Độ tương phản đạt {contrast_ratio}:1 rất rõ nét, giúp phom dáng áo ngũ thân hiển thị nổi bật."
@@ -102,22 +113,27 @@ class ColorAnalysisService:
 
         # Gợi ý các biến thể có thật trong database
         suggested_variants: List[ColorVariantSuggestion] = []
-        rows = Database.fetch_all("""
+        rows = Database.fetch_all(
+            """
             SELECT v.id as variant_id, v.item_id, v.color_name, v.hex_color, i.name as item_name
             FROM item_variants v
             JOIN items i ON v.item_id = i.id
-            WHERE v.hex_color != ?
+            WHERE i.is_published = 1 AND v.hex_color != ?
             LIMIT 3
-        """, (dominant_hex,))
+        """,
+            (dominant_hex,),
+        )
 
         for r in rows:
-            suggested_variants.append(ColorVariantSuggestion(
-                item_id=r["item_id"],
-                variant_id=r["variant_id"],
-                color_name=r["color_name"],
-                hex_color=r["hex_color"],
-                harmony_reason=f"Màu {r['color_name']} tạo độ tương phản trang nhã khi phối cùng {dominant_hex}."
-            ))
+            suggested_variants.append(
+                ColorVariantSuggestion(
+                    item_id=r["item_id"],
+                    variant_id=r["variant_id"],
+                    color_name=r["color_name"],
+                    hex_color=r["hex_color"],
+                    harmony_reason=f"Màu {r['color_name']} tạo độ tương phản trang nhã khi phối cùng {dominant_hex}.",
+                )
+            )
 
         return ColorAnalysisResponse(
             dominant_color=dominant_hex,

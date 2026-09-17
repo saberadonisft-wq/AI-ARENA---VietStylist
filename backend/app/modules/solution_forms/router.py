@@ -10,7 +10,7 @@ router = APIRouter(prefix="/solution-form", tags=["Solution Form F12"])
 
 
 @router.get("", response_model=SolutionFormResponse)
-async def get_solution_form(user: AuthenticatedUser = Depends(require_current_user)):
+def get_solution_form(user: AuthenticatedUser = Depends(require_current_user)):
     """
     Lấy nội dung form trình bày giải pháp của người dùng đã đăng nhập (R04).
     Nếu chưa có, tự động khởi tạo bản nháp mẫu với đầy đủ các mục nghiên cứu và văn hóa.
@@ -19,7 +19,7 @@ async def get_solution_form(user: AuthenticatedUser = Depends(require_current_us
 
 
 @router.put("", response_model=SolutionFormResponse)
-async def update_solution_form(
+def update_solution_form(
     req: UpdateSolutionFormRequest,
     user: AuthenticatedUser = Depends(require_current_user),
 ):

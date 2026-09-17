@@ -1,4 +1,5 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+from app.core.rate_limit import ai_rate_limit
 from app.modules.recommendations.schemas import (
     ContextRecommendationRequest,
     AIRecommendationRequest,
@@ -6,7 +7,11 @@ from app.modules.recommendations.schemas import (
 )
 from app.modules.recommendations.service import RecommendationService
 
-router = APIRouter(prefix="/recommendations", tags=["Styling Recommendations"])
+router = APIRouter(
+    prefix="/recommendations",
+    tags=["Styling Recommendations"],
+    dependencies=[Depends(ai_rate_limit)],
+)
 
 
 @router.post("/context", response_model=RecommendationResponse)

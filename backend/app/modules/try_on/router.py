@@ -7,7 +7,7 @@ router = APIRouter(prefix="/ai", tags=["AI Virtual Try-On"])
 
 
 @router.post("/try-on", response_model=TryOnJobResponse)
-async def create_try_on_job(
+def create_try_on_job(
     req: CreateTryOnJobRequest,
     user: AuthenticatedUser = Depends(require_current_user),
 ):
@@ -19,7 +19,7 @@ async def create_try_on_job(
 
 
 @router.get("/jobs/{job_id}", response_model=TryOnJobResponse)
-async def get_job_status(
+def get_job_status(
     job_id: str,
     user: AuthenticatedUser = Depends(require_current_user),
 ):

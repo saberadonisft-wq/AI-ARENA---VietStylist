@@ -1,27 +1,26 @@
-"""
-HTTP Client singleton and connection pool management (O02).
-"""
-from typing import Optional
+"""One bounded HTTP pool per event loop and timeout policy; closed by lifespan."""
+
+import asyncio
 import httpx
 
-_shared_async_client: Optional[httpx.AsyncClient] = None
+_clients = {}
 
 
-def get_shared_async_client(timeout: float = 15.0) -> httpx.AsyncClient:
-    """Lấy singleton httpx.AsyncClient tái sử dụng connection pool."""
-    global _shared_async_client
-    if _shared_async_client is None or _shared_async_client.is_closed:
-        limits = httpx.Limits(max_keepalive_connections=20, max_connections=50)
-        _shared_async_client = httpx.AsyncClient(
+def get_shared_async_client(timeout=15.0):
+    key = (asyncio.get_running_loop(), timeout)
+    client = _clients.get(key)
+    if client is None or client.is_closed:
+        client = httpx.AsyncClient(
             timeout=httpx.Timeout(timeout, connect=5.0),
-            limits=limits,
+            limits=httpx.Limits(max_keepalive_connections=20, max_connections=50),
         )
-    return _shared_async_client
+        _clients[key] = client
+    return client
 
 
 async def close_shared_async_client():
-    """Đóng HTTP client khi ứng dụng shutdown."""
-    global _shared_async_client
-    if _shared_async_client is not None and not _shared_async_client.is_closed:
-        await _shared_async_client.aclose()
-        _shared_async_client = None
+    loop = asyncio.get_running_loop()
+    for key, client in list(_clients.items()):
+        if key[0] is loop:
+            await client.aclose()
+            del _clients[key]

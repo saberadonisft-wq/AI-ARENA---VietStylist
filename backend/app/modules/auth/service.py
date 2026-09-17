@@ -89,7 +89,11 @@ class AuthService:
                 )
         except sqlite3.IntegrityError:
             if Database.fetch_one("SELECT id FROM accounts WHERE email = ?", (email,)):
-                raise AppError(code="EMAIL_EXISTS", message="Email này đã được sử dụng.", status_code=400)
+                raise AppError(
+                    code="EMAIL_EXISTS",
+                    message="Email này đã được sử dụng.",
+                    status_code=400,
+                )
             raise
 
         roles = [role]
@@ -117,15 +121,23 @@ class AuthService:
             (email_or_username,),
         )
 
-        if (not account or not account.get("is_active") or
-                (settings.ENVIRONMENT != "development" and account["id"].startswith("usr_demo_"))):
+        if (
+            not account
+            or not account.get("is_active")
+            or (
+                settings.ENVIRONMENT != "development"
+                and account["id"].startswith("usr_demo_")
+            )
+        ):
             raise AppError(
                 code="INVALID_CREDENTIALS",
                 message="Email hoặc mật khẩu không chính xác. Vui lòng thử lại.",
                 status_code=status.HTTP_401_UNAUTHORIZED,
             )
 
-        if account.get("auth_provider") == "google" and not account.get("password_hash"):
+        if account.get("auth_provider") == "google" and not account.get(
+            "password_hash"
+        ):
             raise AppError(
                 code="OAUTH_ACCOUNT",
                 message="Tài khoản này được đăng ký bằng Google. Vui lòng bấm 'Tiếp tục với Google'.",
@@ -139,7 +151,9 @@ class AuthService:
                 status_code=status.HTTP_401_UNAUTHORIZED,
             )
 
-        if not cls.verify_password(req.password, account["salt"], account["password_hash"]):
+        if not cls.verify_password(
+            req.password, account["salt"], account["password_hash"]
+        ):
             raise AppError(
                 code="INVALID_CREDENTIALS",
                 message="Email hoặc mật khẩu không chính xác. Vui lòng thử lại.",
@@ -148,7 +162,9 @@ class AuthService:
 
         account_id = account["id"]
         roles = cls.get_user_roles(account_id)
-        token = create_access_token(user_id=account_id, email=account["email"], roles=roles)
+        token = create_access_token(
+            user_id=account_id, email=account["email"], roles=roles
+        )
 
         user_resp = UserResponse(
             id=account_id,
@@ -167,14 +183,21 @@ class AuthService:
         google_client_id = settings.GOOGLE_CLIENT_ID or os.getenv("GOOGLE_CLIENT_ID")
         if not google_client_id:
             raise AppError(
-                code="GOOGLE_AUTH_UNAVAILABLE", message="Đăng nhập Google chưa được cấu hình.", status_code=503,
+                code="GOOGLE_AUTH_UNAVAILABLE",
+                message="Đăng nhập Google chưa được cấu hình.",
+                status_code=503,
             )
         try:
             header = jwt.get_unverified_header(req.credential)
             if header.get("alg") != "RS256" or not header.get("kid"):
                 raise ValueError("Invalid signing key")
-            async with httpx.AsyncClient(timeout=5.0) as client:
-                response = await client.get("https://www.googleapis.com/oauth2/v3/certs")
+            from app.core.http_client import get_shared_async_client
+            import anyio
+
+            with anyio.fail_after(10):
+                response = await get_shared_async_client(5.0).get(
+                    "https://www.googleapis.com/oauth2/v3/certs"
+                )
                 response.raise_for_status()
             key = next(k for k in response.json()["keys"] if k["kid"] == header["kid"])
             decode_kwargs = {
@@ -187,84 +210,123 @@ class AuthService:
             else:
                 decode_kwargs["options"]["verify_aud"] = False
 
-            data = jwt.decode(req.credential, jwt.PyJWK.from_dict(key).key, **decode_kwargs)
-            if data.get("email_verified") is not True or not data.get("sub") or not data.get("email"):
+            data = jwt.decode(
+                req.credential, jwt.PyJWK.from_dict(key).key, **decode_kwargs
+            )
+            if (
+                data.get("email_verified") is not True
+                or not data.get("sub")
+                or not data.get("email")
+            ):
                 raise ValueError("Unverified identity")
-        except httpx.HTTPError:
-            raise AppError(code="GOOGLE_AUTH_UNAVAILABLE", message="Không thể kết nối máy chủ Google để xác thực. Vui lòng thử lại.", status_code=503)
+        except (httpx.HTTPError, TimeoutError):
+            raise AppError(
+                code="GOOGLE_AUTH_UNAVAILABLE",
+                message="Không thể kết nối máy chủ Google để xác thực. Vui lòng thử lại.",
+                status_code=503,
+            )
         except (jwt.PyJWTError, ValueError, KeyError, TypeError, StopIteration) as err:
-            raise AppError(code="GOOGLE_AUTH_FAILED", message=f"Thông tin xác thực Google không hợp lệ: {str(err)}", status_code=401)
-
-        email = data["email"].strip().lower()
-        google_sub = data["sub"]
-        display_name = data.get("name") or email.split("@")[0]
-        avatar_url = data.get("picture")
-
-        # Kiểm tra tài khoản đã tồn tại theo provider_id hoặc email
-        existing = Database.fetch_one(
-            "SELECT * FROM accounts WHERE (auth_provider = 'google' AND provider_id = ?) OR email = ?",
-            (google_sub, email),
-        )
-
-        if existing:
-            if not existing["is_active"]:
-                raise AppError(code="UNAUTHORIZED", message="Tài khoản đã bị vô hiệu hóa.", status_code=401)
-            account_id = existing["id"]
-            email = existing["email"]
-            # Cập nhật thông tin bổ sung nếu có
-            Database.execute(
-                """
-                UPDATE accounts 
-                SET provider_id = COALESCE(provider_id, ?),
-                    avatar_url = COALESCE(avatar_url, ?),
-                    updated_at = CURRENT_TIMESTAMP 
-                WHERE id = ?
-                """,
-                (google_sub, avatar_url, account_id),
-            )
-            roles = cls.get_user_roles(account_id)
-            display_name = existing["display_name"]
-        else:
-            # Tạo tài khoản mới từ Google
-            account_id = f"usr_gg_{uuid.uuid4().hex[:10]}"
-            Database.execute(
-                """
-                INSERT INTO accounts (id, email, display_name, avatar_url, auth_provider, provider_id, is_active)
-                VALUES (?, ?, ?, ?, 'google', ?, 1)
-                """,
-                (account_id, email, display_name, avatar_url, google_sub),
+            raise AppError(
+                code="GOOGLE_AUTH_FAILED",
+                message=f"Thông tin xác thực Google không hợp lệ: {str(err)}",
+                status_code=401,
             )
 
-            # Tạo profile
-            profile_id = f"prof_{uuid.uuid4().hex[:12]}"
-            Database.execute(
-                """
-                INSERT INTO profiles (id, user_id, display_name, avatar_url, preferences)
-                VALUES (?, ?, ?, ?, '{}')
-                """,
-                (profile_id, account_id, display_name, avatar_url),
+        from starlette.concurrency import run_in_threadpool
+
+        return await run_in_threadpool(cls._complete_google_auth, data)
+
+    @classmethod
+    def _complete_google_auth(cls, data):
+        from app.core.database import db_transaction
+
+        with db_transaction() as conn:
+            email = data["email"].strip().lower()
+            google_sub = data["sub"]
+            display_name = data.get("name") or email.split("@")[0]
+            avatar_url = data.get("picture")
+
+            # Kiểm tra tài khoản đã tồn tại theo provider_id hoặc email
+            existing = Database.fetch_one(
+                "SELECT * FROM accounts WHERE (auth_provider = 'google' AND provider_id = ?) OR email = ?",
+                (google_sub, email),
+                conn=conn,
             )
 
-            # Gán vai trò mặc định: user
-            role_id = f"ur_{uuid.uuid4().hex[:12]}"
-            Database.execute(
-                "INSERT INTO user_roles (id, user_id, role) VALUES (?, ?, 'user')",
-                (role_id, account_id),
+            if existing:
+                if not existing["is_active"]:
+                    raise AppError(
+                        code="UNAUTHORIZED",
+                        message="Tài khoản đã bị vô hiệu hóa.",
+                        status_code=401,
+                    )
+                account_id = existing["id"]
+                email = existing["email"]
+                # Cập nhật thông tin bổ sung nếu có
+                Database.execute(
+                    """
+                    UPDATE accounts
+                    SET provider_id = COALESCE(provider_id, ?),
+                        avatar_url = COALESCE(avatar_url, ?),
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE id = ?
+                    """,
+                    (google_sub, avatar_url, account_id),
+                    conn=conn,
+                )
+                roles = [
+                    r["role"]
+                    for r in Database.fetch_all(
+                        "SELECT role FROM user_roles WHERE user_id=?",
+                        (account_id,),
+                        conn=conn,
+                    )
+                ] or ["user"]
+                display_name = existing["display_name"]
+            else:
+                # Tạo tài khoản mới từ Google
+                account_id = f"usr_gg_{uuid.uuid4().hex[:10]}"
+                Database.execute(
+                    """
+                    INSERT INTO accounts (id, email, display_name, avatar_url, auth_provider, provider_id, is_active)
+                    VALUES (?, ?, ?, ?, 'google', ?, 1)
+                    """,
+                    (account_id, email, display_name, avatar_url, google_sub),
+                    conn=conn,
+                )
+
+                # Tạo profile
+                profile_id = f"prof_{uuid.uuid4().hex[:12]}"
+                Database.execute(
+                    """
+                    INSERT INTO profiles (id, user_id, display_name, avatar_url, preferences)
+                    VALUES (?, ?, ?, ?, '{}')
+                    """,
+                    (profile_id, account_id, display_name, avatar_url),
+                    conn=conn,
+                )
+
+                # Gán vai trò mặc định: user
+                role_id = f"ur_{uuid.uuid4().hex[:12]}"
+                Database.execute(
+                    "INSERT INTO user_roles (id, user_id, role) VALUES (?, ?, 'user')",
+                    (role_id, account_id),
+                    conn=conn,
+                )
+                roles = ["user"]
+
+            token = create_access_token(user_id=account_id, email=email, roles=roles)
+
+            user_resp = UserResponse(
+                id=account_id,
+                email=email,
+                display_name=display_name,
+                avatar_url=avatar_url,
+                roles=roles,
+                auth_provider="google",
             )
-            roles = ["user"]
 
-        token = create_access_token(user_id=account_id, email=email, roles=roles)
-
-        user_resp = UserResponse(
-            id=account_id,
-            email=email,
-            display_name=display_name,
-            avatar_url=avatar_url,
-            roles=roles,
-            auth_provider="google",
-        )
-
-        return AuthResponse(access_token=token, token_type="bearer", user=user_resp)
+            return AuthResponse(access_token=token, token_type="bearer", user=user_resp)
 
     @classmethod
     def get_me(cls, user_id: str) -> UserResponse:
@@ -275,7 +337,11 @@ class AuthService:
         )
 
         if not account or not account["is_active"]:
-            raise AppError(code="UNAUTHORIZED", message="Tài khoản không tồn tại hoặc đã bị vô hiệu hóa.", status_code=401)
+            raise AppError(
+                code="UNAUTHORIZED",
+                message="Tài khoản không tồn tại hoặc đã bị vô hiệu hóa.",
+                status_code=401,
+            )
 
         roles = cls.get_user_roles(user_id)
 
