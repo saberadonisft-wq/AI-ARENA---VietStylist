@@ -26,8 +26,8 @@ module.exports = {
         },
       },
       fontFamily: {
-        sans: ["'Be Vietnam Pro'", "Inter", "-apple-system", "BlinkMacSystemFont", "sans-serif"],
-        serif: ["'Noto Serif'", "'Playfair Display'", "Georgia", "serif"],
+        sans: ["var(--font-sans)", "'Be Vietnam Pro'", "Inter", "-apple-system", "BlinkMacSystemFont", "sans-serif"],
+        serif: ["var(--font-serif)", "'Noto Serif'", "'Playfair Display'", "Georgia", "serif"],
       },
     },
   },

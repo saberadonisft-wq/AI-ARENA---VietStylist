@@ -16,8 +16,18 @@
   }
 
   h1, h2, h3, h4, .font-serif-cophong {
-    font-family: 'Noto Serif', 'Playfair Display', Georgia, serif;
+    font-family: var(--font-serif), 'Noto Serif', 'Playfair Display', Georgia, serif;
     letter-spacing: -0.015em;
+  }
+
+  a, button {
+    -webkit-tap-highlight-color: transparent;
+    outline: none !important;
+  }
+
+  a:focus, a:focus-visible, button:focus, button:focus-visible {
+    outline: none !important;
+    box-shadow: none;
   }
 }
 
@@ -33,6 +43,219 @@
 
 .animate-shimmer {
   animation: shimmer 1.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+/* Các chuyển động nghệ thuật Cổ phong & Motion Design */
+@keyframes float-slow {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-12px) rotate(1.5deg);
+  }
+}
+
+@keyframes float-reverse {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(12px) rotate(-1.5deg);
+  }
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    opacity: 0.45;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.85;
+    transform: scale(1.08);
+  }
+}
+
+@keyframes gradient-flow {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+@keyframes garment-enter {
+  0% {
+    opacity: 0;
+    transform: scale(0.96) translateY(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes beam-sweep {
+  0% {
+    transform: translateX(-150%) skewX(-20deg);
+  }
+  100% {
+    transform: translateX(250%) skewX(-20deg);
+  }
+}
+
+.animate-float-slow {
+  animation: float-slow 7s ease-in-out infinite;
+}
+
+.animate-float-reverse {
+  animation: float-reverse 9s ease-in-out infinite;
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 5s ease-in-out infinite;
+}
+
+.animate-gradient-flow {
+  background-size: 200% auto;
+  animation: gradient-flow 5s ease infinite;
+}
+
+.animate-garment-enter {
+  animation: garment-enter 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-beam-sweep {
+  animation: beam-sweep 3.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+@keyframes sparkle-float {
+  0%, 100% {
+    transform: translateY(0px) scale(0.85);
+    opacity: 0.3;
+  }
+  50% {
+    transform: translateY(-16px) scale(1.15);
+    opacity: 0.9;
+  }
+}
+
+@keyframes drift-slow {
+  0% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+  50% {
+    transform: translate(15px, -18px) rotate(6deg);
+  }
+  100% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+}
+
+@keyframes drift-reverse {
+  0% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+  50% {
+    transform: translate(-18px, 15px) rotate(-6deg);
+  }
+  100% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+}
+
+.animate-sparkle-float {
+  animation: sparkle-float 4s ease-in-out infinite;
+}
+
+.animate-drift-slow {
+  animation: drift-slow 8s ease-in-out infinite;
+}
+
+.animate-drift-reverse {
+  animation: drift-reverse 10s ease-in-out infinite;
+}
+
+/* Scroll Reveal Classes */
+.scroll-reveal {
+  opacity: 0;
+  transform: translateY(36px) scale(0.97);
+  transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1), transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: opacity, transform;
+}
+
+.scroll-reveal.is-visible {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.scroll-slide-left {
+  opacity: 0;
+  transform: translateX(-36px);
+  transition: opacity 0.85s cubic-bezier(0.16, 1, 0.3, 1), transform 0.85s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: opacity, transform;
+}
+
+.scroll-slide-left.is-visible {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.scroll-slide-right {
+  opacity: 0;
+  transform: translateX(36px);
+  transition: opacity 0.85s cubic-bezier(0.16, 1, 0.3, 1), transform 0.85s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: opacity, transform;
+}
+
+.scroll-slide-right.is-visible {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+/* Full Palette Rotating & Breathing Chromatic Aura Animations */
+@keyframes spin-slow {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes spin-reverse-slow {
+  0% {
+    transform: rotate(360deg);
+  }
+  100% {
+    transform: rotate(0deg);
+  }
+}
+
+@keyframes aura-breathe {
+  0%, 100% {
+    transform: scale(0.94);
+    opacity: 0.55;
+  }
+  50% {
+    transform: scale(1.14);
+    opacity: 0.90;
+  }
+}
+
+.animate-spin-slow {
+  animation: spin-slow 18s linear infinite;
+}
+
+.animate-spin-reverse-slow {
+  animation: spin-reverse-slow 24s linear infinite;
+}
+
+.animate-aura-breathe {
+  animation: aura-breathe 6s ease-in-out infinite;
 }
 
 /* Custom scrollbars */

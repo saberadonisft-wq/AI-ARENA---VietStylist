@@ -1,0 +1,11 @@
+{
+  "ffprobe_sha256": "139f8420bcb2f29fcd5734e29d686289df826cadce5d2b7b5f56d0000ea9a951",
+  "ffprobe_version": "ffprobe version 6.0-essentials_build-www.gyan.dev Copyright (c) 2007-2023 the FFmpeg developers",
+  "valid_upload_complete": 200,
+  "verified_width": 64,
+  "verified_height": 48,
+  "verified_duration_ms": 1000,
+  "roundtrip_bytes": 1146,
+  "truncated_mp4_status": 422,
+  "passed": true
+}

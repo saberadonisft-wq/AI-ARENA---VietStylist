@@ -1,9 +1,24 @@
 import type { Metadata } from "next";
-import Script from "next/script";
+import { Be_Vietnam_Pro, Noto_Serif } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/lib/auth/context";
+import { CatalogProvider } from "@/lib/catalog/CatalogProvider";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+
+const beVietnamPro = Be_Vietnam_Pro({
+  subsets: ["vietnamese", "latin"],
+  weight: ["300", "400", "500", "600", "700", "800"],
+  variable: "--font-sans",
+  display: "swap",
+});
+
+const notoSerif = Noto_Serif({
+  subsets: ["vietnamese", "latin"],
+  weight: ["400", "600", "700"],
+  variable: "--font-serif",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "VietStylist | Nền tảng Phối đồ & Di sản Thời trang Việt",
@@ -25,21 +40,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="vi" className="h-full">
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400;1,600&family=Noto+Serif:ital,wght@0,400;0,600;0,700;1,400&family=Playfair+Display:ital,wght@0,600;0,700;1,600&display=swap"
-          rel="stylesheet"
-        />
-      </head>
-      <body className="flex flex-col min-h-screen bg-[#FAF8F5] text-stone-800">
-        <Script src="https://accounts.google.com/gsi/client" strategy="afterInteractive" />
+    <html lang="vi" className={`h-full ${beVietnamPro.variable} ${notoSerif.variable}`}>
+      <body className="flex flex-col min-h-screen bg-[#FAF8F5] text-stone-800 font-sans">
         <AuthProvider>
-          <Navbar />
-          <main className="flex-1">{children}</main>
-          <Footer />
+          <CatalogProvider>
+            <Navbar />
+            <main className="flex-1">{children}</main>
+            <Footer />
+          </CatalogProvider>
         </AuthProvider>
       </body>
     </html>

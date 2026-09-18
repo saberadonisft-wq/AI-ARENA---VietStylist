@@ -20,7 +20,7 @@ import {
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_API_ORIGIN || "http://localhost:4000";
 
-class ApiError extends Error {
+export class ApiError extends Error {
   code: string;
   statusCode: number;
   details: any;
@@ -37,7 +37,7 @@ class ApiError extends Error {
 // In-memory cache cho dữ liệu tĩnh catalog & heritage (TTL 60s)
 const requestCache = new Map<string, { data: any; expiry: number }>();
 
-export async function apiFetch<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+export async function apiFetch<T>(endpoint: string, options: RequestInit & { timeoutMs?: number } = {}): Promise<T> {
   const url = `${API_ORIGIN}${endpoint.startsWith("/api") ? endpoint : `/api${endpoint}`}`;
   const method = (options.method || "GET").toUpperCase();
   const isCacheable = method === "GET" && (endpoint.includes("/catalog") || endpoint.includes("/heritage"));
@@ -62,10 +62,37 @@ export async function apiFetch<T>(endpoint: string, options: RequestInit = {}): 
     }
   }
 
-  const response = await fetch(url, {
-    ...options,
-    headers,
-  });
+  const timeoutMs = options.timeoutMs || 3000;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  let response: Response;
+  try {
+    if (options.signal) {
+      options.signal.addEventListener("abort", () => controller.abort());
+    }
+
+    response = await fetch(url, {
+      ...options,
+      headers,
+      signal: controller.signal,
+    });
+  } catch (err: any) {
+    if (err.name === "AbortError") {
+      throw new ApiError(
+        `Yêu cầu máy chủ vượt quá thời gian chờ (${timeoutMs}ms): ${endpoint}`,
+        "TIMEOUT_ERROR",
+        408
+      );
+    }
+    throw new ApiError(
+      err.message || "Không thể kết nối đến máy chủ backend",
+      "NETWORK_ERROR",
+      503
+    );
+  } finally {
+    clearTimeout(timeoutId);
+  }
 
   if (!response.ok) {
     let errBody: any = {};

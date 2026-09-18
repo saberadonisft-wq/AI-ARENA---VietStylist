@@ -5,7 +5,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/lib/auth/context";
 import Logo from "@/components/Logo";
-import AuthModal from "@/components/AuthModal";
+import dynamic from "next/dynamic";
+const AuthModal = dynamic(() => import("@/components/AuthModal"), { ssr: false });
 import {
   Sparkles,
   BookOpen,
@@ -28,9 +29,15 @@ export default function Navbar() {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authModalTab, setAuthModalTab] = useState<"login" | "register">("login");
   const [showUserDropdown, setShowUserDropdown] = useState(false);
+  const [navigatingTo, setNavigatingTo] = useState<string | null>(null);
+
+  // Tự động tắt trạng thái điều hướng khi route đã thay đổi
+  React.useEffect(() => {
+    setNavigatingTo(null);
+  }, [pathname]);
 
   const navLinks = [
-    { href: "/", label: "Studio Phối đồ", icon: Sparkles },
+    { href: "/studio", label: "Studio Phối đồ", icon: Sparkles },
     { href: "/thu-vien", label: "Thư viện Cổ phục", icon: BookOpen },
     { href: "/lookbook", label: "Lookbook", icon: FolderHeart },
     { href: "/chuyen-co-phuc", label: "Chuyện Cổ phục", icon: Feather },
@@ -64,11 +71,25 @@ export default function Navbar() {
 
   return (
     <>
-      <header className="sticky top-0 z-50 bg-[#FAF8F5] border-b border-stone-200/80 shadow-xs transition-colors will-change-transform">
+      <header className="sticky top-0 z-50 bg-[#FAF8F5] border-b border-stone-200/80 shadow-xs transition-colors will-change-transform relative">
+        {/* Thanh chỉ báo điều hướng tức thì khi người dùng click chuyển trang */}
+        {navigatingTo && (
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-400 via-heritage-red to-amber-500 animate-shimmer z-50">
+            <div className="w-full h-full bg-heritage-red/60 animate-pulse" />
+          </div>
+        )}
+
         <div className="max-w-[1720px] mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             {/* Logo Brand VietStylist */}
-            <Link href="/" className="group flex items-center">
+            <Link
+              href="/"
+              prefetch={true}
+              onClick={() => {
+                if (pathname !== "/") setNavigatingTo("/");
+              }}
+              className="group flex items-center outline-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 border-none"
+            >
               <Logo size="md" />
             </Link>
 
@@ -77,18 +98,28 @@ export default function Navbar() {
               {navLinks.map((item) => {
                 const Icon = item.icon;
                 const isActive = pathname === item.href;
+                const isNavigatingThis = navigatingTo === item.href;
                 return (
                   <Link
                     key={item.href}
                     href={item.href}
+                    prefetch={true}
+                    onClick={() => {
+                      if (pathname !== item.href) setNavigatingTo(item.href);
+                    }}
                     className={`flex items-center space-x-1.5 px-3 py-2 rounded-md text-sm font-medium transition-all ${
                       isActive
                         ? "bg-heritage-red/10 text-heritage-red font-semibold border-b-2 border-heritage-red"
+                        : isNavigatingThis
+                        ? "bg-amber-100/70 text-heritage-red font-semibold animate-pulse"
                         : "text-stone-600 hover:text-stone-900 hover:bg-stone-100/80"
                     }`}
                   >
-                    <Icon className={`w-4 h-4 ${isActive ? "text-heritage-red" : "text-stone-400"}`} />
+                    <Icon className={`w-4 h-4 ${isActive || isNavigatingThis ? "text-heritage-red" : "text-stone-400"}`} />
                     <span>{item.label}</span>
+                    {isNavigatingThis && (
+                      <span className="w-1.5 h-1.5 rounded-full bg-heritage-red animate-ping ml-0.5" />
+                    )}
                   </Link>
                 );
               })}
@@ -207,18 +238,25 @@ export default function Navbar() {
             {navLinks.map((item) => {
               const Icon = item.icon;
               const isActive = pathname === item.href;
+              const isNavigatingThis = navigatingTo === item.href;
               return (
                 <Link
                   key={item.href}
                   href={item.href}
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  className={`flex items-center space-x-2 px-3 py-2.5 rounded-md text-base font-medium ${
+                  prefetch={true}
+                  onClick={() => {
+                    setIsMobileMenuOpen(false);
+                    if (pathname !== item.href) setNavigatingTo(item.href);
+                  }}
+                  className={`flex items-center space-x-2 px-3 py-2.5 rounded-md text-base font-medium transition-all ${
                     isActive
                       ? "bg-heritage-red/10 text-heritage-red font-semibold"
+                      : isNavigatingThis
+                      ? "bg-amber-100/70 text-heritage-red font-semibold animate-pulse"
                       : "text-stone-700 hover:bg-stone-100"
                   }`}
                 >
-                  <Icon className="w-5 h-5 text-heritage-red" />
+                  <Icon className={`w-5 h-5 ${isActive || isNavigatingThis ? "text-heritage-red" : "text-stone-500"}`} />
                   <span>{item.label}</span>
                 </Link>
               );
@@ -285,11 +323,13 @@ export default function Navbar() {
       </header>
 
       {/* Auth Modal Component */}
-      <AuthModal
-        isOpen={showAuthModal}
-        onClose={() => setShowAuthModal(false)}
-        defaultTab={authModalTab}
-      />
+      {showAuthModal && (
+        <AuthModal
+          isOpen={showAuthModal}
+          onClose={() => setShowAuthModal(false)}
+          defaultTab={authModalTab}
+        />
+      )}
     </>
   );
 }

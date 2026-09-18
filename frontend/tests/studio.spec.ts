@@ -64,7 +64,7 @@ async function readDraft(page: Page) {
 
 test("refresh preserves draft, first change can undo, and saving updates one outfit", async ({ page }) => {
   const saves = await mockApi(page);
-  await page.goto("/");
+  await page.goto("/studio");
   const title = page.locator('input').first();
   await title.fill("Nháp cần giữ");
   await expect.poll(async () => (await readDraft(page))?.title).toBe("Nháp cần giữ");
@@ -93,7 +93,7 @@ test("refresh preserves draft, first change can undo, and saving updates one out
 
 test("canvas drag persists, undo restores it, and export includes garment image", async ({ page }) => {
   await mockApi(page);
-  await page.goto("/");
+  await page.goto("/studio");
   const image = page.locator('#content-outerwear image');
   await expect(image).toBeVisible();
   await image.scrollIntoViewIfNeeded();
@@ -126,7 +126,7 @@ test("canvas drag persists, undo restores it, and export includes garment image"
 
 test("unavailable try-on displays an error without fake success", async ({ page }) => {
   await mockApi(page);
-  await page.goto("/");
+  await page.goto("/studio");
   await page.getByRole("button", { name: "Thử đồ AI (F05)" }).click();
   await page.getByRole("button", { name: "Tạo ảnh Thử đồ AI" }).click();
   await expect(page.locator("p[role=alert]")).toHaveText("Thử đồ AI chưa sẵn sàng.");

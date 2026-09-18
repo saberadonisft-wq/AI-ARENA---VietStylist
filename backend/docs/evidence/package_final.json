@@ -1,0 +1,107 @@
+{
+  "python": "3.13.6 (tags/v3.13.6:4e66535, Aug  6 2025, 14:36:00) [MSC v.1944 64 bit (AMD64)]",
+  "platform": "Windows-11-10.0.26200-SP0",
+  "steps": [
+    {
+      "command": [
+        "C:\\Users\\vhc\\AppData\\Local\\Programs\\Python\\Python313\\python.exe",
+        "-m",
+        "pip",
+        "wheel",
+        "--no-deps",
+        "--no-build-isolation",
+        "--no-index",
+        "--wheel-dir",
+        "C:\\Users\\vhc\\AppData\\Local\\Temp\\vietstylist-package-vzhc3b71\\wheels",
+        "C:\\Users\\vhc\\AppData\\Local\\Temp\\vietstylist-package-vzhc3b71\\source"
+      ],
+      "exit_code": 0,
+      "stdout": "Processing c:\\users\\vhc\\appdata\\local\\temp\\vietstylist-package-vzhc3b71\\source\n  Preparing metadata (pyproject.toml): started\n  Preparing metadata (pyproject.toml): finished with status 'done'\nBuilding wheels for collected packages: viet-phuc-remix-backend\n  Building wheel for viet-phuc-remix-backend (pyproject.toml): started\n  Building wheel for viet-phuc-remix-backend (pyproject.toml): finished with status 'done'\n  Created wheel for viet-phuc-remix-backend: filename=viet_phuc_remix_backend-0.1.0-py3-none-any.whl size=107669 sha256=f37ba135150f2d980afb7d11d9456b882347444a0fd9cfd74adee7a8c3974aa1\n  Stored in directory: C:\\Users\\vhc\\AppData\\Local\\Temp\\pip-ephem-wheel-cache-k21gx57y\\wheels\\10\\29\\63\\0960bb32d31b3f97c9958404d76720fdaca9d9fce2ded0c2f7\nSuccessfully built viet-phuc-remix-backend\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "C:\\Users\\vhc\\AppData\\Local\\Programs\\Python\\Python313\\python.exe",
+        "-m",
+        "venv",
+        "C:\\Users\\vhc\\AppData\\Local\\Temp\\vietstylist-package-vzhc3b71\\venv"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "C:\\Users\\vhc\\AppData\\Local\\Temp\\vietstylist-package-vzhc3b71\\venv\\Scripts\\python.exe",
+        "-m",
+        "pip",
+        "install",
+        "--disable-pip-version-check",
+        "--no-input",
+        "--timeout",
+        "30",
+        "--retries",
+        "1",
+        "C:\\Users\\vhc\\AppData\\Local\\Temp\\vietstylist-package-vzhc3b71\\wheels\\viet_phuc_remix_backend-0.1.0-py3-none-any.whl[dev]",
+        "-c",
+        "D:\\AI-ARENA---VietStylist\\backend\\constraints-py313-windows.txt"
+      ],
+      "exit_code": 0,
+      "stdout": "Processing c:\\users\\vhc\\appdata\\local\\temp\\vietstylist-package-vzhc3b71\\wheels\\viet_phuc_remix_backend-0.1.0-py3-none-any.whl (from viet-phuc-remix-backend==0.1.0)\nCollecting fastapi>=0.115.0 (from viet-phuc-remix-backend==0.1.0->viet-phuc-remix-backend==0.1.0)\n  Using cached fastapi-0.115.6-py3-none-any.whl.metadata (27 kB)\nCollecting uvicorn>=0.34.0 (from uvicorn[standard]>=0.34.0->viet-phuc-remix-backend==0.1.0->viet-phuc-remix-backend==0.1.0)\n  Using cached uvicorn-0.34.0-py3-none-any.whl.metadata (6.5 kB)\nCollecting pydantic>=2.10.0 (from viet-phuc-remix-backend==0.1.0->viet-phuc-remix-backend==0.1.0)\n  Using cached pydantic-2.10.6-py3-none-any.whl.metadata (30 kB)\nCollecting pydantic-settings>=2.7.0 (from viet-phuc-remix-backend==0.1.0->viet-phuc-remix-backend==0.1.0)\n  Using cached pydantic_settings-2.7.1-py3-none-any.whl.metadata (3.5 kB)\nCollecting pyjwt>=2.10.0 (from pyjwt[crypto]>=2.10.0->viet-phuc-remix-backend==0.1.0->viet-phuc-remix-backend==0.1.0)\n  Using cached pyjwt-2.13.0-py3-none-any.whl.metadata (3.4 kB)\nCollecting httpx>=0.28.0 (from viet-phuc-remix-backend==0.1.0->viet-phuc-remix-backend==0.1.0)\n  Using cached httpx-0.28.1-py3-none-any.whl.metadata (7.1 kB)\nCollecting boto3>=1.35.0 (from viet-phuc-remix-backend==0.1.0->viet-phuc-remix-backend==0.1.0)\n  Using cached boto3-1.43.95-py3-none-any.whl.metadata (6.6 kB)\nCollecting python-multipart>=0.0.20 (from viet-phuc-remix-backend==0.1.0->viet-phuc-remix-backend==0.1.0)\n  Using cached python_multipart-0.0.32-py3-none-any.whl.metadata (2.1 kB)\nCollecting aiofiles>=24.1.0 (from viet-phuc-remix-backend==0.1.0->viet-phuc-remix-backend==0.1.0)\n  Using cached aiofiles-25.1.0-py3-none-any.whl.metadata (6.3 kB)\nCollecting pillow>=11.0.0 (from viet-phuc-remix-backend==0.1.0->viet-phuc-remix-backend==0.1.0)\n  Using cached pillow-11.3.0-cp313-cp313-win_amd64.whl.metadata (9.2 kB)\nCollecting pytest>=8.3.0 (from viet-phuc-remix-backend==0.1.0->viet-phuc-remix-backend==0.1.0)\n  Using cached pytest-9.1.1-py3-none-any.whl.metadata (7.6 kB)\nCollecting pytest-asyncio>=0.24.0 (from viet-phuc-remix-backend==0.1.0->viet-phuc-remix-backend==0.1.0)\n  Using cached pytest_asyncio-1.4.0-py3-none-any.whl.metadata (4.1 kB)\nCollecting psutil>=6.0.0 (from viet-phuc-remix-backend==0.1.0->viet-phuc-remix-backend==0.1.0)\n  Using cached psutil-7.1.0-cp37-abi3-win_amd64.whl.metadata (23 kB)\nCollecting botocore<1.44.0,>=1.43.95 (from boto3>=1.35.0->viet-phuc-remix-backend==0.1.0->viet-phuc-remix-backend==0.1.0)\n  Using cached botocore-1.43.95-py3-none-any.whl.metadata (5.6 kB)\nCollecting jmespath<2.0.0,>=0.7.1 (from boto3>=1.35.0->viet-phuc-remix-backend==0.1.0->viet-phuc-remix-backend==0.1.0)\n  Using cached jmespath-1.1.0-py3-none-any.whl.metadata (7.6 kB)\nCollecting s3transfer<0.20.0,>=0.19.0 (from boto3>=1.35.0->viet-phuc-remix-backend==0.1.0->viet-phuc-remix-backend==0.1.0)\n  Using cached s3transfer-0.19.2-py3-none-any.whl.metadata (1.7 kB)\nCollecting python-dateutil<3.0.0,>=2.1 (from botocore<1.44.0,>=1.43.95->boto3>=1.35.0->viet-phuc-remix-backend==0.1.0->viet-phuc-remix-backend==0.1.0)\n  Using cached python_dateutil-2.9.0.post0-py2.py3-none-any.whl.metadata (8.4 kB)\nCollecting urllib3!=2.2.0,<3,>=1.25.4 (from botocore<1.44.0,>=1.43.95->boto3>=1.35.0->viet-phuc-remix-backend==0.1.0->viet-phuc-remix-backend==0.1.0)\n  Using cached urllib3-2.5.0-py3-none-any.whl.metadata (6.5 kB)\nCollecting six>=1.5 (from python-dateutil<3.0.0,>=2.1->botocore<1.44.0,>=1.43.95->boto3>=1.35.0->viet-phuc-remix-backend==0.1.0->viet-phuc-remix-backend==0.1.0)\n  Using cached six-1.17.0-py2.py3-none-any.whl.metadata (1.7 kB)\nCollecting starlette<0.42.0,>=0.40.0 (from fastapi>=0.115.0->viet-phuc-remix-backend==0.1.0->viet-phuc-remix-backend==0.1.0)\n  Using cached starlette-0.41.3-py3-none-any.whl.metadata (6.0 kB)\nCollecting typing-extensions>=4.8.0 (from fastapi>=0.115.0->viet-phuc-remix-backend==0.1.0->viet-phuc-remix-backend==0.1.0)\n  Using cached typing_extensions-4.14.1-py3-none-any.whl.metadata (3.0 kB)\nCollecting annotated-types>=0.6.0 (from pydantic>=2.10.0->viet-phuc-remix-backend==0.1.0->viet-phuc-remix-backend==0.1.0)\n  Using cached annotated_types-0.7.0-py3-none-any.whl.metadata (15 kB)\nCollecting pydantic-core==2.27.2 (from pydantic>=2.10.0->viet-phuc-remix-backend==0.1.0->viet-phuc-remix-backend==0.1.0)\n  Using cached pydantic_core-2.27.2-cp313-cp313-win_amd64.whl.metadata (6.7 kB)\nCollecting anyio<5,>=3.4.0 (from starlette<0.42.0,>=0.40.0->fastapi>=0.115.0->viet-phuc-remix-backend==0.1.0->viet-phuc-remix-backend==0.1.0)\n  Using cached anyio-4.10.0-py3-none-any.whl.metadata (4.0 kB)\nCollecting idna>=2.8 (from anyio<5,>=3.4.0->starlette<0.42.0,>=0.40.0->fastapi>=0.115.0->viet-phuc-remix-backend==0.1.0->viet-phuc-remix-backend==0.1.0)\n  Using cached idna-3.10-py3-none-any.whl.metadata (10 kB)\nCollecting sniffio>=1.1 (from anyio<5,>=3.4.0->starlette<0.42.0,>=0.40.0->fastapi>=0.115.0->viet-phuc-remix-backend==0.1.0->viet-phuc-remix-backend==0.1.0)\n  Using cached sniffio-1.3.1-py3-none-any.whl.metadata (3.9 kB)\nCollecting certifi (from httpx>=0.28.0->viet-phuc-remix-backend==0.1.0->viet-phuc-remix-backend==0.1.0)\n  Using cached certifi-2025.8.3-py3-none-any.whl.metadata (2.4 kB)\nCollecting httpcore==1.* (from httpx>=0.28.0->viet-phuc-remix-backend==0.1.0->viet-phuc-remix-backend==0.1.0)\n  Using cached httpcore-1.0.9-py3-none-any.whl.metadata (21 kB)\nCollecting h11>=0.16 (from httpcore==1.*->httpx>=0.28.0->viet-phuc-remix-backend==0.1.0->viet-phuc-remix-backend==0.1.0)\n  Using cached h11-0.16.0-py3-none-any.whl.metadata (8.3 kB)\nCollecting python-dotenv>=0.21.0 (from pydantic-settings>=2.7.0->viet-phuc-remix-backend==0.1.0->viet-phuc-remix-backend==0.1.0)\n  Using cached python_dotenv-1.2.2-py3-none-any.whl.metadata (27 kB)\nCollecting cryptography>=3.4.0 (from pyjwt[crypto]>=2.10.0->viet-phuc-remix-backend==0.1.0->viet-phuc-remix-backend==0.1.0)\n  Using cached cryptography-50.0.0-cp311-abi3-win_amd64.whl.metadata (4.3 kB)\nCollecting cffi>=2.0.0 (from cryptography>=3.4.0->pyjwt[crypto]>=2.10.0->viet-phuc-remix-backend==0.1.0->viet-phuc-remix-backend==0.1.0)\n  Using cached cffi-2.1.1-cp313-cp313-win_amd64.whl.metadata (2.6 kB)\nCollecting pycparser (from cffi>=2.0.0->cryptography>=3.4.0->pyjwt[crypto]>=2.10.0->viet-phuc-remix-backend==0.1.0->viet-phuc-remix-backend==0.1.0)\n  Using cached pycparser-2.22-py3-none-any.whl.metadata (943 bytes)\nCollecting colorama>=0.4 (from pytest>=8.3.0->viet-phuc-remix-backend==0.1.0->viet-phuc-remix-backend==0.1.0)\n  Using cached colorama-0.4.6-py2.py3-none-any.whl.metadata (17 kB)\nCollecting iniconfig>=1.0.1 (from pytest>=8.3.0->viet-phuc-remix-backend==0.1.0->viet-phuc-remix-backend==0.1.0)\n  Using cached iniconfig-2.3.0-py3-none-any.whl.metadata (2.5 kB)\nCollecting packaging>=22 (from pytest>=8.3.0->viet-phuc-remix-backend==0.1.0->viet-phuc-remix-backend==0.1.0)\n  Using cached packaging-25.0-py3-none-any.whl.metadata (3.3 kB)\nCollecting pluggy<2,>=1.5 (from pytest>=8.3.0->viet-phuc-remix-backend==0.1.0->viet-phuc-remix-backend==0.1.0)\n  Using cached pluggy-1.6.0-py3-none-any.whl.metadata (4.8 kB)\nCollecting pygments>=2.7.2 (from pytest>=8.3.0->viet-phuc-remix-backend==0.1.0->viet-phuc-remix-backend==0.1.0)\n  Using cached pygments-2.19.2-py3-none-any.whl.metadata (2.5 kB)\nCollecting click>=7.0 (from uvicorn>=0.34.0->uvicorn[standard]>=0.34.0->viet-phuc-remix-backend==0.1.0->viet-phuc-remix-backend==0.1.0)\n  Using cached click-8.3.1-py3-none-any.whl.metadata (2.6 kB)\nCollecting httptools>=0.6.3 (from uvicorn[standard]>=0.34.0->viet-phuc-remix-backend==0.1.0->viet-phuc-remix-backend==0.1.0)\n  Using cached httptools-0.8.0-cp313-cp313-win_amd64.whl.metadata (3.7 kB)\nCollecting pyyaml>=5.1 (from uvicorn[standard]>=0.34.0->viet-phuc-remix-backend==0.1.0->viet-phuc-remix-backend==0.1.0)\n  Using cached PyYAML-6.0.2-cp313-cp313-win_amd64.whl.metadata (2.1 kB)\nCollecting watchfiles>=0.13 (from uvicorn[standard]>=0.34.0->viet-phuc-remix-backend==0.1.0->viet-phuc-remix-backend==0.1.0)\n  Using cached watchfiles-1.2.0-cp313-cp313-win_amd64.whl.metadata (5.0 kB)\nCollecting websockets>=10.4 (from uvicorn[standard]>=0.34.0->viet-phuc-remix-backend==0.1.0->viet-phuc-remix-backend==0.1.0)\n  Using cached websockets-16.0-cp313-cp313-win_amd64.whl.metadata (7.0 kB)\nUsing cached aiofiles-25.1.0-py3-none-any.whl (14 kB)\nUsing cached boto3-1.43.95-py3-none-any.whl (140 kB)\nUsing cached botocore-1.43.95-py3-none-any.whl (15.8 MB)\nUsing cached jmespath-1.1.0-py3-none-any.whl (20 kB)\nUsing cached python_dateutil-2.9.0.post0-py2.py3-none-any.whl (229 kB)\nUsing cached s3transfer-0.19.2-py3-none-any.whl (90 kB)\nUsing cached urllib3-2.5.0-py3-none-any.whl (129 kB)\nUsing cached fastapi-0.115.6-py3-none-any.whl (94 kB)\nUsing cached pydantic-2.10.6-py3-none-any.whl (431 kB)\nUsing cached pydantic_core-2.27.2-cp313-cp313-win_amd64.whl (2.0 MB)\nUsing cached starlette-0.41.3-py3-none-any.whl (73 kB)\nUsing cached anyio-4.10.0-py3-none-any.whl (107 kB)\nUsing cached annotated_types-0.7.0-py3-none-any.whl (13 kB)\nUsing cached httpx-0.28.1-py3-none-any.whl (73 kB)\nUsing cached httpcore-1.0.9-py3-none-any.whl (78 kB)\nUsing cached h11-0.16.0-py3-none-any.whl (37 kB)\nUsing cached idna-3.10-py3-none-any.whl (70 kB)\nUsing cached pillow-11.3.0-cp313-cp313-win_amd64.whl (7.0 MB)\nUsing cached psutil-7.1.0-cp37-abi3-win_amd64.whl (247 kB)\nUsing cached pydantic_settings-2.7.1-py3-none-any.whl (29 kB)\nUsing cached pyjwt-2.13.0-py3-none-any.whl (31 kB)\nUsing cached cryptography-50.0.0-cp311-abi3-win_amd64.whl (3.8 MB)\nUsing cached cffi-2.1.1-cp313-cp313-win_amd64.whl (185 kB)\nUsing cached pytest-9.1.1-py3-none-any.whl (386 kB)\nUsing cached pluggy-1.6.0-py3-none-any.whl (20 kB)\nUsing cached colorama-0.4.6-py2.py3-none-any.whl (25 kB)\nUsing cached iniconfig-2.3.0-py3-none-any.whl (7.5 kB)\nUsing cached packaging-25.0-py3-none-any.whl (66 kB)\nUsing cached pygments-2.19.2-py3-none-any.whl (1.2 MB)\nUsing cached pytest_asyncio-1.4.0-py3-none-any.whl (16 kB)\nUsing cached python_dotenv-1.2.2-py3-none-any.whl (22 kB)\nUsing cached python_multipart-0.0.32-py3-none-any.whl (30 kB)\nUsing cached six-1.17.0-py2.py3-none-any.whl (11 kB)\nUsing cached sniffio-1.3.1-py3-none-any.whl (10 kB)\nUsing cached typing_extensions-4.14.1-py3-none-any.whl (43 kB)\nUsing cached uvicorn-0.34.0-py3-none-any.whl (62 kB)\nUsing cached click-8.3.1-py3-none-any.whl (108 kB)\nUsing cached httptools-0.8.0-cp313-cp313-win_amd64.whl (90 kB)\nUsing cached PyYAML-6.0.2-cp313-cp313-win_amd64.whl (156 kB)\nUsing cached watchfiles-1.2.0-cp313-cp313-win_amd64.whl (288 kB)\nUsing cached websockets-16.0-cp313-cp313-win_amd64.whl (178 kB)\nUsing cached certifi-2025.8.3-py3-none-any.whl (161 kB)\nUsing cached pycparser-2.22-py3-none-any.whl (117 kB)\nInstalling collected packages: websockets, urllib3, typing-extensions, sniffio, six, pyyaml, python-multipart, python-dotenv, pyjwt, pygments, pycparser, psutil, pluggy, pillow, packaging, jmespath, iniconfig, idna, httptools, h11, colorama, certifi, annotated-types, aiofiles, python-dateutil, pytest, pydantic-core, httpcore, click, cffi, anyio, watchfiles, uvicorn, starlette, pytest-asyncio, pydantic, httpx, cryptography, botocore, s3transfer, pydantic-settings, fastapi, boto3, viet-phuc-remix-backend\n\nSuccessfully installed aiofiles-25.1.0 annotated-types-0.7.0 anyio-4.10.0 boto3-1.43.95 botocore-1.43.95 certifi-2025.8.3 cffi-2.1.1 click-8.3.1 colorama-0.4.6 cryptography-50.0.0 fastapi-0.115.6 h11-0.16.0 httpcore-1.0.9 httptools-0.8.0 httpx-0.28.1 idna-3.10 iniconfig-2.3.0 jmespath-1.1.0 packaging-25.0 pillow-11.3.0 pluggy-1.6.0 psutil-7.1.0 pycparser-2.22 pydantic-2.10.6 pydantic-core-2.27.2 pydantic-settings-2.7.1 pygments-2.19.2 pyjwt-2.13.0 pytest-9.1.1 pytest-asyncio-1.4.0 python-dateutil-2.9.0.post0 python-dotenv-1.2.2 python-multipart-0.0.32 pyyaml-6.0.2 s3transfer-0.19.2 six-1.17.0 sniffio-1.3.1 starlette-0.41.3 typing-extensions-4.14.1 urllib3-2.5.0 uvicorn-0.34.0 viet-phuc-remix-backend-0.1.0 watchfiles-1.2.0 websockets-16.0\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "C:\\Users\\vhc\\AppData\\Local\\Temp\\vietstylist-package-vzhc3b71\\venv\\Scripts\\python.exe",
+        "-m",
+        "pip",
+        "check"
+      ],
+      "exit_code": 0,
+      "stdout": "No broken requirements found.\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "C:\\Users\\vhc\\AppData\\Local\\Temp\\vietstylist-package-vzhc3b71\\venv\\Scripts\\python.exe",
+        "-m",
+        "pip",
+        "freeze"
+      ],
+      "exit_code": 0,
+      "stdout": "aiofiles==25.1.0\nannotated-types==0.7.0\nanyio==4.10.0\nboto3==1.43.95\nbotocore==1.43.95\ncertifi==2025.8.3\ncffi==2.1.1\nclick==8.3.1\ncolorama==0.4.6\ncryptography==50.0.0\nfastapi==0.115.6\nh11==0.16.0\nhttpcore==1.0.9\nhttptools==0.8.0\nhttpx==0.28.1\nidna==3.10\niniconfig==2.3.0\njmespath==1.1.0\npackaging==25.0\npillow==11.3.0\npluggy==1.6.0\npsutil==7.1.0\npycparser==2.22\npydantic==2.10.6\npydantic-settings==2.7.1\npydantic_core==2.27.2\nPygments==2.19.2\nPyJWT==2.13.0\npytest==9.1.1\npytest-asyncio==1.4.0\npython-dateutil==2.9.0.post0\npython-dotenv==1.2.2\npython-multipart==0.0.32\nPyYAML==6.0.2\ns3transfer==0.19.2\nsix==1.17.0\nsniffio==1.3.1\nstarlette==0.41.3\ntyping_extensions==4.14.1\nurllib3==2.5.0\nuvicorn==0.34.0\nviet-phuc-remix-backend @ file:///C:/Users/vhc/AppData/Local/Temp/vietstylist-package-vzhc3b71/wheels/viet_phuc_remix_backend-0.1.0-py3-none-any.whl#sha256=f37ba135150f2d980afb7d11d9456b882347444a0fd9cfd74adee7a8c3974aa1\nwatchfiles==1.2.0\nwebsockets==16.0\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "C:\\Users\\vhc\\AppData\\Local\\Temp\\vietstylist-package-vzhc3b71\\venv\\Scripts\\python.exe",
+        "-c",
+        "\nimport io,json,os\nfrom pathlib import Path\nimport app\nassert Path(app.__file__).is_relative_to(Path(os.environ['EXPECTED_VENV']))\nimport httpx,botocore.endpoint\nasync def deny_async(*a,**k):raise AssertionError('Outbound forbidden')\ndef deny(*a,**k):raise AssertionError('Outbound forbidden')\nhttpx.AsyncHTTPTransport.handle_async_request=deny_async\nhttpx.HTTPTransport.handle_request=deny\nbotocore.endpoint.Endpoint.make_request=deny\nfrom app.main import app as api\nfrom fastapi.testclient import TestClient\nfrom PIL import Image\nfrom app.core.database import init_database\ninit_database()\ninit_database()\nwith TestClient(api) as client:\n    assert client.get('/health').status_code==200\n    assert client.get('/ready').status_code==200\n    response=client.post('/api/auth/register',json={'email':'smoke@example.invalid','password':'StrongPassword123!','display_name':'Smoke'})\n    assert response.status_code==200,response.text\n    headers={'Authorization':'Bearer '+response.json()['access_token']}\n    assert client.post('/api/outfits',headers=headers,json={'snapshot':{'items':[]}}).status_code==200\n    response=client.post('/api/media/uploads',headers=headers,json={'filename':'smoke.png'})\n    assert response.status_code==200,response.text\n    session=response.json()\n    data=io.BytesIO()\n    Image.new('RGB',(4,4),'red').save(data,format='PNG')\n    assert client.post(session['upload_url'],files={'file':('smoke.png',data.getvalue(),'image/png')}).status_code==200\n    response=client.post('/api/media/'+session['media_id']+'/complete',headers=headers,json={})\n    assert response.status_code==200,response.text\n    assert client.delete('/api/media/'+session['media_id'],headers=headers).status_code==200\nprint(json.dumps({'installed_path':str(Path(app.__file__)),'smoke':'passed'}))\n"
+      ],
+      "exit_code": 0,
+      "stdout": "{\"installed_path\": \"C:\\\\Users\\\\vhc\\\\AppData\\\\Local\\\\Temp\\\\vietstylist-package-vzhc3b71\\\\venv\\\\Lib\\\\site-packages\\\\app\\\\__init__.py\", \"smoke\": \"passed\"}\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "C:\\Users\\vhc\\AppData\\Local\\Temp\\vietstylist-package-vzhc3b71\\venv\\Scripts\\python.exe",
+        "-m",
+        "pytest",
+        "D:\\AI-ARENA---VietStylist\\backend\\tests",
+        "-o",
+        "addopts=",
+        "-q"
+      ],
+      "exit_code": 0,
+      "stdout": "........................................................................ [ 57%]\n.....................................................                    [100%]\n125 passed in 21.72s\n",
+      "stderr": ""
+    }
+  ],
+  "smoke": {
+    "installed_path": "C:\\Users\\vhc\\AppData\\Local\\Temp\\vietstylist-package-vzhc3b71\\venv\\Lib\\site-packages\\app\\__init__.py",
+    "smoke": "passed"
+  },
+  "full_suite": "........................................................................ [ 57%]\n.....................................................                    [100%]\n125 passed in 21.72s\n",
+  "passed": true,
+  "elapsed_seconds": 91.7576968000003
+}

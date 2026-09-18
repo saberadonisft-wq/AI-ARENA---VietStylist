@@ -1,9 +1,12 @@
+"use client";
+
 import React from "react";
 import Link from "next/link";
 import { BookOpen, Shield, Heart } from "lucide-react";
 import Logo from "@/components/Logo";
 
 export default function Footer() {
+
   return (
     <footer className="bg-[#F5EFEB] border-t border-stone-300/80 text-stone-700 py-10 mt-auto">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -56,7 +59,7 @@ export default function Footer() {
             </h4>
             <ul className="space-y-2 text-xs text-stone-600">
               <li>
-                <Link href="/" className="hover:text-heritage-red transition-colors">
+                <Link href="/studio" className="hover:text-heritage-red transition-colors">
                   Studio Phối đồ 2D (Konva Canvas)
                 </Link>
               </li>
