@@ -24,7 +24,7 @@ export default function Logo({
   const current = dimensions[size];
 
   return (
-    <div className={`flex items-center space-x-3 select-none ${className}`}>
+    <div className={`flex items-center space-x-3 select-none outline-none border-none ${className}`}>
       {/* Brand Icon: Heritage Red (#9B2C2C) background with pure White (#FFFFFF) Vietnamese collar + VS monogram */}
       <div
         className={`${current.box} bg-gradient-to-br from-[#A82B2B] via-[#9B2C2C] to-[#801F1F] flex items-center justify-center text-white shadow-md border border-white/20 flex-shrink-0 transition-transform group-hover:scale-105`}

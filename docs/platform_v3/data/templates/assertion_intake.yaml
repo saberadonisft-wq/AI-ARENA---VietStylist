@@ -1,0 +1,18 @@
+id:
+subject_id:
+predicate:
+value:
+qualifiers:
+  period_ids: []
+  region_ids: []
+  place_ids: []
+  community_ids: []
+  occasion_ids: []
+  social_context_ids: []
+statement_vi:
+evidence:
+  - source_id:
+    locator:
+confidence:
+consensus:
+review_status: draft

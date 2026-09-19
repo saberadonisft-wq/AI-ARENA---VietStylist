@@ -1,0 +1,13 @@
+flowchart LR
+  SRC[Sources] --> AS[Assertions]
+  AS --> CORE[Canonical Cultural Graph]
+  CORE --> EDU[Education Projection]
+  CORE --> CB[Composer Bundle]
+  CB --> OS[OutfitSpec]
+  OS --> VAL[Cultural Validation]
+  CORE --> GP[Generation Profile]
+  GP --> GR[Grounding Package]
+  OS --> GR
+  GR --> AI[External AI Provider]
+  AI --> PV[Post Validation]
+  PV --> LB[Lookbook]

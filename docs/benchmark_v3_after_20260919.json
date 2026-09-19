@@ -1,0 +1,127 @@
+{
+  "schema": 1,
+  "workload": {
+    "entities": 3000,
+    "iterations": 30,
+    "clients": 10,
+    "database": "temporary_sqlite"
+  },
+  "indexes": true,
+  "query_plans": {
+    "list_entities": [
+      {
+        "id": 8,
+        "parent": 0,
+        "notused": 61,
+        "detail": "SEARCH entity_registry USING INDEX idx_entity_status_type_id_v3 (status=? AND entity_type=?)"
+      }
+    ],
+    "attribute_values": [
+      {
+        "id": 4,
+        "parent": 0,
+        "notused": 62,
+        "detail": "SEARCH attribute_values USING INDEX idx_attrval_entity_key_id_v3 (entity_id=?)"
+      }
+    ],
+    "relations": [
+      {
+        "id": 4,
+        "parent": 0,
+        "notused": 62,
+        "detail": "SEARCH entity_relations USING INDEX idx_rel_subject_type_id_v3 (subject_id=?)"
+      }
+    ]
+  },
+  "raw_sequential": {
+    "list_entities": {
+      "count": 30,
+      "p50_ms": 21.294,
+      "p95_ms": 31.007,
+      "max_ms": 51.838,
+      "mean_ms": 22.357
+    },
+    "attribute_values": {
+      "count": 30,
+      "p50_ms": 8.433,
+      "p95_ms": 10.61,
+      "max_ms": 10.98,
+      "mean_ms": 8.32
+    },
+    "relations": {
+      "count": 30,
+      "p50_ms": 9.439,
+      "p95_ms": 15.99,
+      "max_ms": 17.207,
+      "mean_ms": 10.165
+    }
+  },
+  "sequential": {
+    "list_entities": {
+      "count": 30,
+      "p50_ms": 9.768,
+      "p95_ms": 14.128,
+      "max_ms": 14.932,
+      "mean_ms": 10.232,
+      "payload_bytes_p50": 31801,
+      "payload_bytes_max": 31801
+    },
+    "education": {
+      "count": 30,
+      "p50_ms": 20.039,
+      "p95_ms": 33.415,
+      "max_ms": 37.765,
+      "mean_ms": 20.443,
+      "payload_bytes_p50": 209,
+      "payload_bytes_max": 209
+    },
+    "composer_bundle": {
+      "count": 30,
+      "p50_ms": 77.902,
+      "p95_ms": 123.766,
+      "max_ms": 165.08,
+      "mean_ms": 83.897,
+      "payload_bytes_p50": 449,
+      "payload_bytes_max": 449
+    },
+    "validate_outfit": {
+      "count": 30,
+      "p50_ms": 97.002,
+      "p95_ms": 146.786,
+      "max_ms": 156.008,
+      "mean_ms": 102.303,
+      "payload_bytes_p50": 544,
+      "payload_bytes_max": 544
+    }
+  },
+  "concurrent": {
+    "list_entities": {
+      "clients": 10,
+      "wall_ms": 243.865,
+      "response_p50_ms": 141.168,
+      "response_p95_ms": 193.546,
+      "max_response_ms": 207.773
+    },
+    "education": {
+      "clients": 10,
+      "wall_ms": 257.739,
+      "response_p50_ms": 203.936,
+      "response_p95_ms": 227.212,
+      "max_response_ms": 232.618
+    },
+    "composer_bundle": {
+      "clients": 10,
+      "wall_ms": 432.953,
+      "response_p50_ms": 357.253,
+      "response_p95_ms": 404.199,
+      "max_response_ms": 410.262
+    },
+    "validate_outfit": {
+      "clients": 10,
+      "wall_ms": 640.901,
+      "response_p50_ms": 530.379,
+      "response_p95_ms": 584.506,
+      "max_response_ms": 590.454
+    }
+  }
+}

@@ -39,7 +39,7 @@ export default function PublicSharePage() {
         </div>
         <h2 className="text-xl font-serif font-bold text-stone-900">Liên kết không khả dụng</h2>
         <p className="text-xs text-stone-600">{errorMsg || "Liên kết có thể đã bị thu hồi hoặc đã hết hạn sử dụng."}</p>
-        <Link href="/" className="inline-block px-4 py-2 bg-stone-900 text-white rounded-xl text-xs font-semibold">
+        <Link href="/studio" className="inline-block px-4 py-2 bg-stone-900 text-white rounded-xl text-xs font-semibold">
           Khám phá Studio Phối đồ
         </Link>
       </div>
@@ -54,7 +54,7 @@ export default function PublicSharePage() {
           <Globe className="w-4 h-4" />
           <span>Bạn đang xem bản phối được chia sẻ công khai qua liên kết bảo mật (F09).</span>
         </div>
-        <Link href="/" className="font-bold underline hover:text-heritage-red">
+        <Link href="/studio" className="font-bold underline hover:text-heritage-red">
           Tự phối đồ của riêng bạn →
         </Link>
       </div>

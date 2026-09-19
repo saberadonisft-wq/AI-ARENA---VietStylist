@@ -1,0 +1,62 @@
+[
+  {
+    "key": "regional_variant_of",
+    "label_vi": "Biến thể vùng của",
+    "source_types": ["garment_variant"],
+    "target_types": ["garment"],
+    "directional": true,
+    "inverse_relation_key": null,
+    "contextual": true,
+    "inheritable": false,
+    "status": "draft",
+    "version": 1
+  },
+  {
+    "key": "modern_adaptation_of",
+    "label_vi": "Biến thể hiện đại của",
+    "source_types": ["garment_variant"],
+    "target_types": ["garment", "garment_variant"],
+    "directional": true,
+    "inverse_relation_key": null,
+    "contextual": true,
+    "inheritable": false,
+    "status": "draft",
+    "version": 1
+  },
+  {
+    "key": "used_with",
+    "label_vi": "Dùng kèm với",
+    "source_types": ["garment", "garment_variant", "accessory"],
+    "target_types": ["garment", "garment_variant", "accessory"],
+    "directional": false,
+    "inverse_relation_key": null,
+    "contextual": true,
+    "inheritable": true,
+    "status": "draft",
+    "version": 1
+  },
+  {
+    "key": "layered_over",
+    "label_vi": "Mặc phủ lên",
+    "source_types": ["garment", "garment_variant"],
+    "target_types": ["garment", "garment_variant"],
+    "directional": true,
+    "inverse_relation_key": "layered_under",
+    "contextual": true,
+    "inheritable": true,
+    "status": "draft",
+    "version": 1
+  },
+  {
+    "key": "layered_under",
+    "label_vi": "Mặc lót dưới",
+    "source_types": ["garment", "garment_variant"],
+    "target_types": ["garment", "garment_variant"],
+    "directional": true,
+    "inverse_relation_key": "layered_over",
+    "contextual": true,
+    "inheritable": true,
+    "status": "draft",
+    "version": 1
+  }
+]

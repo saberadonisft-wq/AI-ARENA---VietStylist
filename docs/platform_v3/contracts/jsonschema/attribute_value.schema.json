@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AttributeValue",
+  "type": "object",
+  "required": [
+    "id",
+    "entity_id",
+    "attribute_key",
+    "state",
+    "qualifiers",
+    "assertion_ids"
+  ],
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "entity_id": {
+      "type": "string"
+    },
+    "attribute_key": {
+      "type": "string"
+    },
+    "state": {
+      "type": "string",
+      "enum": [
+        "known",
+        "unknown",
+        "not_collected",
+        "not_applicable",
+        "disputed",
+        "inferred",
+        "withheld"
+      ]
+    },
+    "value": {},
+    "candidate_values": {
+      "type": "array",
+      "items": {}
+    },
+    "qualifiers": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "assertion_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "additionalProperties": false
+}

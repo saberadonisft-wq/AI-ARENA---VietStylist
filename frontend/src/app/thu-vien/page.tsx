@@ -2,30 +2,15 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { CatalogItem, GarmentType, Occasion } from "@/lib/types/api";
-import { api } from "@/lib/api/client";
+import { useCatalog } from "@/lib/catalog/CatalogProvider";
 import { BookOpen, Sparkles, Filter, Search, ArrowUpRight } from "lucide-react";
 import { LibraryCardSkeleton } from "@/components/ui/Skeleton";
 
 export default function ThuVienPage() {
-  const [items, setItems] = useState<CatalogItem[]>([]);
-  const [garmentTypes, setGarmentTypes] = useState<GarmentType[]>([]);
-  const [occasions, setOccasions] = useState<Occasion[]>([]);
+  const { catalogItems: items, garmentTypes, occasions, isLoading } = useCatalog();
   const [selectedType, setSelectedType] = useState("all");
   const [selectedOccasion, setSelectedOccasion] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    Promise.all([api.getCatalogItems(), api.getGarmentTypes(), api.getOccasions()])
-      .then(([its, gts, occs]) => {
-        setItems(its);
-        setGarmentTypes(gts);
-        setOccasions(occs);
-      })
-      .catch((err) => console.error("Lỗi lấy dữ liệu thư viện:", err))
-      .finally(() => setIsLoading(false));
-  }, []);
 
   const filteredItems = items.filter((item) => {
     if (selectedType !== "all" && item.garment_type_id !== selectedType) return false;

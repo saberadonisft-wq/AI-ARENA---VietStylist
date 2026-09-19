@@ -1,0 +1,12 @@
+{
+  "id": "garment_ngu_than",
+  "entity_type": "garment",
+  "schema_version": "1.0",
+  "identity": {
+    "name_vi": "Áo ngũ thân",
+    "aliases": ["Ngũ thân tay chẽn", "Áo năm thân"]
+  },
+  "status": "draft",
+  "version": 1,
+  "extensions": {}
+}

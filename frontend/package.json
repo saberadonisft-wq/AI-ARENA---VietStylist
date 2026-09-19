@@ -3,21 +3,25 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "check:public": "node scripts/check-public-assets.mjs",
+    "test:public": "node --test scripts/check-public-assets.test.mjs",
+    "predev": "npm run check:public",
+    "prebuild": "npm run check:public",
+    "prestart": "npm run check:public",
     "dev": "next dev -p 3000",
     "build": "next build",
     "start": "next start -p 3000",
     "lint": "next lint",
     "typecheck": "tsc --noEmit --incremental false",
-    "test": "playwright test"
+    "test": "playwright test",
+    "test:integration": "playwright test --config playwright.integration.config.ts"
   },
   "dependencies": {
     "clsx": "^2.1.1",
-    "konva": "^9.3.18",
     "lucide-react": "^0.469.0",
     "next": "14.2.23",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-konva": "^18.2.10",
     "tailwind-merge": "^2.6.0"
   },
   "devDependencies": {

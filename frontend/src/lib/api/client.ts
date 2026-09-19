@@ -20,34 +20,26 @@ import {
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_API_ORIGIN || "http://localhost:4000";
 
-class ApiError extends Error {
+export class ApiError extends Error {
   code: string;
   statusCode: number;
   details: any;
+  requestId?: string;
+  retryAfter?: number;
 
-  constructor(message: string, code: string, statusCode: number, details?: any) {
+  constructor(message: string, code: string, statusCode: number, details?: any, requestId?: string, retryAfter?: number) {
     super(message);
     this.name = "ApiError";
     this.code = code;
     this.statusCode = statusCode;
     this.details = details;
+    this.requestId = requestId;
+    this.retryAfter = retryAfter;
   }
 }
 
-// In-memory cache cho dữ liệu tĩnh catalog & heritage (TTL 60s)
-const requestCache = new Map<string, { data: any; expiry: number }>();
-
-export async function apiFetch<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+export async function apiFetch<T>(endpoint: string, options: RequestInit & { timeoutMs?: number } = {}): Promise<T> {
   const url = `${API_ORIGIN}${endpoint.startsWith("/api") ? endpoint : `/api${endpoint}`}`;
-  const method = (options.method || "GET").toUpperCase();
-  const isCacheable = method === "GET" && (endpoint.includes("/catalog") || endpoint.includes("/heritage"));
-
-  if (isCacheable) {
-    const cached = requestCache.get(url);
-    if (cached && cached.expiry > Date.now()) {
-      return cached.data as T;
-    }
-  }
   
   const headers = new Headers(options.headers || {});
   if (!headers.has("Content-Type") && !(options.body instanceof FormData)) {
@@ -62,31 +54,65 @@ export async function apiFetch<T>(endpoint: string, options: RequestInit = {}): 
     }
   }
 
-  const response = await fetch(url, {
-    ...options,
-    headers,
-  });
+  const timeoutMs = options.timeoutMs ?? 10000;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  const abort = () => controller.abort();
+  if (options.signal?.aborted) abort();
+  else options.signal?.addEventListener("abort", abort, { once: true });
+
+  let response: Response;
+  let data: any;
+  try {
+    response = await fetch(url, {
+      ...options,
+      // Publication and access can change between reads, even for catalog data.
+      // Cache only after the API supports revalidation/invalidation explicitly.
+      cache: "no-store",
+      headers,
+      signal: controller.signal,
+    });
+    const text = await response.text();
+    try { data = text ? JSON.parse(text) : null; }
+    catch {
+      if (response.ok) throw new ApiError("Máy chủ trả dữ liệu không hợp lệ.", "INVALID_RESPONSE", response.status, undefined, response.headers.get("X-Request-ID") || undefined);
+      data = {};
+    }
+  } catch (err: any) {
+    if (err instanceof ApiError) throw err;
+    if (err.name === "AbortError") {
+      if (options.signal?.aborted) throw new ApiError("Yêu cầu đã được hủy.", "REQUEST_CANCELLED", 0);
+      throw new ApiError(
+        `Yêu cầu máy chủ vượt quá thời gian chờ (${timeoutMs}ms): ${endpoint}`,
+        "TIMEOUT_ERROR",
+        408
+      );
+    }
+    throw new ApiError(
+      err.message || "Không thể kết nối đến máy chủ backend",
+      "NETWORK_ERROR",
+      503
+    );
+  } finally {
+    clearTimeout(timeoutId);
+    options.signal?.removeEventListener("abort", abort);
+  }
 
   if (!response.ok) {
-    let errBody: any = {};
-    try {
-      errBody = await response.json();
-    } catch {
-      // ignore json parse error
-    }
+    const errBody = data || {};
     const errInfo = errBody.error || {};
+    const retry = response.headers.get("Retry-After");
+    const retrySeconds = retry === null ? Number(errInfo.details?.retry_after) : /^\d+$/.test(retry) ? Number(retry) : Math.max(0, Math.ceil((Date.parse(retry) - Date.now()) / 1000));
     throw new ApiError(
       errInfo.message || `Lỗi yêu cầu máy chủ (mã ${response.status})`,
       errInfo.code || "UNKNOWN_ERROR",
       response.status,
-      errInfo.details
+      errInfo.details,
+      errInfo.request_id || response.headers.get("X-Request-ID") || undefined,
+      Number.isFinite(retrySeconds) ? retrySeconds : undefined
     );
   }
 
-  const data = await response.json();
-  if (isCacheable) {
-    requestCache.set(url, { data, expiry: Date.now() + 60000 });
-  }
   return data;
 }
 
@@ -185,6 +211,7 @@ export const api = {
     locked_items?: Array<{ slot: string; item_id: string; variant_id?: string }>;
   }) => apiFetch<any>("/api/recommendations/ai", {
     method: "POST",
+    timeoutMs: 35000,
     body: JSON.stringify(payload),
   }),
 

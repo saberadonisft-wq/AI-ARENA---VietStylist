@@ -120,6 +120,11 @@ export interface OutfitSnapshot {
   lockedSlots?: string[];
   backgroundTheme?: "white" | "dopaper";
   aspectRatio?: "1:1" | "9:16";
+  culturalSettings?: {
+    dataset_version: string;
+    ruleset_version: string | null;
+    context: import("./v3").ContextQualifier;
+  } | null;
 }
 
 export interface OutfitResponse {

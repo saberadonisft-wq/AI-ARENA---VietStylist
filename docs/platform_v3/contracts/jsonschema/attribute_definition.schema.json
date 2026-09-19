@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AttributeDefinition",
+  "type": "object",
+  "required": [
+    "key",
+    "label_vi",
+    "value_type",
+    "cardinality",
+    "applies_to",
+    "contextual",
+    "queryable",
+    "inheritable",
+    "default_missing_state",
+    "status",
+    "version"
+  ],
+  "properties": {
+    "key": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_.-]+$"
+    },
+    "label_vi": {
+      "type": "string"
+    },
+    "description": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "value_type": {
+      "type": "string",
+      "enum": [
+        "string",
+        "number",
+        "boolean",
+        "enum",
+        "entity_ref",
+        "entity_ref_list",
+        "measurement",
+        "color",
+        "date_range",
+        "geo_ref",
+        "structured"
+      ]
+    },
+    "cardinality": {
+      "type": "string",
+      "enum": [
+        "single",
+        "multiple"
+      ]
+    },
+    "allowed_values": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {}
+    },
+    "applies_to": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string"
+      }
+    },
+    "contextual": {
+      "type": "boolean"
+    },
+    "queryable": {
+      "type": "boolean"
+    },
+    "inheritable": {
+      "type": "boolean"
+    },
+    "default_missing_state": {
+      "type": "string",
+      "enum": [
+        "unknown",
+        "not_collected",
+        "not_applicable"
+      ]
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "draft",
+        "active",
+        "deprecated"
+      ]
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1
+    }
+  },
+  "additionalProperties": false
+}

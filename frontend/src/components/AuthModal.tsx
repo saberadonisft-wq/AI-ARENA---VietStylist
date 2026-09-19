@@ -124,25 +124,22 @@ export default function AuthModal({
       setErrorMsg(null);
       setSuccessMsg(null);
 
-      // Render Google Sign-In button
+      // Dynamic on-demand loading of Google Identity Services (GSI)
       if ((window as any).google?.accounts?.id) {
         setTimeout(initGoogleButton, 80);
       } else {
-        const interval = setInterval(() => {
-          if ((window as any).google?.accounts?.id) {
-            clearInterval(interval);
-            setTimeout(initGoogleButton, 80);
-          }
-        }, 200);
-
-        const timeout = setTimeout(() => {
-          clearInterval(interval);
-        }, 4000);
-
-        return () => {
-          clearInterval(interval);
-          clearTimeout(timeout);
-        };
+        const existingScript = document.getElementById("gsi-client-script") as HTMLScriptElement | null;
+        if (!existingScript) {
+          const script = document.createElement("script");
+          script.id = "gsi-client-script";
+          script.src = "https://accounts.google.com/gsi/client";
+          script.async = true;
+          script.defer = true;
+          script.onload = () => setTimeout(initGoogleButton, 80);
+          document.head.appendChild(script);
+        } else {
+          existingScript.addEventListener("load", () => setTimeout(initGoogleButton, 80), { once: true });
+        }
       }
     } else {
       setIsGsiReady(false);

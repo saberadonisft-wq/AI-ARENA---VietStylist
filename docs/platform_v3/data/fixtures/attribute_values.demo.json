@@ -1,0 +1,19 @@
+[
+  {
+    "id": "av_demo_001",
+    "entity_id": "garment_demo_current",
+    "attribute_key": "construction.closure.direction",
+    "state": "not_collected",
+    "value": null,
+    "candidate_values": [],
+    "qualifiers": {
+      "period_ids": [],
+      "region_ids": [],
+      "place_ids": [],
+      "community_ids": [],
+      "occasion_ids": [],
+      "social_context_ids": []
+    },
+    "assertion_ids": []
+  }
+]

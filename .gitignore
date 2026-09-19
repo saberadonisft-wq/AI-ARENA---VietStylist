@@ -34,6 +34,13 @@ backend/*.sqlite3
 *.db-journal
 *.db-wal
 *.db-shm
+# Databases, dumps and backups must never be shipped as public assets.
+**/public/**/*.db
+**/public/**/*.sqlite*
+**/public/**/*.bak
+**/public/**/*.backup
+**/public/**/*.dump
+**/public/**/*.sql
 media_storage/
 backend/local_media/
 */local_media/

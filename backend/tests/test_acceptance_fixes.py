@@ -785,7 +785,7 @@ def test_cleanup_cli_dry_run_and_apply(png_bytes):
     s=upload(png_bytes)
     Database.execute("UPDATE media_assets SET upload_expires_at=0 WHERE id=?",(s["media_id"],))
     env={**os.environ,"DATABASE_URL":"sqlite:///"+database.SQLITE_DB_PATH,"LOCAL_MEDIA_DIR":settings.LOCAL_MEDIA_DIR}
-    command=[sys.executable,"backend/scripts/cleanup_staged_media.py","--limit","1"]
+    command=[sys.executable,str(Path(__file__).resolve().parents[1] / "scripts" / "cleanup_staged_media.py"),"--limit","1"]
     dry=subprocess.run(command+["--dry-run"],env=env,capture_output=True,text=True)
     assert dry.returncode==0,dry.stderr
     assert json.loads(dry.stdout)=={"candidates":1,"processed":0,"failed":0}

@@ -1,1191 +1,870 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect } from "react";
+import Link from "next/link";
+import Image from "next/image";
+
 import {
-  GarmentType,
-  Occasion,
-  CatalogItem,
-  ItemVariant,
-  Avatar,
-  AssetLayer,
-  OutfitSnapshot,
-  SnapshotItem,
-  CulturalCheckResponse,
-} from "@/lib/types/api";
-import { api } from "@/lib/api/client";
-import { useAuth } from "@/lib/auth/context";
-import Canvas2D, { Canvas2DHandle } from "@/features/studio/Canvas2D";
-import SwatchPicker from "@/features/studio/SwatchPicker";
-import CulturalCheckBadge from "@/features/studio/CulturalCheckBadge";
-import WeatherWidget from "@/features/studio/WeatherWidget";
-import ColorAnalysisPanel from "@/features/studio/ColorAnalysisPanel";
-import CompareModal from "@/features/studio/CompareModal";
-import ExportModal from "@/features/studio/ExportModal";
-import StarterOutfitModal from "@/features/studio/StarterOutfitModal";
-import AITryOnModal from "@/features/studio/AITryOnModal";
-import {
-  Skeleton,
-  GarmentItemSkeleton,
-  OccasionGridSkeleton,
-} from "@/components/ui/Skeleton";
-import {
-  Undo2,
-  Redo2,
-  Lock,
-  Unlock,
-  Save,
-  Download,
   Sparkles,
-  ArrowRightLeft,
-  Camera,
+  ArrowRight,
+  ArrowDown,
+  BookOpen,
+  ShieldCheck,
+  Palette,
   Layers,
-  Check,
-  RefreshCw,
-  SlidersHorizontal,
-  BookmarkPlus,
+  CheckCircle2,
+  ChevronRight,
+  Calendar,
+  Share2,
   Compass,
-  ChevronDown,
-  X,
-  Info,
+  Wand2,
 } from "lucide-react";
 
-export default function StudioPage() {
-  const { user, isLoggedIn } = useAuth();
-  const canvasRef = useRef<Canvas2DHandle | null>(null);
-
-  // Dữ liệu danh mục
-  const [garmentTypes, setGarmentTypes] = useState<GarmentType[]>([]);
-  const [occasions, setOccasions] = useState<Occasion[]>([]);
-  const [catalogItems, setCatalogItems] = useState<CatalogItem[]>([]);
-  const [avatars, setAvatars] = useState<Avatar[]>([]);
-  const [currentAvatar, setCurrentAvatar] = useState<Avatar | null>(null);
-  const [isInitialLoading, setIsInitialLoading] = useState<boolean>(true);
-
-  // Bộ lọc
-  const [selectedGarmentType, setSelectedGarmentType] = useState<string>("all");
-  const [selectedOccasion, setSelectedOccasion] = useState<string>("ky_yeu");
-  const [activeSlot, setActiveSlot] = useState<string>("outerwear");
-
-  // State bộ phối hiện hành (Snapshot F01-F03)
-  const [outfitTitle, setOutfitTitle] = useState<string>("Bản phối Kỷ yếu Cổ phong");
-  const [styleMode, setStyleMode] = useState<"traditional" | "remix">("traditional");
-  const [overlapDirection, setOverlapDirection] = useState<"right_over_left" | "left_over_right">("right_over_left");
-  const [equippedItems, setEquippedItems] = useState<SnapshotItem[]>([
-    { slot: "outerwear", itemId: "item_ngu_than_nam_xanh", variantId: "var_ngu_than_nam_xanh_cham", assetVersion: 1, colorHex: "#1A365D" },
-    { slot: "undergarment", itemId: "item_ao_lot_trang", variantId: "var_ao_lot_trang", assetVersion: 1, colorHex: "#FFFFFF" },
-    { slot: "bottom", itemId: "item_quan_trang_lua", variantId: "var_quan_trang", assetVersion: 1, colorHex: "#FFFFFF" },
-    { slot: "headwear", itemId: "item_khan_van_den", variantId: "var_khan_van_den", assetVersion: 1, colorHex: "#171923" },
-    { slot: "accessory_front", itemId: "item_quat_xep_giay_do", variantId: "var_quat_xep", assetVersion: 1, colorHex: "#9C4221" },
-    { slot: "footwear", itemId: "item_guoc_moc_quai_nhung", variantId: "var_guoc_moc", assetVersion: 1, colorHex: "#4A5568" },
-  ]);
-
-  // Khóa món (Item lock F02)
-  const [lockedSlots, setLockedSlots] = useState<Set<string>>(new Set());
-
-  // Lịch sử Undo/Redo (F02)
-  const [historyStack, setHistoryStack] = useState<SnapshotItem[][]>([]);
-  const [historyIndex, setHistoryIndex] = useState<number>(-1);
-
-  // Lớp vẽ render
-  const [layers, setLayers] = useState<AssetLayer[]>([]);
-
-  // Kiểm tra văn hóa thời gian thực (F10)
-  const [culturalCheck, setCulturalCheck] = useState<CulturalCheckResponse | null>(null);
-
-  // Ghim Phương án A để so sánh A/B (F08)
-  const [pinnedSnapshotA, setPinnedSnapshotA] = useState<OutfitSnapshot | null>(null);
-
-  // Modals
-  const [isStarterOpen, setIsStarterOpen] = useState(false);
-  const [isCompareOpen, setIsCompareOpen] = useState(false);
-  const [isExportOpen, setIsExportOpen] = useState(false);
-  const [isTryOnOpen, setIsTryOnOpen] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [saveSuccessMessage, setSaveSuccessMessage] = useState<string | null>(null);
-
-  // AI Prompt nhanh
-  const [aiPrompt, setAiPrompt] = useState("");
-  const [isAiLoading, setIsAiLoading] = useState(false);
-
-  // Tỷ lệ khung hình hiển thị
-  const [displayRatio, setDisplayRatio] = useState<"1:1" | "9:16">("9:16");
-
-  const [canvasBackgroundTheme, setCanvasBackgroundTheme] = useState<"white" | "dopaper">("white");
-
-  // Thông báo khôi phục bản nháp & giải thích văn hóa Hữu nhậm
-  const [draftNotice, setDraftNotice] = useState<any | null>(null);
-  const [showHuuNhamInfo, setShowHuuNhamInfo] = useState(false);
-
-  // Bảng phối màu Ngũ Hành 1 chạm (Tối ưu trải nghiệm F02/F07)
-  const NGU_HANH_PALETTES = [
-    {
-      name: "Mộc",
-      element: "wood",
-      desc: "Sinh sôi, thanh nhã",
-      badge: "bg-emerald-100 text-emerald-800 border-emerald-300",
-      colors: { outerwear: "#276749", undergarment: "#FFFFFF", bottom: "#FFFFFF", headwear: "#171923" },
-    },
-    {
-      name: "Hỏa",
-      element: "fire",
-      desc: "Rực rỡ, may mắn",
-      badge: "bg-rose-100 text-rose-800 border-rose-300",
-      colors: { outerwear: "#9B2C2C", undergarment: "#FFFFFF", bottom: "#FFFFFF", headwear: "#171923" },
-    },
-    {
-      name: "Thổ",
-      element: "earth",
-      desc: "Hoàng gia, uy nghi",
-      badge: "bg-amber-100 text-amber-800 border-amber-300",
-      colors: { outerwear: "#D69E2E", undergarment: "#FFFFFF", bottom: "#1A202C", headwear: "#171923" },
-    },
-    {
-      name: "Kim",
-      element: "metal",
-      desc: "Thuần khiết, đoan trang",
-      badge: "bg-stone-100 text-stone-800 border-stone-300",
-      colors: { outerwear: "#E2E8F0", undergarment: "#FFFFFF", bottom: "#FFFFFF", headwear: "#171923" },
-    },
-    {
-      name: "Thủy",
-      element: "water",
-      desc: "Trầm mặc, thâm sâu",
-      badge: "bg-sky-100 text-sky-800 border-sky-300",
-      colors: { outerwear: "#1A365D", undergarment: "#FFFFFF", bottom: "#FFFFFF", headwear: "#171923" },
-    },
-  ];
-
-  const applyNguHanhPalette = (palette: (typeof NGU_HANH_PALETTES)[0]) => {
-    const newItems = equippedItems.map((item) => {
-      const colorHex = (palette.colors as Record<string, string>)[item.slot];
-      if (colorHex && !lockedSlots.has(item.slot)) {
-        return { ...item, colorHex };
-      }
-      return item;
-    });
-    pushHistory(newItems);
+// Dữ liệu 5 Trang Phục Tham Chiếu Chuẩn Thư Tịch
+interface ReferenceGarment {
+  id: string;
+  name: string;
+  shortName: string;
+  dynasties: string;
+  eraTime: string;
+  role: string;
+  significance: string;
+  structure: {
+    collar: string;
+    sleeves: string;
+    lapelAndButtons: string;
+    pattern: string;
   };
+  features: string[];
+  colors: { name: string; hex: string }[];
+  citation: string;
+  sourceBook: string;
+  imageUrl: string;
+  thumbUrl: string;
+  badge: string;
+}
 
-  // Khởi tạo dữ liệu từ backend
+const REFERENCE_GARMENTS: ReferenceGarment[] = [
+  {
+    id: "giao-linh",
+    name: "Áo Giao Lĩnh (Trực Lĩnh)",
+    shortName: "Giao Lĩnh",
+    dynasties: "Triều Lý — Trần — Lê",
+    eraTime: "TK XI — TK XVIII",
+    role: "Lễ phục & Thường phục Quý tộc, Trí thức",
+    significance:
+      "Dáng áo cổ xưa bậc nhất trong lịch sử trang phục dân tộc Đại Việt. Phục trang mang phong thái thoát tục, thanh tao với vạt giao chéo hữu nhậm, dây đai thắt lưng lụa buông dài và hoa văn cúc dây, hoa sen thanh nhã.",
+    structure: {
+      collar: "Cổ giao lĩnh (Trực lĩnh) vạt chéo, cổ lót trắng ôm khít bên trong",
+      sleeves: "Ống tay rộng vừa hoặc tay thụng dài buông rủ uyển chuyển",
+      lapelAndButtons: "Hữu nhậm: Vạt bên trái đè sang vạt bên phải, buộc dải lụa ngang eo",
+      pattern: "Gấm dệt chìm hoa cúc đại đóa, hoa sen tây và hoa mây thời Lý — Trần",
+    },
+    features: [
+      "Quy thức Hữu nhậm chuẩn mực: vạt trái đè vạt phải tôn cốt cách đoan chính",
+      "Sắc lục rêu cung đình kết hợp đai lụa nâu đỏ trầm ấm và quần trắng trang nhã",
+      "Phù hợp tái hiện không gian lễ hội lịch sử thời Lý, Trần, Lê Sơ",
+    ],
+    colors: [
+      { name: "Lục Rêu Gấm", hex: "#4A5D43" },
+      { name: "Lụa Nâu Đỏ", hex: "#7D4E41" },
+      { name: "Trắng Ngà Tơ", hex: "#F5F2EB" },
+    ],
+    citation:
+      "Lý — Trần y phục phần lớn theo lối giao lĩnh, vạt áo buông dài phủ gối, lấy nét thanh tao nhã nhặn làm quy thức tôn nghiêm của bậc vương triều.",
+    sourceBook: "Ngàn năm áo mũ (Trần Quang Đức)",
+    imageUrl: "/images/heritage/ly_tran_le_giao_linh.webp",
+    thumbUrl: "/images/heritage/thumb_ly_tran_le_giao_linh.webp",
+    badge: "Thanh Thoát & Cổ Kính",
+  },
+  {
+    id: "vien-linh",
+    name: "Áo Viên Lĩnh (Đoàn Lĩnh)",
+    shortName: "Viên Lĩnh",
+    dynasties: "Triều Lý — Trần — Lê — Nguyễn",
+    eraTime: "TK XI — TK XX",
+    role: "Triều phục, Phẩm phục Quan lại & Bổ phục Hoàng gia",
+    significance:
+      "Kiểu thức áo cổ tròn trang trọng xuyên suốt cả ngàn năm vương triều. Mang biểu trưng quyền uy tối thượng với đồ án Bổ Đoàn rồng mây kim tuyến trước ngực và dải sóng nước Thủy Ba Tam Sơn uy nghiêm nơi chân vạt.",
+    structure: {
+      collar: "Cổ tròn (Viên lĩnh) may nẹp kín, cài khuy kim loại bên vai phải",
+      sleeves: "Tay áo thụng dài uy nghi, mép viền may lót lụa tương phản sắc sảo",
+      lapelAndButtons: "Bổ tử / Bổ đoàn dệt thêu rồng cuộn kim tuyến rực rỡ trước ngực và sau lưng",
+      pattern: "Đồ án Đoàn Long (rồng cuộn mây) và sóng nước Thủy Ba Tam Sơn ngũ sắc",
+    },
+    features: [
+      "Cổ tròn nẹp khuy vai phải kín đáo, nghiêm cẩn chốn thiết triều đại lễ",
+      "Bổ đoàn rồng cuộn kim tuyến chỉ vàng dệt gấm sắc tím hoàng triều (Tử sắc)",
+      "Kết hợp hoàn mỹ cùng Mũ cánh chuồn Ô Sa và quần lụa trắng hoàng gia",
+    ],
+    colors: [
+      { name: "Tử Thẫm Hoàng Triều", hex: "#4A3258" },
+      { name: "Vàng Kim Thêu Rồng", hex: "#C89A38" },
+      { name: "Lam Sóng Thủy Ba", hex: "#2B4A6F" },
+    ],
+    citation:
+      "Quan viên thiết triều đại lễ đều mặc áo cổ tròn viên lĩnh, thêu bổ tử rồng mây sóng nước thủy ba để phân định điển lệ phẩm hàm.",
+    sourceBook: "Đại Việt sử ký toàn thư",
+    imageUrl: "/images/heritage/ly_tran_le_nguyen_vien_linh.webp",
+    thumbUrl: "/images/heritage/thumb_ly_tran_le_nguyen_vien_linh.webp",
+    badge: "Uy Nghi & Vương Triều",
+  },
+  {
+    id: "nhat-binh",
+    name: "Áo Nhật Bình",
+    shortName: "Nhật Bình",
+    dynasties: "Triều Nguyễn",
+    eraTime: "1802 — 1945",
+    role: "Thường phục Hoàng hậu, Công chúa & Triều phục Mệnh phụ",
+    significance:
+      "Kiệt tác phục trang nữ giới đỉnh cao của cung đình Huế. Tên gọi xuất phát từ nẹp cổ áo hình chữ nhật to bản trước ngực. Nổi bật với dải viền ngũ hành ngũ sắc ở ống tay áo và đồ án chim phượng thêu kim tuyến lộng lẫy.",
+    structure: {
+      collar: "Cổ đối khâm hình chữ nhật to bản (Nhật Bình), kết nẹp khuy cúc ngọc bội",
+      sleeves: "Ống tay thụng viền dải Ngũ Sắc tương sinh (xanh, vàng, trắng, đỏ, lục)",
+      lapelAndButtons: "Vạt áo xẻ trước cài khuy nẹp ngọc, buông dài ngang gối phủ ngoài xiêm lụa",
+      pattern: "Chim phượng hoàng ngậm hoa sen, hoa cúc đại đóa dệt kim tuyến, sóng ngũ sắc",
+    },
+    features: [
+      "Nẹp cổ chữ nhật ngũ sắc độc bản kết hợp dải tay ngũ hành tương sinh",
+      "Sắc đỏ son chu sa rực rỡ biểu trưng cho tôn quý, phúc thọ và quyền quý cung đình",
+      "Trang phục được ưa chuộng bậc nhất hiện nay trong lễ cưới truyền thống và chụp kỷ yếu",
+    ],
+    colors: [
+      { name: "Đỏ Son Chu Sa", hex: "#9E2A2B" },
+      { name: "Vàng Kim Tuyến", hex: "#D4AF37" },
+      { name: "Xanh Khăn Vành", hex: "#1E3A8A" },
+    ],
+    citation:
+      "Áo Nhật bình là thường phục của Hoàng thái hậu, Hoàng hậu, Công chúa; lại là triều phục của các bậc Cung tần và Mệnh phụ chốn kinh kỳ.",
+    sourceBook: "Khâm định Đại Nam hội điển sự lệ",
+    imageUrl: "/images/heritage/nguyen_nhat_binh.webp",
+    thumbUrl: "/images/heritage/thumb_nguyen_nhat_binh.webp",
+    badge: "Tuyệt Mỹ Cung Đình",
+  },
+  {
+    id: "ao-tac",
+    name: "Áo Tấc (Áo Thụng)",
+    shortName: "Áo Tấc",
+    dynasties: "Triều Nguyễn",
+    eraTime: "1802 — 1945",
+    role: "Lễ phục Quốc gia cho các dịp Tế tự, Hỷ sự & Đại lễ",
+    significance:
+      "Lễ phục trang nghiêm của bậc quan lại và dân gian thời Nguyễn. Áo may theo thể thức ngũ thân lập lĩnh nhưng có ống tay rộng thụng xòe dài qua đầu ngón tay đúng 1 tấc (khoảng 4cm), thể hiện thái độ cung kính, mực thước.",
+    structure: {
+      collar: "Cổ đứng lập lĩnh cao 3–4 cm ôm khít, dựng thẳng đoan trang",
+      sleeves: "Tay may thụng cực rộng, phẳng phiu, buông dài quá ngón tay đúng 1 tấc",
+      lapelAndButtons: "5 thân vải ghép lại, cài 5 khuy bên phải (hữu nhậm) nghiêm cẩn",
+      pattern: "Gấm dệt đoàn long rồng cuộn, mây ngũ sắc và đồ án tam sơn thủy ba",
+    },
+    features: [
+      "Tay áo thụng dài xòe rộng lót lụa đỏ bên trong, phong thái ung dung đĩnh đạc",
+      "Màu lam chàm thêu kim tuyến lộng lẫy, phối cùng khăn đóng đen truyền thống",
+      "Lựa chọn hoàn hảo cho lễ đính hôn, rước dâu, cúng đình và lễ hội văn hóa",
+    ],
+    colors: [
+      { name: "Lam Chàm Gấm", hex: "#1D3557" },
+      { name: "Đỏ Lót Tay Áo", hex: "#8B1E1E" },
+      { name: "Vàng Kim Rồng Cuộn", hex: "#C59B27" },
+    ],
+    citation:
+      "Áo tấc được mặc vào các dịp lễ tiết trọng thể như cúng tế trời đất, bái yết tổ tiên, đình đám làng xã và ngày thành hôn lứa đôi.",
+    sourceBook: "Khâm định Đại Nam hội điển sự lệ",
+    imageUrl: "/images/heritage/nguyen_ao_tac.webp",
+    thumbUrl: "/images/heritage/thumb_nguyen_ao_tac.webp",
+    badge: "Đại Lễ & Trang Nghiêm",
+  },
+  {
+    id: "ngu-than",
+    name: "Áo Ngũ Thân Tay Chẽn",
+    shortName: "Ngũ Thân Tay Chẽn",
+    dynasties: "Triều Nguyễn (Cải cách Minh Mạng)",
+    eraTime: "1827 — Đến nay",
+    role: "Quốc phục Toàn dân & Tiền thân Trực tiếp của Áo Dài Hiện Đại",
+    significance:
+      "Đỉnh cao thống nhất y phục Đại Nam dưới triều vua Minh Mạng. Áo cấu thành từ 5 thân vải tượng trưng phụ mẫu đôi bên và chính mình (tứ thân phụ mẫu & kỷ thân), 5 hạt khuy giữ gìn Ngũ thường (Nhân, Lễ, Nghĩa, Trí, Tín).",
+    structure: {
+      collar: "Cổ đứng lập lĩnh cao vuông vức, nẹp cổ cài khuy kín đáo mực thước",
+      sleeves: "Tay chẽn thuôn gọn ôm vừa cánh tay, thuận tiện làm việc và sinh hoạt",
+      lapelAndButtons: "5 thân áo khép kín thân thể, 5 khuy bên hữu tượng trưng ngũ thường",
+      pattern: "Gấm đoạn dệt chìm hoa văn chữ Thọ chữ Phúc, mây cát tường tao nhã",
+    },
+    features: [
+      "5 thân áo tượng trưng cho tứ thân phụ mẫu và bản thân, 5 khuy giữ gìn nhân lễ",
+      "Ống tay chẽn gọn gàng, tôn phom dáng thanh thoát, cội nguồn của tà áo dài Việt",
+      "Thường phục chuẩn mực cho cả nam và nữ trong công sở, trường học, dạo phố",
+    ],
+    colors: [
+      { name: "Xanh Chàm Chữ Thọ", hex: "#2B4C6F" },
+      { name: "Trắng Lụa Quần", hex: "#F8F7F4" },
+      { name: "Đen Khăn Đóng", hex: "#1A1A1A" },
+    ],
+    citation:
+      "Đạo trị quốc chuộng sự mực thước; áo ngũ thân che kín thân mình, năm khuy giữ lễ, răn dạy con người giữ trọn đạo cương thường.",
+    sourceBook: "Đại Nam thực lục chính biên",
+    imageUrl: "/images/heritage/nguyen_ngu_than_tay_chen.webp",
+    thumbUrl: "/images/heritage/thumb_nguyen_ngu_than_tay_chen.webp",
+    badge: "Quốc Phục & Cội Nguồn Áo Dài",
+  },
+];
+
+
+// Từng trang phục trong bộ sưu tập tham chiếu
+function GarmentStoryCard({
+  garment,
+  index,
+  isEven,
+}: {
+  garment: ReferenceGarment;
+  index: number;
+  isEven: boolean;
+}) {
+  const cardRef = React.useRef<HTMLDivElement>(null);
+  const [isVisible, setIsVisible] = useState(false);
+
   useEffect(() => {
-    setIsInitialLoading(true);
-    Promise.all([
-      api.getGarmentTypes(),
-      api.getOccasions(),
-      api.getCatalogItems(),
-      api.getAvatars(),
-    ])
-      .then(([gt, occ, items, avts]) => {
-        setGarmentTypes(gt);
-        setOccasions(occ);
-        setCatalogItems(items);
-        setAvatars(avts);
-        if (avts.length > 0) setCurrentAvatar(avts[0]);
-      })
-      .catch((err) => console.error("Lỗi khởi tạo Studio:", err))
-      .finally(() => setIsInitialLoading(false));
-  }, []);
-
-  // Cập nhật lớp vẽ dựa trên các món đang chọn
-  useEffect(() => {
-    const loadedLayers: AssetLayer[] = [];
-    equippedItems.forEach((it) => {
-      const dbItem = catalogItems.find((ci) => ci.id === it.itemId);
-      if (dbItem?.default_layer) {
-        loadedLayers.push(dbItem.default_layer);
-      }
-    });
-    setLayers(loadedLayers);
-
-    // Chạy kiểm tra quy chuẩn văn hóa thời gian thực (F10)
-    api
-      .checkCulturalCompliance({
-        garment_type_id: selectedGarmentType === "all" ? undefined : selectedGarmentType,
-        occasion_id: selectedOccasion,
-        style_mode: styleMode,
-        overlap_direction: overlapDirection,
-        items: equippedItems.map((it) => ({
-          slot: it.slot,
-          item_id: it.itemId,
-          variant_id: it.variantId,
-          color_hex: it.colorHex,
-        })),
-      })
-      .then((res) => setCulturalCheck(res))
-      .catch((err) => console.error("Lỗi kiểm tra văn hóa:", err));
-
-    // Tự động lưu bản nháp Studio cục bộ (F13 - khách vãng lai)
-    try {
-      if (typeof window !== "undefined") {
-        localStorage.setItem(
-          "viet_stylist_current_draft",
-          JSON.stringify({
-            title: outfitTitle,
-            occasionId: selectedOccasion,
-            styleMode: styleMode,
-            overlapDirection: overlapDirection,
-            snapshot: {
-              schemaVersion: 1,
-              avatarId: currentAvatar?.id || "avatar_nam_chuan",
-              poseId: "front_01",
-              occasionId: selectedOccasion,
-              styleMode: styleMode,
-              overlapDirection: overlapDirection,
-              items: equippedItems,
-            },
-          })
-        );
-      }
-    } catch {
-      // Bỏ qua lỗi quota
-    }
-  }, [equippedItems, catalogItems, selectedGarmentType, selectedOccasion, styleMode, overlapDirection, outfitTitle, currentAvatar]);
-
-  // Kiểm tra tham số tải bộ phối từ URL (?loadOutfit=id)
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const params = new URLSearchParams(window.location.search);
-      const loadId = params.get("loadOutfit");
-      if (loadId) {
-        api.getOutfit(loadId)
-          .then((saved) => {
-            if (saved) {
-              setOutfitTitle(saved.title);
-              if (saved.occasion_id) setSelectedOccasion(saved.occasion_id);
-              if (saved.style_mode) setStyleMode(saved.style_mode as any);
-              if (saved.current_snapshot?.items) {
-                setEquippedItems(saved.current_snapshot.items);
-              }
-              if (saved.current_snapshot?.overlapDirection) {
-                setOverlapDirection(saved.current_snapshot.overlapDirection as any);
-              }
-            }
-          })
-          .catch((err) => console.warn("Không tải được outfit từ link:", err));
-      }
-    }
-  }, []);
-
-  // Lưu lịch sử Undo/Redo khi đổi đồ
-  const pushHistory = (newItems: SnapshotItem[]) => {
-    const nextStack = historyStack.slice(0, historyIndex + 1);
-    nextStack.push(newItems);
-    setHistoryStack(nextStack);
-    setHistoryIndex(nextStack.length - 1);
-    setEquippedItems(newItems);
-  };
-
-  const handleUndo = () => {
-    if (historyIndex > 0) {
-      setHistoryIndex(historyIndex - 1);
-      setEquippedItems(historyStack[historyIndex - 1]);
-    }
-  };
-
-  const handleRedo = () => {
-    if (historyIndex < historyStack.length - 1) {
-      setHistoryIndex(historyIndex + 1);
-      setEquippedItems(historyStack[historyIndex + 1]);
-    }
-  };
-
-  // Lắng nghe phím tắt: Ctrl+Z, Ctrl+Y, Esc, Phím số 1-6 đổi slot
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
-        e.preventDefault();
-        if (e.shiftKey) handleRedo();
-        else handleUndo();
-      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "y") {
-        e.preventDefault();
-        handleRedo();
-      } else if (e.key === "Escape") {
-        setIsStarterOpen(false);
-        setIsCompareOpen(false);
-        setIsExportOpen(false);
-        setIsTryOnOpen(false);
-        setShowHuuNhamInfo(false);
-      } else if (e.key >= "1" && e.key <= "6") {
-        const slots = ["outerwear", "undergarment", "bottom", "headwear", "accessory_front", "footwear"];
-        const idx = parseInt(e.key) - 1;
-        if (slots[idx]) setActiveSlot(slots[idx]);
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [historyIndex, historyStack]);
-
-  // Kiểm tra xem có bản nháp từ phiên trước không
-  useEffect(() => {
-    try {
-      if (typeof window !== "undefined") {
-        const saved = localStorage.getItem("viet_stylist_current_draft");
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          if (parsed?.snapshot?.items && parsed.snapshot.items.length > 0) {
-            setDraftNotice(parsed);
-          }
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setIsVisible(true);
         }
+      },
+      {
+        threshold: 0.12,
+        rootMargin: "0px 0px -40px 0px",
       }
-    } catch {
-      // Bỏ qua
+    );
+
+    if (cardRef.current) {
+      observer.observe(cardRef.current);
     }
+
+    return () => observer.disconnect();
   }, []);
 
-  const handleRestoreDraft = () => {
-    if (!draftNotice) return;
-    if (draftNotice.title) setOutfitTitle(draftNotice.title);
-    if (draftNotice.occasionId) setSelectedOccasion(draftNotice.occasionId);
-    if (draftNotice.styleMode) setStyleMode(draftNotice.styleMode);
-    if (draftNotice.overlapDirection) setOverlapDirection(draftNotice.overlapDirection);
-    if (draftNotice.snapshot?.items) {
-      setEquippedItems(draftNotice.snapshot.items);
-      pushHistory(draftNotice.snapshot.items);
-    }
-    setDraftNotice(null);
-  };
-
-  const toggleLockSlot = (slot: string) => {
-    const next = new Set(lockedSlots);
-    if (next.has(slot)) next.delete(slot);
-    else next.add(slot);
-    setLockedSlots(next);
-  };
-
-  // Chọn món từ catalog
-  const handleSelectItem = (item: CatalogItem) => {
-    if (lockedSlots.has(item.slot)) return;
-
-    const defaultVar = item.variants[0];
-    const newItems = equippedItems.filter((it) => it.slot !== item.slot);
-    newItems.push({
-      slot: item.slot,
-      itemId: item.id,
-      variantId: defaultVar?.id,
-      assetVersion: 1,
-      colorHex: defaultVar?.hex_color,
-    });
-    pushHistory(newItems);
-  };
-
-  // Chọn biến thể màu
-  const handleSelectVariant = (variant: ItemVariant) => {
-    const activeItemConfig = equippedItems.find((it) => it.slot === activeSlot);
-    if (!activeItemConfig) return;
-
-    const newItems = equippedItems.map((it) => {
-      if (it.slot === activeSlot) {
-        return {
-          ...it,
-          variantId: variant.id,
-          colorHex: variant.hex_color,
-        };
-      }
-      return it;
-    });
-    pushHistory(newItems);
-  };
-
-  // Áp dụng sửa nhanh từ cảnh báo văn hóa (F10)
-  const handleApplyCulturalFix = (fix: any) => {
-    if (!fix) return;
-    if (fix.action === "set_direction") {
-      setOverlapDirection("right_over_left");
-    } else if (fix.action === "equip_headwear" || fix.action === "equip_undergarment") {
-      const targetItem = catalogItems.find((ci) => ci.id === fix.item_id);
-      if (targetItem) handleSelectItem(targetItem);
-    }
-  };
-
-  // Nạp Starter Outfit (F01)
-  const handleLoadStarter = (starter: any) => {
-    setSelectedOccasion(starter.occasion_id);
-    setSelectedGarmentType(starter.garment_type_id);
-    setOutfitTitle(starter.title);
-
-    const newItems: SnapshotItem[] = starter.items.map((it: any) => {
-      const dbItem = catalogItems.find((ci) => ci.id === it.item_id);
-      const chosenVar = dbItem?.variants.find((v) => v.id === it.variant_id) || dbItem?.variants[0];
-      return {
-        slot: it.slot,
-        itemId: it.item_id,
-        variantId: it.variant_id,
-        assetVersion: 1,
-        colorHex: chosenVar?.hex_color,
-      };
-    });
-    pushHistory(newItems);
-  };
-
-  // Lưu bộ phối vào database (F08, F13)
-  const handleSaveOutfit = async () => {
-    setIsSaving(true);
-    try {
-      const currentSnapshot: OutfitSnapshot = {
-        schemaVersion: 1,
-        avatarId: currentAvatar?.id || "avatar_nam_chuan",
-        poseId: "front_01",
-        occasionId: selectedOccasion,
-        styleMode: styleMode,
-        overlapDirection: overlapDirection,
-        items: equippedItems,
-      };
-
-      await api.createOutfit({
-        title: outfitTitle,
-        occasion_id: selectedOccasion,
-        style_mode: styleMode,
-        snapshot: currentSnapshot,
-      });
-
-      setSaveSuccessMessage("Đã lưu bộ phối thành công!");
-      setTimeout(() => setSaveSuccessMessage(null), 3000);
-    } catch (err: any) {
-      alert("Lỗi khi lưu bộ phối: " + err.message);
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  // Trợ lý AI Gemini gợi ý phối đồ (F11)
-  const handleAskAIStylist = async () => {
-    if (!aiPrompt.trim()) return;
-    setIsAiLoading(true);
-    try {
-      const lockedList = Array.from(lockedSlots).map((slot) => {
-        const it = equippedItems.find((item) => item.slot === slot);
-        return { slot, item_id: it?.itemId || "", variant_id: it?.variantId };
-      });
-
-      const res = await api.getAIRecommendations({
-        prompt: aiPrompt,
-        occasion_id: selectedOccasion,
-        style_mode: styleMode,
-        locked_items: lockedList,
-      });
-
-      if (res.outfits && res.outfits.length > 0) {
-        const recOutfit = res.outfits[0];
-        setOutfitTitle(recOutfit.title);
-
-        const newItems: SnapshotItem[] = recOutfit.items.map((it: any) => ({
-          slot: it.slot,
-          itemId: it.item_id,
-          variantId: it.variant_id,
-          assetVersion: 1,
-          colorHex: it.hex_color,
-        }));
-        pushHistory(newItems);
-      }
-    } catch (err: any) {
-      alert("Trợ lý AI bận: " + err.message);
-    } finally {
-      setIsAiLoading(false);
-    }
-  };
-
-  // Danh sách màu hiện tại phục vụ ColorAnalysis (Memoized)
-  const currentColorsForAnalysis = useMemo(() => {
-    return equippedItems
-      .filter((it) => it.colorHex)
-      .map((it) => ({
-        slot: it.slot,
-        hex_color: it.colorHex!,
-        item_id: it.itemId,
-        variant_id: it.variantId,
-      }));
-  }, [equippedItems]);
-
-  // Món đồ của slot đang kích hoạt để chọn biến thể
-  const activeEquippedItem = equippedItems.find((it) => it.slot === activeSlot);
-  const activeCatalogItem = catalogItems.find((ci) => ci.id === activeEquippedItem?.itemId);
-
-  // Lọc danh mục hiển thị bên trái (Memoized)
-  const filteredCatalogItems = useMemo(() => {
-    return catalogItems.filter((ci) => {
-      if (selectedGarmentType !== "all" && ci.garment_type_id && ci.garment_type_id !== selectedGarmentType) {
-        return false;
-      }
-      if (activeSlot && ci.slot !== activeSlot) {
-        return false;
-      }
-      return true;
-    });
-  }, [catalogItems, selectedGarmentType, activeSlot]);
+  const chapterNum = String(index + 1).padStart(2, "0");
 
   return (
-    <div className="max-w-[1720px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-      {/* Banner thông báo khôi phục bản nháp */}
-      {draftNotice && (
-        <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200/90 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3 shadow-xs">
-          <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 rounded-full bg-amber-200/60 flex items-center justify-center text-amber-800 shrink-0">
-              <Sparkles className="w-4 h-4" />
-            </div>
-            <div>
-              <h4 className="text-xs font-bold text-amber-900">
-                Phát hiện bản phối dở dang từ phiên trước: &quot;{draftNotice.title}&quot;
-              </h4>
-              <p className="text-[11px] text-amber-700">
-                Gồm {draftNotice.snapshot?.items?.length || 0} món trang phục đã chọn. Bạn có muốn khôi phục lại không?
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center space-x-2">
-            <button
-              onClick={handleRestoreDraft}
-              className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold rounded-lg transition-colors shadow-xs"
+    <div
+      id={`garment-${garment.id}`}
+      ref={cardRef}
+      className={`scroll-mt-28 relative py-12 sm:py-20 transition-all duration-1000 motion-reduce:transition-none motion-reduce:opacity-100 motion-reduce:translate-y-0 ${
+        isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"
+      }`}
+    >
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16 items-center relative z-10">
+        {/* Cột 1: Ảnh Ma-nơ-canh Tham Chiếu Cổ Phục */}
+        <div
+          className={`lg:col-span-5 flex flex-col items-center justify-center ${
+            isEven ? "lg:order-1" : "lg:order-2"
+          }`}
+        >
+          {/* Khung ảnh trang phục với viền vàng đồng cung đình */}
+          <div className="relative w-full max-w-[380px] sm:max-w-[420px] aspect-[4/5] flex items-center justify-center">
+            {/* Khung Đế Đứng Cổ Phong với 4 Góc Đồng Dát Vàng Cung Đình */}
+            <div
+              className="relative w-full h-full rounded-3xl overflow-hidden bg-[#FAF8F5] border border-amber-800/30 shadow-2xl flex items-center justify-center group z-10"
             >
-              Khôi phục bản phối
-            </button>
-            <button
-              onClick={() => setDraftNotice(null)}
-              className="px-3 py-1.5 bg-white border border-stone-200 hover:bg-stone-50 text-stone-600 text-xs font-medium rounded-lg transition-colors"
-            >
-              Bỏ qua
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Top Toolbar: Tên bộ phối, Chế độ, Undo/Redo, Nút Lưu & Xuất */}
-      <div className="bg-white rounded-2xl border border-stone-200/80 p-4 shadow-xs flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center space-x-3">
-          <input
-            type="text"
-            value={outfitTitle}
-            onChange={(e) => setOutfitTitle(e.target.value)}
-            className="font-serif font-bold text-xl sm:text-2xl text-stone-900 bg-transparent border-b border-transparent hover:border-stone-300 focus:border-heritage-red focus:outline-none px-1 py-0.5 tracking-tight"
-          />
-
-          {/* Segmented control: Truyền thống vs Remix */}
-          <div className="flex items-center bg-stone-100 p-1 rounded-xl border border-stone-200 text-xs font-semibold">
-            <button
-              onClick={() => setStyleMode("traditional")}
-              className={`px-3 py-1 rounded-lg transition-all ${
-                styleMode === "traditional"
-                  ? "bg-white text-stone-900 shadow-xs"
-                  : "text-stone-500 hover:text-stone-800"
-              }`}
-            >
-              Cổ phong Chuẩn mực
-            </button>
-            <button
-              onClick={() => setStyleMode("remix")}
-              className={`px-3 py-1 rounded-lg transition-all ${
-                styleMode === "remix"
-                  ? "bg-heritage-red text-white shadow-xs"
-                  : "text-stone-500 hover:text-stone-800"
-              }`}
-            >
-              Remix Đương đại
-            </button>
-          </div>
-        </div>
-
-        {/* Nút thao tác nhanh: Undo, Redo, Mở đầu, So sánh, Thử đồ, Lưu, Xuất */}
-        <div className="flex items-center flex-wrap gap-2">
-          {/* Undo / Redo & Phím tắt */}
-          <div className="flex items-center space-x-1.5">
-            <div className="flex items-center bg-stone-100 rounded-lg p-0.5 border border-stone-200">
-              <button
-                onClick={handleUndo}
-                disabled={historyIndex <= 0}
-                className="p-1.5 rounded-md hover:bg-white text-stone-700 disabled:opacity-30 transition-all"
-                title="Hoàn tác (Ctrl+Z)"
-              >
-                <Undo2 className="w-4 h-4" />
-              </button>
-              <button
-                onClick={handleRedo}
-                disabled={historyIndex >= historyStack.length - 1}
-                className="p-1.5 rounded-md hover:bg-white text-stone-700 disabled:opacity-30 transition-all"
-                title="Làm lại (Ctrl+Y)"
-              >
-                <Redo2 className="w-4 h-4" />
-              </button>
-            </div>
-            <span
-              className="hidden xl:inline-block text-[10px] text-stone-400 font-mono bg-stone-50 border border-stone-200 px-2 py-1 rounded-md"
-              title="Phím tắt: Ctrl+Z (Undo), Ctrl+Y (Redo), 1-6 (Đổi slot trang phục), Esc (Đóng bảng)"
-            >
-              ⌨️ Ctrl+Z / 1-6
-            </span>
-          </div>
-
-          <button
-            onClick={() => setIsStarterOpen(true)}
-            className="flex items-center space-x-1 px-3 py-1.5 rounded-lg border border-stone-300 hover:bg-stone-50 text-xs font-semibold text-stone-700 transition-colors"
-          >
-            <Sparkles className="w-3.5 h-3.5 text-heritage-gold" />
-            <span>Mẫu mở đầu (F01)</span>
-          </button>
-
-          {/* Ghim / So sánh A/B */}
-          <button
-            onClick={() => {
-              if (!pinnedSnapshotA) {
-                setPinnedSnapshotA({
-                  schemaVersion: 1,
-                  avatarId: currentAvatar?.id || "avatar_nam_chuan",
-                  poseId: "front_01",
-                  occasionId: selectedOccasion,
-                  styleMode: styleMode,
-                  overlapDirection: overlapDirection,
-                  items: equippedItems,
-                });
-              } else {
-                setIsCompareOpen(true);
-              }
-            }}
-            className={`flex items-center space-x-1 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all ${
-              pinnedSnapshotA
-                ? "border-heritage-indigo bg-heritage-indigo/10 text-heritage-indigo"
-                : "border-stone-300 text-stone-700 hover:bg-stone-50"
-            }`}
-          >
-            <ArrowRightLeft className="w-3.5 h-3.5" />
-            <span>{pinnedSnapshotA ? "So sánh A/B (F08)" : "Ghim bản A"}</span>
-          </button>
-
-          {/* Thử đồ AI */}
-          <button
-            onClick={() => setIsTryOnOpen(true)}
-            className="flex items-center space-x-1 px-3 py-1.5 rounded-lg border border-heritage-gold bg-amber-50/50 hover:bg-amber-100/60 text-xs font-semibold text-amber-900 transition-colors"
-          >
-            <Camera className="w-3.5 h-3.5 text-heritage-gold" />
-            <span>Thử đồ AI (F05)</span>
-          </button>
-
-          {/* Xuất ảnh 2D */}
-          <button
-            onClick={() => setIsExportOpen(true)}
-            className="flex items-center space-x-1 px-3.5 py-1.5 rounded-lg bg-stone-800 hover:bg-stone-900 text-white text-xs font-semibold transition-all shadow-xs"
-          >
-            <Download className="w-3.5 h-3.5" />
-            <span>Xuất ảnh (F03)</span>
-          </button>
-
-          {/* Lưu bộ phối */}
-          <button
-            onClick={handleSaveOutfit}
-            disabled={isSaving}
-            className="flex items-center space-x-1 px-3.5 py-1.5 rounded-lg bg-heritage-red hover:bg-heritage-red-dark text-white text-xs font-semibold transition-all shadow-xs disabled:opacity-50"
-          >
-            <Save className="w-3.5 h-3.5" />
-            <span>{isSaving ? "Đang lưu..." : "Lưu bộ phối"}</span>
-          </button>
-        </div>
-      </div>
-
-      {saveSuccessMessage && (
-        <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-xl flex items-center space-x-2">
-          <Check className="w-4 h-4 text-emerald-600" />
-          <span>{saveSuccessMessage}</span>
-        </div>
-      )}
-
-      {/* Main Studio 3-Column Layout: Trái (Danh mục & Sự kiện) | Giữa (Canvas 2D) | Phải (Màu sắc, Cảnh báo văn hóa, Thời tiết) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* CỘT TRÁI (3 cols): Bối cảnh sự kiện & Kho đồ */}
-        <div className="lg:col-span-3 xl:col-span-3 space-y-4">
-          {/* Lọc Sự Kiện & Bối Cảnh (F01) */}
-          <div className="bg-white p-4 rounded-2xl border border-stone-200/80 shadow-xs space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-stone-500 uppercase tracking-wider">
-                Hoàn cảnh sử dụng
-              </span>
-              <span className="text-[11px] font-medium text-stone-400">Occasion</span>
-            </div>
-            {isInitialLoading ? (
-              <OccasionGridSkeleton />
-            ) : (
-              <div className="grid grid-cols-2 gap-2">
-                {occasions.map((occ) => (
-                  <button
-                    key={occ.id}
-                    onClick={() => setSelectedOccasion(occ.id)}
-                    className={`p-2.5 rounded-xl border text-left transition-all ${
-                      selectedOccasion === occ.id
-                        ? "border-heritage-red bg-heritage-red/10 text-heritage-red font-semibold shadow-xs"
-                        : "border-stone-200 hover:border-stone-300 text-stone-700 bg-stone-50/50"
-                    }`}
-                  >
-                    <div className="font-semibold text-xs text-stone-900 truncate">{occ.name}</div>
-                    <div className="text-[11px] text-stone-500 font-normal capitalize mt-0.5">{occ.season}</div>
-                  </button>
-                ))}
+              {/* 4 Góc Đồng Dát Vàng Cung Đình (Imperial Corner Brackets) */}
+              <div className="absolute top-2.5 left-2.5 w-6 h-6 pointer-events-none text-amber-600/80 z-20">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" className="w-full h-full">
+                  <path d="M 2 12 L 2 2 L 12 2 M 5 5 L 10 5 M 5 5 L 5 10" />
+                  <circle cx="5" cy="5" r="1.5" fill="currentColor" />
+                </svg>
               </div>
-            )}
-          </div>
-
-          {/* Lọc Nhóm Áo & Slot */}
-          <div className="bg-white p-4 rounded-2xl border border-stone-200/80 shadow-xs space-y-3">
-            {/* Tiêu đề mục phân loại */}
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-stone-700 uppercase tracking-wider">
-                Phân loại trang phục
-              </span>
-              <span className="text-xs text-stone-400 font-medium">
-                {filteredCatalogItems.length} món
-              </span>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <div className="relative min-w-0 flex-1">
-                <select
-                  aria-label="Phân loại trang phục"
-                  value={activeSlot}
-                  onChange={(event) => setActiveSlot(event.target.value)}
-                  className="w-full appearance-none rounded-lg border border-heritage-red bg-white py-2 pl-3 pr-9 text-sm font-medium text-stone-800 cursor-pointer focus:outline-none focus:ring-2 focus:ring-heritage-red/20"
-                >
-                  <option value="outerwear">Áo ngoài</option>
-                  <option value="undergarment">Áo lót trong</option>
-                  <option value="bottom">Quần</option>
-                  <option value="headwear">Khăn vấn</option>
-                  <option value="accessory_front">Phụ kiện</option>
-                  <option value="footwear">Giày/Guốc</option>
-                </select>
-                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-700" />
+              <div className="absolute top-2.5 right-2.5 w-6 h-6 pointer-events-none text-amber-600/80 rotate-90 z-20">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" className="w-full h-full">
+                  <path d="M 2 12 L 2 2 L 12 2 M 5 5 L 10 5 M 5 5 L 5 10" />
+                  <circle cx="5" cy="5" r="1.5" fill="currentColor" />
+                </svg>
               </div>
-              <button
-                type="button"
-                onClick={() => toggleLockSlot(activeSlot)}
-                aria-label={lockedSlots.has(activeSlot) ? "Mở khóa danh mục đang chọn" : "Khóa danh mục đang chọn"}
-                title={lockedSlots.has(activeSlot) ? "Đã khóa - Giữ nguyên khi tạo ngẫu nhiên" : "Khóa danh mục khi tạo ngẫu nhiên"}
-                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border transition-colors ${
-                  lockedSlots.has(activeSlot)
-                    ? "border-amber-300 bg-amber-50 text-amber-600"
-                    : "border-stone-200 bg-white text-stone-500 hover:border-stone-300 hover:text-stone-800"
-                }`}
-              >
-                {lockedSlots.has(activeSlot) ? <Lock className="h-4 w-4" /> : <Unlock className="h-4 w-4" />}
-              </button>
-            </div>
-
-            {/* Quy cách Cài vạt Cổ phục (Hữu nhậm vs Tả nhậm) gọn gàng */}
-            <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-stone-50/80 border border-stone-200/80 text-xs">
-              <div className="flex items-center space-x-1.5">
-                <Compass className="w-3.5 h-3.5 text-heritage-red shrink-0" />
-                <span className="font-semibold text-stone-700">Cài vạt:</span>
-                <button
-                  type="button"
-                  onClick={() => setShowHuuNhamInfo(true)}
-                  className="text-stone-400 hover:text-heritage-red transition-colors inline-flex items-center"
-                  title="Tìm hiểu ý nghĩa quy chuẩn Hữu nhậm cổ truyền"
-                >
-                  <span className="w-3.5 h-3.5 rounded-full border border-stone-300 text-[9px] flex items-center justify-center font-bold text-stone-500 hover:border-heritage-red hover:text-heritage-red">?</span>
-                </button>
+              <div className="absolute bottom-2.5 left-2.5 w-6 h-6 pointer-events-none text-amber-600/80 -rotate-90 z-20">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" className="w-full h-full">
+                  <path d="M 2 12 L 2 2 L 12 2 M 5 5 L 10 5 M 5 5 L 10 5" />
+                  <circle cx="5" cy="5" r="1.5" fill="currentColor" />
+                </svg>
               </div>
-              <button
-                type="button"
-                onClick={() =>
-                  setOverlapDirection(
-                    overlapDirection === "right_over_left" ? "left_over_right" : "right_over_left"
-                  )
-                }
-                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all flex items-center space-x-1.5 border shadow-2xs ${
-                  overlapDirection === "right_over_left"
-                    ? "bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100"
-                    : "bg-red-50 text-red-800 border-red-200 hover:bg-red-100"
-                }`}
-                title="Nhấn để đổi hướng vạt áo và kiểm tra cảnh báo quy chuẩn văn hóa"
-              >
-                <span className={`w-1.5 h-1.5 rounded-full ${overlapDirection === "right_over_left" ? "bg-emerald-600" : "bg-red-600"}`} />
-                <span>{overlapDirection === "right_over_left" ? "Hữu nhậm (Phải)" : "Tả nhậm (Trái)"}</span>
-              </button>
-            </div>
-
-            {/* Danh sách items có sẵn theo slot */}
-            {isInitialLoading ? (
-              <div className="space-y-2">
-                {[1, 2, 3, 4, 5].map((i) => (
-                  <GarmentItemSkeleton key={i} />
-                ))}
-              </div>
-            ) : (
-              <div className="space-y-2 max-h-[480px] xl:max-h-[560px] overflow-y-auto pr-1 overscroll-contain">
-                {filteredCatalogItems.map((item) => {
-                  const isEquipped = equippedItems.some((it) => it.itemId === item.id);
-                  return (
-                    <div
-                      key={item.id}
-                      onClick={() => handleSelectItem(item)}
-                      className={`p-2.5 rounded-xl border flex items-center space-x-3 cursor-pointer transition-colors duration-150 ${
-                        isEquipped
-                          ? "border-heritage-red bg-heritage-red/5 ring-1.5 ring-heritage-red shadow-xs"
-                          : "border-stone-200 hover:border-stone-400 bg-white hover:bg-[#FAF8F5]"
-                      }`}
-                    >
-                      {/* Thumbnail ảnh minh họa thật hoặc SVG */}
-                      <div className="w-14 h-14 rounded-lg bg-[#FAF8F5] border border-stone-200/80 flex items-center justify-center overflow-hidden shrink-0 relative">
-                        {item.metadata?.real_image_url ? (
-                          <img
-                            src={item.metadata.real_image_url}
-                            alt={item.name}
-                            loading="lazy"
-                            decoding="async"
-                            className="w-full h-full object-contain p-0.5"
-                          />
-                        ) : item.default_layer?.svg_content ? (
-                          <svg
-                            viewBox="0 0 800 1200"
-                            className="w-full h-full object-contain p-1 pointer-events-none"
-                            dangerouslySetInnerHTML={{ __html: item.default_layer.svg_content }}
-                          />
-                        ) : (
-                          <div className="text-[10px] text-stone-400 text-center font-serif">Cổ phục</div>
-                        )}
-                        {item.metadata?.real_image_url && (
-                          <span className="absolute bottom-0 right-0 bg-heritage-red text-[8px] font-bold text-white px-1 rounded-tl">
-                            Ảnh thật
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="flex-1 min-w-0 space-y-0.5">
-                        <div className="font-semibold text-[13px] text-stone-900 truncate tracking-tight" title={item.name}>
-                          {item.name}
-                        </div>
-                        <div className="flex items-center space-x-2 text-xs text-stone-500">
-                          <span>Thời {item.era || "Nguyễn"}</span>
-                          {item.variants.length > 0 && (
-                            <div className="flex items-center space-x-1">
-                              <span>•</span>
-                              <div className="flex -space-x-1">
-                                {item.variants.map((v) => (
-                                  <div
-                                    key={v.id}
-                                    className="w-2.5 h-2.5 rounded-full border border-white shadow-xs"
-                                    style={{ backgroundColor: v.hex_color }}
-                                    title={v.color_name}
-                                  />
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      {isEquipped && (
-                        <div className="w-6 h-6 rounded-full bg-heritage-red text-white flex items-center justify-center shrink-0">
-                          <Check className="w-3.5 h-3.5" />
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* CỘT GIỮA (6 cols): Vùng Artboard Canvas 2D (F03) - Trọng tâm thiết kế */}
-        <div className="lg:col-span-6 xl:col-span-6 space-y-3">
-          {/* Thanh công cụ Artboard: Chế độ Flat-lay, Nền, Tỉ lệ */}
-          <div className="bg-white p-2.5 rounded-2xl border border-stone-200 shadow-xs space-y-2">
-            <div className="flex items-center justify-between">
-              {/* Tiêu đề Bảng phối Flat-lay OOTD */}
-              <div className="flex items-center space-x-2">
-                <div className="w-6 h-6 rounded-lg bg-heritage-red/10 text-heritage-red flex items-center justify-center">
-                  <Layers className="w-3.5 h-3.5" />
-                </div>
-                <span className="text-sm font-bold text-stone-900 tracking-tight">Bảng Phối Đồ Flat-lay (OOTD)</span>
+              <div className="absolute bottom-2.5 right-2.5 w-6 h-6 pointer-events-none text-amber-600/80 rotate-180 z-20">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" className="w-full h-full">
+                  <path d="M 2 12 L 2 2 L 12 2 M 5 5 L 10 5 M 5 5 L 10 5" />
+                  <circle cx="5" cy="5" r="1.5" fill="currentColor" />
+                </svg>
               </div>
 
-              {/* Tỉ lệ khung hình */}
-              <div className="flex items-center space-x-1 text-xs">
-                <button
-                  onClick={() => setDisplayRatio("9:16")}
-                  className={`px-2.5 py-1 rounded-lg font-mono font-semibold text-xs transition-all ${
-                    displayRatio === "9:16" ? "bg-stone-900 text-white shadow-xs" : "bg-stone-100 text-stone-600 hover:bg-stone-200"
-                  }`}
-                  title="Tỉ lệ dọc (Story / TikTok / Reels)"
-                >
-                  9:16
-                </button>
-                <button
-                  onClick={() => setDisplayRatio("1:1")}
-                  className={`px-2.5 py-1 rounded-lg font-mono font-semibold text-xs transition-all ${
-                    displayRatio === "1:1" ? "bg-stone-900 text-white shadow-xs" : "bg-stone-100 text-stone-600 hover:bg-stone-200"
-                  }`}
-                  title="Tỉ lệ vuông (Instagram / Feed)"
-                >
-                  1:1
-                </button>
-              </div>
-            </div>
-
-            {/* Tùy chọn nền & Nút đặt lại vị trí */}
-            <div className="flex items-center justify-between pt-1 border-t border-stone-100 text-xs text-stone-500">
-              <div className="flex items-center space-x-1.5">
-                <span className="font-medium text-stone-600">Nền:</span>
-                <button
-                  onClick={() => setCanvasBackgroundTheme("white")}
-                  className={`px-2.5 py-1 rounded-md text-xs font-medium border transition-colors ${
-                    canvasBackgroundTheme === "white"
-                      ? "bg-stone-900 text-white border-stone-900 shadow-xs"
-                      : "bg-white text-stone-700 border-stone-200 hover:bg-stone-50"
-                  }`}
-                >
-                  Trắng Studio
-                </button>
-                <button
-                  onClick={() => setCanvasBackgroundTheme("dopaper")}
-                  className={`px-2.5 py-1 rounded-md text-xs font-medium border transition-colors ${
-                    canvasBackgroundTheme === "dopaper"
-                      ? "bg-heritage-red text-white border-heritage-red shadow-xs"
-                      : "bg-[#FAF8F5] text-stone-700 border-stone-200 hover:bg-stone-100"
-                  }`}
-                >
-                  Giấy Dó
-                </button>
-              </div>
-
-              <button
-                onClick={() => canvasRef.current?.resetAllTransforms()}
-                className="inline-flex items-center space-x-1.5 text-xs font-semibold text-stone-600 hover:text-heritage-red transition-colors"
-                title="Khôi phục toàn bộ trang phục về vị trí sắp xếp OOTD ban đầu"
-              >
-                <RefreshCw className="w-3.5 h-3.5" />
-                <span>Căn lại vị trí ban đầu</span>
-              </button>
-            </div>
-          </div>
-
-          <Canvas2D
-            ref={canvasRef}
-            avatar={currentAvatar}
-            layers={layers}
-            equippedItems={equippedItems}
-            catalogItems={catalogItems}
-            aspectRatio={displayRatio}
-            viewMode="flatlay"
-            backgroundTheme={canvasBackgroundTheme}
-            selectedSlot={activeSlot}
-            onSelectItem={(slot) => setActiveSlot(slot)}
-            className="w-full"
-          />
-
-          {/* Trợ lý Gemini gợi ý nhanh */}
-          <div className="bg-white p-3.5 rounded-2xl border border-stone-200 shadow-xs space-y-2">
-            <div className="flex items-center space-x-1.5 text-xs font-semibold text-stone-900">
-              <Sparkles className="w-3.5 h-3.5 text-heritage-red" />
-              <span>Trợ lý Gemini Styling (F11)</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <input
-                type="text"
-                value={aiPrompt}
-                onChange={(e) => setAiPrompt(e.target.value)}
-                placeholder="Ví dụ: Phối áo ngũ thân chụp kỷ yếu thanh lịch..."
-                className="flex-1 text-xs px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:border-heritage-red"
+              <Image
+                src={garment.imageUrl}
+                alt={garment.name}
+                fill
+                unoptimized
+                loading="lazy"
+                className="object-cover transform group-hover:scale-105 transition-transform duration-700"
               />
-              <button
-                onClick={handleAskAIStylist}
-                disabled={isAiLoading || !aiPrompt.trim()}
-                className="px-3.5 py-2 bg-heritage-red text-white rounded-lg text-xs font-semibold hover:bg-heritage-red-dark transition-all disabled:opacity-50"
-              >
-                {isAiLoading ? "..." : "Gợi ý"}
-              </button>
+
+
             </div>
-            {isAiLoading && (
-              <div className="flex items-center space-x-2 text-xs text-heritage-red pt-1">
-                <span className="w-2 h-2 rounded-full bg-heritage-red animate-ping shrink-0" />
-                <span className="font-medium animate-pulse">Gemini AI đang phân tích bối cảnh & tuyển chọn trang phục...</span>
-              </div>
-            )}
           </div>
-        </div>
 
-        {/* CỘT PHẢI (3 cols): Swatch Màu (F02), Cảnh báo văn hóa (F10), Hài hòa màu (F07), Thời tiết (F06) */}
-        <div className="lg:col-span-3 xl:col-span-3 space-y-4">
-          {/* Cảnh báo Quy Chuẩn Văn Hóa (F10) */}
-          <CulturalCheckBadge
-            checkData={culturalCheck}
-            onApplyFix={handleApplyCulturalFix}
-          />
-
-          {/* Bảng phối màu Ngũ Hành 1 chạm (Tối ưu trải nghiệm F02/F07) */}
-          <div className="bg-white p-4 rounded-2xl border border-stone-200/80 shadow-xs space-y-2.5">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-stone-500 uppercase tracking-wider flex items-center space-x-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-heritage-gold" />
-                <span>Phối Màu Ngũ Hành 1 Chạm</span>
-              </span>
-              <span className="text-xs text-stone-400 font-medium">Tương sinh</span>
-            </div>
-            <div className="grid grid-cols-5 gap-1.5">
-              {NGU_HANH_PALETTES.map((pal) => (
-                <button
-                  key={pal.name}
-                  onClick={() => applyNguHanhPalette(pal)}
-                  className={`p-2 rounded-xl border text-center transition-all hover:scale-105 ${pal.badge}`}
-                  title={`${pal.name} (${pal.desc}) - Bấm để áp dụng`}
+          {/* Dải Mã Màu Hòa Sắc Đầy Đủ Nằm Ngay Dưới Ảnh */}
+          <div className="relative z-10 mt-7 px-4 py-2 rounded-2xl bg-white/90 backdrop-blur-xs border border-stone-200/90 shadow-xs flex items-center space-x-3">
+            <span className="text-xs font-semibold text-stone-600">
+              Hòa sắc di sản:
+            </span>
+            <div className="flex items-center space-x-2.5">
+              {garment.colors.map((c, i) => (
+                <div
+                  key={i}
+                  className="flex items-center space-x-1.5 transform hover:scale-115 transition-transform cursor-pointer"
+                  title={c.name}
                 >
-                  <div
-                    className="w-4 h-4 rounded-full mx-auto mb-1 border border-black/10 shadow-xs"
-                    style={{ backgroundColor: pal.colors.outerwear }}
-                  ></div>
-                  <div className="text-xs font-bold">{pal.name}</div>
-                </button>
+                  <span
+                    className="w-3.5 h-3.5 rounded-full border border-black/15 shadow-xs"
+                    style={{ backgroundColor: c.hex }}
+                  />
+                  <span className="text-xs font-medium text-stone-700 hidden sm:inline">
+                    {c.name}
+                  </span>
+                </div>
               ))}
             </div>
           </div>
+        </div>
 
-          {/* Bộ chọn Biến thể màu sắc & Chất liệu cho món đang chọn (F02) */}
-          {isInitialLoading ? (
-            <div className="bg-white p-4 rounded-2xl border border-stone-200/80 shadow-xs space-y-3">
-              <div className="flex items-center justify-between">
-                <Skeleton className="h-4 w-32 rounded-md" />
-                <Skeleton className="h-4 w-12 rounded-md" />
-              </div>
-              <div className="grid grid-cols-4 gap-2">
-                {[1, 2, 3, 4].map((i) => (
-                  <Skeleton key={i} className="h-12 rounded-xl" />
-                ))}
-              </div>
+        {/* Cột 2: Toàn Bộ Thông Tin Khảo Cứu Nối Liền Thoáng Đãng (Không Đóng Hộp) */}
+        <div
+          className={`lg:col-span-7 space-y-6 text-left ${
+            isEven ? "lg:order-2 lg:pl-6" : "lg:order-1 lg:pr-6"
+          }`}
+        >
+          {/* Tiêu Đề, Triều Đại & Niên Biểu */}
+          <div className="space-y-2">
+            <div className="flex items-center space-x-2.5 flex-wrap gap-y-2">
+              <span className="px-3 py-1 rounded-md bg-heritage-red/10 text-heritage-red text-xs font-mono font-bold uppercase tracking-wider border border-heritage-red/20 shadow-2xs">
+                {garment.dynasties}
+              </span>
+              <span className="text-xs font-mono text-stone-500">
+                Thời kỳ: {garment.eraTime}
+              </span>
+              <span className="text-xs font-medium text-amber-800 bg-amber-50 px-2.5 py-0.5 rounded-md border border-amber-200">
+                {garment.role}
+              </span>
             </div>
-          ) : activeCatalogItem && activeCatalogItem.variants.length > 0 ? (
-            <div className="bg-white p-4 rounded-2xl border border-stone-200/80 shadow-xs">
-              <SwatchPicker
-                variants={activeCatalogItem.variants}
-                selectedVariantId={activeEquippedItem?.variantId}
-                onSelectVariant={handleSelectVariant}
-              />
+
+            <h3 className="font-serif text-3xl sm:text-4xl lg:text-5xl font-bold text-stone-900 leading-snug tracking-tight">
+              <span className="text-amber-700/60 font-mono text-xl sm:text-2xl mr-2 font-bold">
+                {chapterNum}.
+              </span>
+              {garment.name}
+            </h3>
+          </div>
+
+          <p className="text-stone-600 text-sm sm:text-base leading-relaxed font-light">
+            {garment.significance}
+          </p>
+
+          {/* Lưới 4 Thẻ Quy Thức Kiến Trúc Cổ Phong */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+            <div className="p-4 rounded-2xl bg-white/85 backdrop-blur-xs border border-stone-200/90 space-y-1.5 transition-all duration-300 hover:-translate-y-1 hover:shadow-md hover:bg-white hover:border-amber-400/50 group cursor-default shadow-xs">
+              <div className="text-xs font-bold text-stone-800 flex items-center space-x-1.5">
+                <ShieldCheck className="w-3.5 h-3.5 text-heritage-red transform group-hover:scale-125 group-hover:rotate-6 transition-transform duration-300" />
+                <span className="group-hover:text-heritage-red transition-colors">
+                  Quy thức Cổ Áo:
+                </span>
+              </div>
+              <p className="text-xs text-stone-600 leading-relaxed font-light">
+                {garment.structure.collar}
+              </p>
             </div>
-          ) : null}
 
-          {/* Phân tích Hài hòa Màu sắc & Độ tương phản (F07) */}
-          <ColorAnalysisPanel
-            equippedColors={currentColorsForAnalysis}
-            onApplyColorVariant={(sug) => {
-              const targetSlot = catalogItems.find((ci) => ci.id === sug.item_id)?.slot;
-              if (targetSlot) {
-                const newItems = equippedItems.map((it) => {
-                  if (it.slot === targetSlot) {
-                    return { ...it, itemId: sug.item_id, variantId: sug.variant_id, colorHex: sug.hex_color };
-                  }
-                  return it;
-                });
-                pushHistory(newItems);
-              }
-            }}
-          />
+            <div className="p-4 rounded-2xl bg-white/85 backdrop-blur-xs border border-stone-200/90 space-y-1.5 transition-all duration-300 hover:-translate-y-1 hover:shadow-md hover:bg-white hover:border-amber-400/50 group cursor-default shadow-xs">
+              <div className="text-xs font-bold text-stone-800 flex items-center space-x-1.5">
+                <Layers className="w-3.5 h-3.5 text-heritage-indigo transform group-hover:scale-125 group-hover:rotate-6 transition-transform duration-300" />
+                <span className="group-hover:text-heritage-indigo transition-colors">
+                  Quy thức Tay Áo:
+                </span>
+              </div>
+              <p className="text-xs text-stone-600 leading-relaxed font-light">
+                {garment.structure.sleeves}
+              </p>
+            </div>
 
-          {/* Dự báo Thời tiết & Lời khuyên bối cảnh (F06) */}
-          <WeatherWidget
-            onApplyWeatherSuggestion={(accessories) => {
-              // Tìm phụ kiện tương ứng trong catalog
-              const fan = catalogItems.find((ci) => ci.id === "item_quat_xep_giay_do");
-              if (fan) handleSelectItem(fan);
-            }}
-          />
+            <div className="p-4 rounded-2xl bg-white/85 backdrop-blur-xs border border-stone-200/90 space-y-1.5 transition-all duration-300 hover:-translate-y-1 hover:shadow-md hover:bg-white hover:border-amber-400/50 group cursor-default shadow-xs">
+              <div className="text-xs font-bold text-stone-800 flex items-center space-x-1.5">
+                <ShieldCheck className="w-3.5 h-3.5 text-heritage-jade transform group-hover:scale-125 group-hover:rotate-6 transition-transform duration-300" />
+                <span className="group-hover:text-heritage-jade transition-colors">
+                  Vạt Áo & Cài Khuy:
+                </span>
+              </div>
+              <p className="text-xs text-stone-600 leading-relaxed font-light">
+                {garment.structure.lapelAndButtons}
+              </p>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-white/85 backdrop-blur-xs border border-stone-200/90 space-y-1.5 transition-all duration-300 hover:-translate-y-1 hover:shadow-md hover:bg-white hover:border-amber-400/50 group cursor-default shadow-xs">
+              <div className="text-xs font-bold text-stone-800 flex items-center space-x-1.5">
+                <Palette className="w-3.5 h-3.5 text-heritage-gold transform group-hover:scale-125 group-hover:rotate-6 transition-transform duration-300" />
+                <span className="group-hover:text-heritage-gold transition-colors">
+                  Hoa Văn & Đồ Án:
+                </span>
+              </div>
+              <p className="text-xs text-stone-600 leading-relaxed font-light">
+                {garment.structure.pattern}
+              </p>
+            </div>
+          </div>
+
+          {/* Khung Trích Dẫn Điển Lệ Thư Tịch Cổ */}
+          <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-amber-50/90 via-[#FAF8F5] to-amber-50/70 border border-amber-300/60 space-y-1.5 hover:border-amber-400 transition-colors shadow-2xs">
+            <div className="flex items-center space-x-1.5 text-xs font-bold text-amber-900 font-serif uppercase">
+              <ShieldCheck className="w-3.5 h-3.5 text-heritage-red" />
+              <span>Khảo Cứu Thư Tịch Cổ</span>
+            </div>
+            <p className="text-xs sm:text-sm text-stone-700 italic leading-relaxed">
+              “{garment.citation}”
+            </p>
+            <p className="text-[11px] text-amber-800 font-mono font-semibold">
+              Trích từ: {garment.sourceBook}
+            </p>
+          </div>
+
+          {/* Nút Bấm Khám Phá Trực Tiếp Trong Studio 2D */}
+          <div className="pt-2 flex flex-wrap gap-4 items-center">
+            <Link
+              href="/studio"
+              prefetch={true}
+              className="relative group inline-flex items-center space-x-2.5 px-7 py-3.5 rounded-xl bg-heritage-red hover:bg-heritage-red-dark text-white font-bold text-sm shadow-md shadow-heritage-red/25 hover:shadow-heritage-red/40 transition-all duration-300 transform hover:scale-105 active:scale-95 overflow-hidden ring-2 ring-amber-400/30"
+            >
+              <div className="absolute inset-0 pointer-events-none overflow-hidden rounded-xl">
+                <div className="w-1/2 h-full bg-gradient-to-r from-transparent via-white/25 to-transparent animate-beam-sweep" />
+              </div>
+              <Sparkles className="w-4 h-4 text-amber-300 group-hover:rotate-12 transition-transform duration-300" />
+              <span>Phối Mẫu {garment.shortName} Tại Studio 2D</span>
+              <ArrowRight className="w-4 h-4 text-white transform group-hover:translate-x-1.5 transition-transform duration-300" />
+            </Link>
+
+            <Link
+              href="/thu-vien"
+              prefetch={true}
+              className="inline-flex items-center space-x-1.5 px-5 py-3.5 rounded-xl bg-white/90 hover:bg-white text-stone-800 font-medium text-sm transition-colors border border-stone-200 shadow-2xs"
+            >
+              <BookOpen className="w-4 h-4 text-stone-500" />
+              <span>Xem Trong Thư Viện</span>
+            </Link>
+          </div>
         </div>
       </div>
+    </div>
+  );
+}
 
-      {/* MODALS */}
-      <StarterOutfitModal
-        isOpen={isStarterOpen}
-        onClose={() => setIsStarterOpen(false)}
-        onSelectStarter={handleLoadStarter}
-      />
+export default function WelcomePage() {
+  const [activeScrollGarmentId, setActiveScrollGarmentId] = useState<string>("giao-linh");
 
-      {pinnedSnapshotA && (
-        <CompareModal
-          isOpen={isCompareOpen}
-          onClose={() => setIsCompareOpen(false)}
-          snapshotA={pinnedSnapshotA}
-          snapshotB={{
-            schemaVersion: 1,
-            avatarId: currentAvatar?.id || "avatar_nam_chuan",
-            poseId: "front_01",
-            occasionId: selectedOccasion,
-            styleMode: styleMode,
-            overlapDirection: overlapDirection,
-            items: equippedItems,
-          }}
-          onSelectOutfit={(chosen) => {
-            setEquippedItems(chosen.items);
-            setStyleMode(chosen.styleMode as any);
-            setOverlapDirection(chosen.overlapDirection as any);
-          }}
-        />
-      )}
+  // Theo dõi vị trí cuộn trang để cập nhật kiểu thức đang hiển thị trên thanh ScrollSpy
+  useEffect(() => {
+    const handleScroll = () => {
+      const scrollPosition = window.scrollY + 320;
+      for (let i = REFERENCE_GARMENTS.length - 1; i >= 0; i--) {
+        const el = document.getElementById(`garment-${REFERENCE_GARMENTS[i].id}`);
+        if (el && el.offsetTop <= scrollPosition) {
+          setActiveScrollGarmentId(REFERENCE_GARMENTS[i].id);
+          break;
+        }
+      }
+    };
 
-      <ExportModal
-        isOpen={isExportOpen}
-        onClose={() => setIsExportOpen(false)}
-        onExport={async (ratio) => {
-          if (!canvasRef.current) throw new Error("Canvas chưa sẵn sàng");
-          return canvasRef.current.exportToDataUrl(ratio);
-        }}
-        outfitTitle={outfitTitle}
-      />
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
 
-      <AITryOnModal
-        isOpen={isTryOnOpen}
-        onClose={() => setIsTryOnOpen(false)}
-        snapshot={{
-          schemaVersion: 1,
-          avatarId: currentAvatar?.id || "avatar_nam_chuan",
-          poseId: "front_01",
-          occasionId: selectedOccasion,
-          styleMode: styleMode,
-          overlapDirection: overlapDirection,
-          items: equippedItems,
-        }}
-        outfitTitle={outfitTitle}
-      />
+  return (
+    <div className="min-h-screen bg-[#FAF8F5] text-stone-900 selection:bg-heritage-gold/30 selection:text-heritage-red overflow-x-clip">
+      {/* 1. HERO SECTION WITH RICH AMBIENT MOTION */}
+      <section className="relative overflow-hidden pt-12 pb-20 sm:pt-20 sm:pb-28 border-b border-stone-200/80 bg-gradient-to-b from-[#F7F2EB] via-[#FAF8F5] to-[#FAF8F5]">
+        {/* Floating Traditional Vietnamese Clouds in Background */}
+        <div className="absolute top-10 left-10 sm:left-1/4 w-72 h-36 opacity-35 pointer-events-none animate-float-slow select-none">
+          <svg viewBox="0 0 240 120" fill="none" className="w-full h-full text-amber-500/40">
+            <path
+              d="M40 90 C 20 90 0 75 0 55 C 0 32 24 15 52 20 C 65 5 95 0 125 12 C 150 0 185 10 192 35 C 215 35 235 52 235 75 C 235 98 210 110 180 102 C 155 125 95 130 60 108 C 48 112 36 108 40 90 Z"
+              fill="currentColor"
+            />
+          </svg>
+        </div>
 
-      {/* Modal Giới thiệu Quy chuẩn Văn hóa Hữu Nhậm */}
-      {showHuuNhamInfo && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-stone-200">
-            <div className="flex items-start justify-between">
-              <div className="flex items-center space-x-2.5">
-                <div className="w-10 h-10 rounded-xl bg-heritage-red/10 text-heritage-red flex items-center justify-center font-serif font-bold text-xl">
-                  右
-                </div>
-                <div>
-                  <h3 className="font-serif font-bold text-lg text-stone-900">
-                    Quy chuẩn Văn hóa &quot;Hữu nhậm&quot; (右衽)
-                  </h3>
-                  <span className="text-xs text-stone-500">Đặc trưng cốt lõi của trang phục truyền thống Việt</span>
-                </div>
-              </div>
-              <button
-                onClick={() => setShowHuuNhamInfo(false)}
-                className="p-1.5 rounded-lg text-stone-400 hover:text-stone-700 hover:bg-stone-100 transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
+        <div className="absolute top-1/3 -right-12 w-80 h-44 opacity-25 pointer-events-none animate-float-reverse select-none">
+          <svg viewBox="0 0 240 120" fill="none" className="w-full h-full text-heritage-red/35">
+            <path
+              d="M45 80 C 25 80 10 65 10 48 C 10 26 32 14 60 18 C 72 4 100 0 128 10 C 152 0 184 10 190 32 C 212 32 230 48 230 70 C 230 92 206 104 176 96 C 152 118 96 122 62 102 C 50 106 40 96 45 80 Z"
+              fill="currentColor"
+            />
+          </svg>
+        </div>
 
-            <div className="mt-4 space-y-3 text-xs text-stone-600 leading-relaxed">
-              <p>
-                <strong>Hữu nhậm (cài vạt sang bên phải):</strong> Vạt áo bên trái đè lên vạt bên phải, các khuy cài dọc theo sườn phải. Đây là quy chuẩn trang phục nhất quán của người Việt từ thời Lý, Trần, Lê cho đến triều Nguyễn.
-              </p>
-              <div className="p-3 bg-amber-50/80 border border-amber-200 rounded-xl text-amber-900">
-                <strong>Tại sao cấm &quot;Tả nhậm&quot; (cài vạt sang trái)?</strong> Theo sách <em>Lễ Ký</em> và khảo cứu <em>Ngàn năm áo mũ</em> (Trần Quang Đức), người phương Bắc cổ đại quy định người sống mặc Hữu nhậm, chỉ khi qua đời khâm liệm mới cài vạt Tả nhậm. Mặc Tả nhậm lúc thường là điều đại kỵ trong văn hóa truyền thống.
-              </div>
-              <p className="text-[11px] text-stone-400 italic">
-                Nguồn học thuật: Khâm định Đại Nam hội điển sự lệ, Ngàn năm áo mũ, Cố đô Huế.
-              </p>
-            </div>
-
-            <div className="mt-6 flex justify-end">
-              <button
-                onClick={() => setShowHuuNhamInfo(false)}
-                className="px-4 py-2 bg-stone-900 text-white rounded-xl text-xs font-semibold hover:bg-stone-800 transition-colors"
-              >
-                Đã hiểu quy chuẩn
-              </button>
+        {/* Traditional Bronze Drum Radial Watermark - Slow Ambient Rotation */}
+        <div
+          className="absolute -top-40 -left-40 w-[640px] h-[640px] rounded-full border border-amber-600/10 opacity-40 pointer-events-none flex items-center justify-center animate-spin"
+          style={{ animationDuration: "140s" }}
+        >
+          <div className="w-4/5 h-4/5 rounded-full border border-dashed border-amber-700/15 flex items-center justify-center">
+            <div className="w-3/5 h-3/5 rounded-full border border-amber-800/10 flex items-center justify-center">
+              <div className="w-2/5 h-2/5 rounded-full border border-dashed border-amber-900/15" />
             </div>
           </div>
         </div>
-      )}
+
+        {/* Floating Golden Sparks & Imperial Accents */}
+        <div className="absolute top-20 left-16 sm:left-1/3 text-amber-500/40 text-lg select-none pointer-events-none animate-sparkle-float" style={{ animationDelay: "0s" }}>✦</div>
+        <div className="absolute top-48 right-16 sm:right-1/4 text-amber-600/35 text-sm select-none pointer-events-none animate-sparkle-float" style={{ animationDelay: "1.5s" }}>✧</div>
+        <div className="absolute bottom-24 left-12 text-amber-500/30 text-xs select-none pointer-events-none animate-sparkle-float" style={{ animationDelay: "2.8s" }}>✦</div>
+        <div className="absolute top-1/2 right-10 text-rose-500/30 text-sm select-none pointer-events-none animate-sparkle-float" style={{ animationDelay: "3.5s" }}>✧</div>
+
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 text-center">
+          <div className="space-y-6 sm:space-y-8">
+            <div className="inline-flex items-center space-x-2 px-3.5 py-1.5 rounded-full bg-heritage-red/10 border border-heritage-red/20 text-heritage-red text-xs font-semibold uppercase tracking-wider shadow-xs transform hover:scale-105 transition-transform">
+              <Sparkles className="w-3.5 h-3.5 text-heritage-gold animate-pulse" />
+              <span>Nền Tảng Phối Đồ Di Sản Thời Trang Việt Nam</span>
+            </div>
+
+            <h1 className="font-serif text-3xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-stone-900 leading-[1.18]">
+              Chạm Vào Ngàn Năm Áo Mũ,{" "}
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-heritage-red via-amber-600 via-rose-700 to-heritage-red animate-gradient-flow">
+                Phối Sắc Việt Theo Cách Của Riêng Bạn
+              </span>
+            </h1>
+
+            <p className="text-base sm:text-lg text-stone-600 font-light leading-relaxed max-w-2xl mx-auto">
+              Chiêm ngưỡng và trải nghiệm <strong>5 kiểu thức cổ phục tham chiếu chuẩn thư tịch</strong>: Giao Lĩnh, Viên Lĩnh, Nhật Bình, Áo Tấc và Áo Ngũ Thân. Phối đồ trực quan trên Studio 2D Canvas đa lớp, thẩm định quy tắc Hữu nhậm và phân tích hòa sắc Ngũ Hành.
+            </p>
+
+            {/* Action Buttons with High-Impact Motion */}
+            <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-4">
+              <Link
+                href="/studio"
+                prefetch={true}
+                className="relative group w-full sm:w-auto px-8 py-4 rounded-2xl bg-heritage-red hover:bg-heritage-red-dark text-white font-bold text-base shadow-xl shadow-heritage-red/30 transition-all duration-300 transform hover:scale-105 active:scale-95 flex items-center justify-center space-x-2.5 border border-amber-400/40 overflow-hidden ring-4 ring-heritage-red/20 hover:ring-heritage-red/40"
+              >
+                {/* Moving Light Beam Sweep Effect */}
+                <div className="absolute inset-0 pointer-events-none overflow-hidden rounded-2xl">
+                  <div className="w-1/2 h-full bg-gradient-to-r from-transparent via-white/25 to-transparent animate-beam-sweep" />
+                </div>
+                <Sparkles className="w-5 h-5 text-amber-300 animate-spin" style={{ animationDuration: "8s" }} />
+                <span>Bắt Đầu Phối Đồ Tại Studio</span>
+                <ArrowRight className="w-4 h-4 transform group-hover:translate-x-1.5 transition-transform duration-300" />
+              </Link>
+
+              <a
+                href="#canonical-garments"
+                className="w-full sm:w-auto px-7 py-4 rounded-2xl bg-white hover:bg-stone-50 text-stone-800 font-semibold text-base border border-stone-300 shadow-xs transition-all duration-200 flex items-center justify-center space-x-2 hover:border-heritage-red/50 hover:shadow-md transform hover:-translate-y-0.5"
+              >
+                <BookOpen className="w-4 h-4 text-heritage-indigo" />
+                <span>5 Kiểu Thức Tham Chiếu</span>
+                <ArrowDown className="w-4 h-4 text-stone-400 animate-bounce" style={{ animationDuration: "2.5s" }} />
+              </a>
+            </div>
+
+            {/* Trust & Heritage Badges */}
+            <div className="pt-4 flex flex-wrap items-center justify-center gap-6 text-xs text-stone-500 font-medium">
+              <div className="flex items-center space-x-1.5 hover:text-stone-800 transition-colors">
+                <ShieldCheck className="w-4 h-4 text-heritage-jade" />
+                <span>Chuẩn Quy thức Thư tịch</span>
+              </div>
+              <div className="flex items-center space-x-1.5 hover:text-stone-800 transition-colors">
+                <Palette className="w-4 h-4 text-heritage-gold" />
+                <span>Hòa sắc Ngũ Hành Tương sinh</span>
+              </div>
+              <div className="flex items-center space-x-1.5 hover:text-stone-800 transition-colors">
+                <Wand2 className="w-4 h-4 text-heritage-red" />
+                <span>Studio 2D Đa Lớp Thông Minh</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* 2. CANONICAL 5 REFERENCE GARMENTS VERTICAL STORYTELLING EXHIBITION */}
+      <section id="canonical-garments" className="pt-16 sm:pt-24 pb-20 sm:pb-32 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
+        <div className="relative" id="heritage-timeline-container">
+          {/* Tiêu đề & Lời dẫn chuẩn mực di sản */}
+          <div className="text-center max-w-3xl mx-auto mb-14 sm:mb-20 relative z-10 pt-6">
+            <div className="inline-flex items-center space-x-2 px-3.5 py-1.5 rounded-full bg-heritage-gold/15 text-stone-800 border border-heritage-gold/30 text-xs font-serif font-bold uppercase tracking-wider shadow-2xs backdrop-blur-xs">
+              <BookOpen className="w-3.5 h-3.5 text-heritage-gold" />
+              <span>Khảo Cứu Điển Chương Thư Tịch</span>
+            </div>
+
+            <h2 className="font-serif text-3xl sm:text-5xl font-bold text-stone-900 tracking-tight leading-tight mt-3">
+              5 Kiểu Thức Cổ Phục Chuẩn Thư Tịch
+            </h2>
+
+            <p className="text-sm sm:text-base text-stone-600 font-light leading-relaxed max-w-2xl mx-auto mt-3">
+              Hành trình chiêm ngưỡng 5 kiểu thức trang phục chuẩn mực của các vương triều Đại Việt được phục dựng trung thực dựa trên thư tịch cổ và hiện vật bảo tàng. Cuộn xuống để khám phá từng chương di sản với cấu trúc vạt áo, nẹp cổ, tay áo và hoa văn.
+            </p>
+          </div>
+
+          {/* Dòng chảy 5 trang phục di sản nối liền */}
+          <div className="relative z-10">
+            {REFERENCE_GARMENTS.map((garment, index) => (
+              <GarmentStoryCard
+                key={garment.id}
+                garment={garment}
+                index={index}
+                isEven={index % 2 === 0}
+              />
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* 3. COMPARATIVE 5 REFERENCE GARMENTS GALLERY */}
+      <section className="py-16 sm:py-24 bg-[#F5EFEB] border-t border-stone-300/80">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center space-y-4 max-w-3xl mx-auto mb-14">
+            <div className="inline-flex items-center space-x-2 px-3.5 py-1.5 rounded-full bg-heritage-indigo/10 text-heritage-indigo border border-heritage-indigo/20 text-xs font-semibold uppercase tracking-wider">
+              <Compass className="w-3.5 h-3.5 text-heritage-indigo" />
+              <span>Toàn Cảnh Bảng Tham Chiếu</span>
+            </div>
+
+            <h2 className="font-serif text-2xl sm:text-4xl font-bold text-stone-900 tracking-tight">
+              Bảo Tàng Thu Nhỏ 5 Hình Thái Cổ Phục
+            </h2>
+
+            <p className="text-sm sm:text-base text-stone-600 font-light leading-relaxed">
+              Đặt cạnh nhau để so sánh trực quan sự biến đổi từ vạt giao chéo (Giao lĩnh), cổ tròn (Viên lĩnh), cổ đối khâm chữ nhật (Nhật bình) đến cổ đứng cài khuy hữu nhậm (Áo tấc, Áo ngũ thân).
+            </p>
+          </div>
+
+          {/* 5-Column Responsive Gallery Grid with 3D Hover & Motion */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5">
+            {REFERENCE_GARMENTS.map((g) => {
+              const isSelected = g.id === activeScrollGarmentId;
+              return (
+                <div
+                  key={g.id}
+                  onClick={() => {
+                    setActiveScrollGarmentId(g.id);
+                    const el = document.getElementById(`garment-${g.id}`);
+                    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+                  }}
+                  className={`group bg-white rounded-3xl border transition-all duration-500 overflow-hidden cursor-pointer flex flex-col justify-between hover:shadow-2xl hover:-translate-y-2 transform ${
+                    isSelected
+                      ? "border-heritage-red ring-4 ring-heritage-red/25 shadow-xl scale-[1.02] bg-amber-50/40"
+                      : "border-stone-200/90 hover:border-amber-400/60"
+                  }`}
+                >
+                  <div className="p-3 bg-gradient-to-b from-[#FBF9F6] via-stone-50 to-stone-100 flex items-center justify-center relative h-72 overflow-hidden">
+                    {/* Hover radial shimmer overlay */}
+                    <div className="absolute inset-0 bg-radial-at-center from-white/60 via-transparent to-black/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
+
+                    <Image
+                      src={g.imageUrl}
+                      alt={g.name}
+                      fill
+                      unoptimized
+                      loading="lazy"
+                      className="object-contain p-2 transform group-hover:scale-112 transition-transform duration-700"
+                    />
+                    <div className="absolute top-2.5 left-2.5 px-2.5 py-0.5 rounded-lg bg-stone-900/85 backdrop-blur-xs text-[10px] font-mono text-amber-200 font-bold border border-amber-400/30 shadow-xs">
+                      {g.shortName}
+                    </div>
+                  </div>
+
+                  <div className="p-4 space-y-2 text-left bg-white">
+                    <h4 className="font-serif font-bold text-sm text-stone-900 line-clamp-1 group-hover:text-heritage-red transition-colors">
+                      {g.name}
+                    </h4>
+                    <p className="text-[11px] text-stone-500 line-clamp-1 font-mono">{g.dynasties}</p>
+                    <div className="flex items-center justify-between pt-2 border-t border-stone-100 text-[11px]">
+                      <span className="text-heritage-red font-semibold flex items-center space-x-1 group-hover:translate-x-1 transition-transform">
+                        <span>Chi tiết</span>
+                        <ChevronRight className="w-3 h-3" />
+                      </span>
+                      <div className="flex space-x-1">
+                        {g.colors.slice(0, 3).map((c, i) => (
+                          <span
+                            key={i}
+                            className="w-2.5 h-2.5 rounded-full border border-black/10 transform hover:scale-125 transition-transform"
+                            style={{ backgroundColor: c.hex }}
+                            title={c.name}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      {/* 4. CORE FEATURES GRID SECTION */}
+      <section className="py-16 sm:py-24 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="text-center space-y-4 max-w-3xl mx-auto mb-16">
+          <div className="inline-flex items-center space-x-2 px-3.5 py-1.5 rounded-full bg-heritage-indigo/10 text-heritage-indigo border border-heritage-indigo/20 text-xs font-semibold uppercase tracking-wider">
+            <Sparkles className="w-3.5 h-3.5 text-heritage-indigo" />
+            <span>Công Nghệ & Chuẩn Mực Văn Hóa</span>
+          </div>
+
+          <h2 className="font-serif text-2xl sm:text-4xl font-bold text-stone-900 tracking-tight">
+            Trải Nghiệm Studio Phối Đồ 2D Đỉnh Cao
+          </h2>
+
+          <p className="text-sm sm:text-base text-stone-600 font-light leading-relaxed">
+            VietStylist kết hợp sức mạnh xử lý canvas đa lớp trực quan với hệ thống thẩm định tri thức di sản nghiêm cẩn.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {/* Feature 1 */}
+          <div className="bg-white p-7 rounded-3xl border border-stone-200/90 shadow-sm hover:shadow-xl hover:-translate-y-2 hover:border-amber-400/50 transition-all duration-300 space-y-4 text-left group">
+            <div className="w-12 h-12 rounded-2xl bg-heritage-red/10 text-heritage-red flex items-center justify-center font-bold text-xl transform group-hover:scale-115 group-hover:rotate-6 transition-transform duration-300 shadow-2xs">
+              <Layers className="w-6 h-6" />
+            </div>
+            <h3 className="font-serif text-lg font-bold text-stone-900 group-hover:text-heritage-red transition-colors">
+              Canvas Đa Lớp Trực Quan
+            </h3>
+            <p className="text-xs sm:text-sm text-stone-600 leading-relaxed font-light">
+              Kéo thả, tự do đảo thứ tự lớp áo (áo lót trong, áo ngũ thân ngoài, quần lụa), thay đổi màu sắc tức thì và khóa các vị trí cố định.
+            </p>
+          </div>
+
+          {/* Feature 2 */}
+          <div className="bg-white p-7 rounded-3xl border border-stone-200/90 shadow-sm hover:shadow-xl hover:-translate-y-2 hover:border-emerald-400/50 transition-all duration-300 space-y-4 text-left group">
+            <div className="w-12 h-12 rounded-2xl bg-heritage-jade/10 text-heritage-jade flex items-center justify-center font-bold text-xl transform group-hover:scale-115 group-hover:rotate-6 transition-transform duration-300 shadow-2xs">
+              <ShieldCheck className="w-6 h-6" />
+            </div>
+            <h3 className="font-serif text-lg font-bold text-stone-900 group-hover:text-heritage-jade transition-colors">
+              Thẩm Định Chuẩn Hữu Nhậm
+            </h3>
+            <p className="text-xs sm:text-sm text-stone-600 leading-relaxed font-light">
+              Hệ thống thời gian thực kiểm tra hướng cài vạt áo (Hữu nhậm - cài sang phải) chuẩn quy thức cổ truyền, cảnh báo các lỗi cấm kỵ văn hóa.
+            </p>
+          </div>
+
+          {/* Feature 3 */}
+          <div className="bg-white p-7 rounded-3xl border border-stone-200/90 shadow-sm hover:shadow-xl hover:-translate-y-2 hover:border-amber-400/50 transition-all duration-300 space-y-4 text-left group">
+            <div className="w-12 h-12 rounded-2xl bg-heritage-gold/15 text-heritage-gold flex items-center justify-center font-bold text-xl transform group-hover:scale-115 group-hover:rotate-6 transition-transform duration-300 shadow-2xs">
+              <Palette className="w-6 h-6" />
+            </div>
+            <h3 className="font-serif text-lg font-bold text-stone-900 group-hover:text-amber-700 transition-colors">
+              Hòa Sắc Ngũ Hành 1 Chạm
+            </h3>
+            <p className="text-xs sm:text-sm text-stone-600 leading-relaxed font-light">
+              Gợi ý bảng phối màu tương sinh Kim - Mộc - Thủy - Hỏa - Thổ cùng gợi ý phụ kiện che mưa, che nắng theo thời tiết 63 tỉnh thành.
+            </p>
+          </div>
+
+          {/* Feature 4 */}
+          <div className="bg-white p-7 rounded-3xl border border-stone-200/90 shadow-sm hover:shadow-xl hover:-translate-y-2 hover:border-indigo-400/50 transition-all duration-300 space-y-4 text-left group">
+            <div className="w-12 h-12 rounded-2xl bg-heritage-indigo/10 text-heritage-indigo flex items-center justify-center font-bold text-xl transform group-hover:scale-115 group-hover:rotate-6 transition-transform duration-300 shadow-2xs">
+              <Share2 className="w-6 h-6" />
+            </div>
+            <h3 className="font-serif text-lg font-bold text-stone-900 group-hover:text-heritage-indigo transition-colors">
+              Xuất Ảnh Sắc Nét & Chia Sẻ
+            </h3>
+            <p className="text-xs sm:text-sm text-stone-600 leading-relaxed font-light">
+              Xuất ảnh định dạng chuẩn bài đăng Instagram, Story, Facebook với độ phân giải cao, đính kèm thẻ khảo cứu học thuật chuẩn xác.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* 5. OCCASION SHOWCASE SECTION */}
+      <section className="py-16 sm:py-24 bg-[#F5EFEB] border-t border-stone-300/80">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center space-y-4 max-w-3xl mx-auto mb-14">
+            <div className="inline-flex items-center space-x-2 px-3.5 py-1.5 rounded-full bg-heritage-red/10 text-heritage-red border border-heritage-red/20 text-xs font-semibold uppercase tracking-wider">
+              <Calendar className="w-3.5 h-3.5 text-heritage-red" />
+              <span>Bối Cảnh Ứng Dụng Đa Dạng</span>
+            </div>
+
+            <h2 className="font-serif text-2xl sm:text-4xl font-bold text-stone-900 tracking-tight">
+              Cổ Phục Trong Nhịp Sống Hiện Đại
+            </h2>
+
+            <p className="text-sm sm:text-base text-stone-600 font-light leading-relaxed">
+              Dành riêng cho học sinh, sinh viên và những người yêu mến văn hóa Việt trong các dịp quan trọng.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {/* Occasion 1 */}
+            <div className="p-6 rounded-3xl bg-white border border-stone-200 shadow-xs space-y-3 text-left hover:border-heritage-red/40 hover:shadow-xl hover:-translate-y-2 transition-all duration-300 group">
+              <div className="text-3xl transform group-hover:scale-125 group-hover:rotate-6 transition-transform duration-300 inline-block">🎓</div>
+              <h4 className="font-serif font-bold text-base text-stone-900 group-hover:text-heritage-red transition-colors">Chụp Ảnh Kỷ Yếu</h4>
+              <p className="text-xs text-stone-600 leading-relaxed">
+                Áo ngũ thân tay chẽn hoặc áo tấc thanh lịch, tôn vẻ trang nhã trong ngày tốt nghiệp trường xưa.
+              </p>
+            </div>
+
+            {/* Occasion 2 */}
+            <div className="p-6 rounded-3xl bg-white border border-stone-200 shadow-xs space-y-3 text-left hover:border-heritage-red/40 hover:shadow-xl hover:-translate-y-2 transition-all duration-300 group">
+              <div className="text-3xl transform group-hover:scale-125 group-hover:rotate-6 transition-transform duration-300 inline-block">🌸</div>
+              <h4 className="font-serif font-bold text-base text-stone-900 group-hover:text-heritage-red transition-colors">Du Xuân Đón Tết</h4>
+              <p className="text-xs text-stone-600 leading-relaxed">
+                Sắc đỏ, vàng rực rỡ mang lại may mắn, ấm cúng khi sum vầy bên gia đình và du ngoạn phố phường.
+              </p>
+            </div>
+
+            {/* Occasion 3 */}
+            <div className="p-6 rounded-3xl bg-white border border-stone-200 shadow-xs space-y-3 text-left hover:border-heritage-red/40 hover:shadow-xl hover:-translate-y-2 transition-all duration-300 group">
+              <div className="text-3xl transform group-hover:scale-125 group-hover:rotate-6 transition-transform duration-300 inline-block">🏮</div>
+              <h4 className="font-serif font-bold text-base text-stone-900 group-hover:text-heritage-red transition-colors">Lễ Hội Văn Hóa</h4>
+              <p className="text-xs text-stone-600 leading-relaxed">
+                Tự do sáng tạo phong cách Việt phục Remix đương đại cho các ngày hội festival truyền thống.
+              </p>
+            </div>
+
+            {/* Occasion 4 */}
+            <div className="p-6 rounded-3xl bg-white border border-stone-200 shadow-xs space-y-3 text-left hover:border-heritage-red/40 hover:shadow-xl hover:-translate-y-2 transition-all duration-300 group">
+              <div className="text-3xl transform group-hover:scale-125 group-hover:rotate-6 transition-transform duration-300 inline-block">💍</div>
+              <h4 className="font-serif font-bold text-base text-stone-900 group-hover:text-heritage-red transition-colors">Lễ Cưới Hỏi & Đính Hôn</h4>
+              <p className="text-xs text-stone-600 leading-relaxed">
+                Áo Nhật bình và áo tấc trang nghiêm, kết nối sợi dây văn hóa ngàn năm trong ngày trọng đại lứa đôi.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* 6. CLOSING CTA BANNER SECTION WITH CINEMATIC MOTION */}
+      <section className="py-16 sm:py-24 bg-gradient-to-r from-[#801F1F] via-stone-950 to-[#801F1F] text-white text-center relative overflow-hidden">
+        {/* Animated Radial Golden Glow */}
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(214,158,46,0.22),transparent_70%)] animate-pulse-glow pointer-events-none" />
+
+        {/* Ambient floating sparkles in background */}
+        <div className="absolute top-8 left-1/5 text-amber-300/30 text-xl animate-float-slow pointer-events-none">✦</div>
+        <div className="absolute bottom-12 right-1/4 text-amber-300/30 text-2xl animate-float-reverse pointer-events-none">✧</div>
+        <div className="absolute top-1/2 right-12 text-amber-400/25 text-lg animate-pulse pointer-events-none">✦</div>
+
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6 relative z-10">
+          <div className="inline-flex items-center space-x-2 px-3.5 py-1.5 rounded-full bg-white/10 text-amber-300 border border-white/20 text-xs font-semibold uppercase tracking-wider shadow-md">
+            <Sparkles className="w-3.5 h-3.5 text-amber-400 animate-spin" style={{ animationDuration: "10s" }} />
+            <span>Sáng Tạo Ngay Hôm Nay</span>
+          </div>
+
+          <h2 className="font-serif text-3xl sm:text-5xl font-bold tracking-tight text-stone-100 leading-tight">
+            Sẵn Sàng Tạo Bản Phối Cổ Phong Của Riêng Bạn?
+          </h2>
+
+          <p className="text-stone-300 text-sm sm:text-base font-light max-w-2xl mx-auto leading-relaxed">
+            Chỉ với vài thao tác kéo thả trên Studio 2D Canvas, bạn đã có thể kiến tạo một bản phối trang phục truyền thống chuẩn mực, tinh tế và đậm dấu ấn cá nhân.
+          </p>
+
+          <div className="pt-3">
+            <Link
+              href="/studio"
+              prefetch={true}
+              className="relative group inline-flex items-center space-x-2.5 px-9 py-4 rounded-2xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-stone-950 font-bold text-base shadow-2xl shadow-amber-400/40 transition-all duration-300 transform hover:scale-105 active:scale-95 overflow-hidden ring-4 ring-amber-400/25"
+            >
+              {/* Light beam sweep on button */}
+              <div className="absolute inset-0 pointer-events-none overflow-hidden rounded-2xl">
+                <div className="w-1/2 h-full bg-gradient-to-r from-transparent via-white/40 to-transparent animate-beam-sweep" />
+              </div>
+              <Sparkles className="w-5 h-5 text-stone-950 group-hover:rotate-12 transition-transform duration-300" />
+              <span>Mở Studio 2D Canvas Ngay</span>
+              <ArrowRight className="w-4 h-4 text-stone-950 transform group-hover:translate-x-1.5 transition-transform duration-300" />
+            </Link>
+          </div>
+        </div>
+      </section>
     </div>
   );
 }

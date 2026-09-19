@@ -5,6 +5,8 @@ export interface StudioDocument { title: string; snapshot: OutfitSnapshot }
 export interface StudioDraft extends StudioDocument {
   outfitId?: string;
   revision?: number;
+  ownerId?: string;
+  savedDocument?: StudioDocument;
 }
 export interface StudioHistory {
   past: StudioDocument[];
@@ -77,6 +79,14 @@ export function parseDraft(raw: string | null): StudioDraft | null {
       (!item.transform || ([item.transform.dx, item.transform.dy, item.transform.scale, item.transform.rotation].every(Number.isFinite) && item.transform.scale > 0))
     )) return null;
     if (new Set(snap.items.map((item: SnapshotItem) => item.slot)).size !== snap.items.length) return null;
+    if (snap.culturalSettings != null) {
+      const settings = snap.culturalSettings;
+      const identifier = (value: unknown) => typeof value === "string" && /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}$/.test(value);
+      const keys = ["period_ids", "region_ids", "place_ids", "community_ids", "occasion_ids", "social_context_ids"];
+      if (!identifier(settings.dataset_version) || (settings.ruleset_version != null && !identifier(settings.ruleset_version)) || !settings.context ||
+          Object.keys(settings.context).some(key => !keys.includes(key)) ||
+          keys.some(key => !Array.isArray(settings.context[key]) || settings.context[key].length > 32 || !settings.context[key].every(identifier))) return null;
+    }
     const snapshot = { ...INITIAL_DOCUMENT.snapshot, ...snap };
     if (!["traditional", "remix", "modern_fusion"].includes(snapshot.styleMode) ||
         !["right_over_left", "left_over_right"].includes(snapshot.overlapDirection) ||
@@ -86,6 +96,8 @@ export function parseDraft(raw: string | null): StudioDraft | null {
     snapshot.aspectRatio = snap.aspectRatio === "1:1" ? "1:1" : "9:16";
     return { title: typeof data.title === "string" ? data.title : INITIAL_DOCUMENT.title, snapshot,
       outfitId: typeof data.outfitId === "string" ? data.outfitId : undefined,
-      revision: Number.isInteger(data.revision) && data.revision > 0 ? data.revision : undefined };
+      revision: Number.isInteger(data.revision) && data.revision > 0 ? data.revision : undefined,
+      ownerId: typeof data.ownerId === "string" ? data.ownerId : undefined,
+      savedDocument: data.savedDocument ? parseDraft(JSON.stringify({ title: data.savedDocument.title, snapshot: data.savedDocument.snapshot })) || undefined : undefined };
   } catch { return null; }
 }
