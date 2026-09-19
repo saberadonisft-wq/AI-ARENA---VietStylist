@@ -1,0 +1,12 @@
+{
+  "schema": 1,
+  "environment": "Playwright Chromium headless, local frontend harness",
+  "workload": "one outerwear drag, 90 requestAnimationFrame samples",
+  "draft_writes": 1,
+  "frame": {
+    "p50_ms": 16.7,
+    "p95_ms": 16.8,
+    "frames": 89
+  },
+  "interpretation": "Local browser evidence only; device, display refresh rate and production media are not represented."
+}
