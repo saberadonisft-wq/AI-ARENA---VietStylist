@@ -134,3 +134,226 @@ test("unavailable try-on displays an error without fake success", async ({ page 
   await expect(page.getByText("Đã hoàn thành", { exact: true })).toHaveCount(0);
   await expect(page.getByAltText("Kết quả", { exact: true })).toHaveCount(0);
 });
+
+test("R08 records Canvas frame intervals and draft writes for one gesture", async ({ page }) => {
+  await mockApi(page);
+  await page.addInitScript((key) => {
+    const original = Storage.prototype.setItem;
+    let writes = 0;
+    Storage.prototype.setItem = function (name, value) {
+      if (name === key) writes += 1;
+      return original.call(this, name, value);
+    };
+    Object.defineProperty(window, "__r08DraftWrites", { get: () => writes });
+    Object.defineProperty(window, "__resetR08DraftWrites", { value: () => { writes = 0; } });
+  }, DRAFT_KEY);
+  await page.goto("/studio");
+  const image = page.locator('#content-outerwear image');
+  await expect(image).toBeVisible();
+  const box = await image.boundingBox();
+  if (!box) throw new Error("Missing garment bounds");
+  await page.evaluate(() => (window as any).__resetR08DraftWrites());
+  const frameSample = page.evaluate(() => new Promise<{ p50_ms: number; p95_ms: number; frames: number }>(resolve => {
+    const intervals: number[] = [];
+    let previous = 0;
+    let frames = 0;
+    const tick = (now: number) => {
+      if (previous) intervals.push(now - previous);
+      previous = now;
+      frames += 1;
+      if (frames < 90) requestAnimationFrame(tick);
+      else {
+        const ordered = intervals.sort((a, b) => a - b);
+        const at = (fraction: number) => ordered[Math.min(ordered.length - 1, Math.floor((ordered.length - 1) * fraction))] || 0;
+        resolve({ p50_ms: Number(at(0.5).toFixed(3)), p95_ms: Number(at(0.95).toFixed(3)), frames: intervals.length });
+      }
+    };
+    requestAnimationFrame(tick);
+  }));
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width / 2 + 45, box.y + box.height / 2 + 30, { steps: 20 });
+  await page.mouse.up();
+  const frames = await frameSample;
+  const writes = await page.evaluate(() => (window as any).__r08DraftWrites as number);
+  const metrics = { workload: "one outerwear drag, 90 requestAnimationFrame samples, Chromium headless", draft_writes: writes, frame: frames };
+  console.log(`R08_STUDIO_METRICS ${JSON.stringify(metrics)}`);
+  await test.info().attach("r08-studio-metrics.json", { body: JSON.stringify(metrics, null, 2), contentType: "application/json" });
+  expect(writes).toBeLessThanOrEqual(3);
+  expect(frames.frames).toBeGreaterThan(30);
+});
+
+test("draft history retains cultural settings and rejects malformed context", () => {
+  const document = structuredClone(INITIAL_DOCUMENT);
+  document.snapshot.culturalSettings = { dataset_version: "ds_test", ruleset_version: "rules_test", context: {
+    period_ids: ["period_nguyen"], region_ids: ["region_hue"], place_ids: [], community_ids: [], occasion_ids: [], social_context_ids: [],
+  } };
+  expect(parseDraft(JSON.stringify(document))).toEqual(document);
+  const changed = studioReducer({ past: [], present: document, future: [] }, { type: "commit", update: value => ({ ...value, snapshot: { ...value.snapshot, backgroundTheme: "dopaper" } }) });
+  expect(studioReducer(changed, { type: "undo" }).present.snapshot.culturalSettings).toEqual(document.snapshot.culturalSettings);
+  expect(parseDraft(JSON.stringify({ ...document, snapshot: { ...document.snapshot, culturalSettings: { dataset_version: "ds_test", context: { period_ids: "wrong" } } } }))).toBeNull();
+});
+
+test("empty draft restores all document settings and undo includes presentation", async ({ page }) => {
+  await mockApi(page);
+  await page.addInitScript(({ key, document }) => {
+    if (!sessionStorage.getItem("seeded")) {
+      localStorage.setItem(key, JSON.stringify(document));
+      sessionStorage.setItem("seeded", "yes");
+    }
+  }, { key: DRAFT_KEY, document: { title: "Bộ phối rỗng", snapshot: { ...INITIAL_DOCUMENT.snapshot, items: [], lockedSlots: ["headwear"], backgroundTheme: "dopaper", aspectRatio: "1:1" } } });
+  await page.goto("/studio");
+  await page.getByRole("button", { name: /Khôi phục bản phối/ }).click();
+  await expect(page.locator("input").first()).toHaveValue("Bộ phối rỗng");
+  expect((await readDraft(page)).snapshot.items).toEqual([]);
+  await page.getByRole("button", { name: "Remix Đương đại" }).click();
+  await page.getByTitle("Hoàn tác (Ctrl+Z)").click();
+  expect((await readDraft(page)).snapshot.styleMode).toBe("traditional");
+  await page.reload();
+  await expect(page.locator("input").first()).toHaveValue("Bộ phối rỗng");
+  expect((await readDraft(page)).snapshot).toMatchObject({ items: [], lockedSlots: ["headwear"], backgroundTheme: "dopaper", aspectRatio: "1:1" });
+});
+
+test("save in flight preserves newer edits and prevents duplicate submissions", async ({ page }) => {
+  await mockApi(page);
+  let release!: () => void;
+  const held = new Promise<void>(resolve => { release = resolve; });
+  let posts = 0;
+  await page.route("**/api/outfits", async route => {
+    posts++;
+    const body = route.request().postDataJSON();
+    await held;
+    await route.fulfill({ json: { id: "saved-1", revision: 1, title: body.title, current_snapshot: body.snapshot } });
+  });
+  await page.goto("/studio");
+  const title = page.locator("input").first();
+  await title.fill("Version submitted");
+  await page.getByRole("button", { name: "Lưu bộ phối", exact: true }).click();
+  await expect.poll(() => posts).toBe(1);
+  await title.fill("Newer unsaved edits");
+  release();
+  await expect.poll(async () => (await readDraft(page))?.outfitId).toBe("saved-1");
+  await expect(title).toHaveValue("Newer unsaved edits");
+  const draft = await readDraft(page);
+  expect(draft.savedDocument.title).toBe("Version submitted");
+  expect(draft.title).toBe("Newer unsaved edits");
+  expect(posts).toBe(1);
+});
+
+test("revision conflict preserves local edits until explicit server selection", async ({ page }) => {
+  await mockApi(page);
+  await page.goto("/studio");
+  const title = page.locator("input").first();
+  await title.fill("Saved version");
+  await page.getByRole("button", { name: "Lưu bộ phối", exact: true }).click();
+  await expect.poll(async () => (await readDraft(page))?.revision).toBe(1);
+  await page.route("**/api/outfits/saved-1", async route => {
+    if (route.request().method() === "PUT") return route.fulfill({ status: 409, json: { error: { code: "REVISION_CONFLICT", message: "conflict" } } });
+    return route.fulfill({ json: { id: "saved-1", revision: 2, title: "Other tab version", current_snapshot: INITIAL_DOCUMENT.snapshot } });
+  });
+  await title.fill("My losing edit");
+  await page.getByRole("button", { name: "Lưu bộ phối", exact: true }).click();
+  await expect(page.getByRole("alert", { name: "Lưu bộ phối" })).toContainText("Bản nháp của bạn vẫn được giữ");
+  expect((await readDraft(page)).revision).toBe(1);
+  await expect(title).toHaveValue("My losing edit");
+  await page.getByRole("button", { name: "Tải bản máy chủ" }).click();
+  await expect(title).toHaveValue("Other tab version");
+  expect((await readDraft(page)).revision).toBe(2);
+  await page.getByTitle("Hoàn tác (Ctrl+Z)").click();
+  await expect(title).toHaveValue("My losing edit");
+});
+
+test("expired session does not expose or erase the account draft", async ({ page }) => {
+  await mockApi(page);
+  await page.addInitScript(({ key, document }) => {
+    localStorage.setItem(key, JSON.stringify({ ...document, ownerId: "account-a" }));
+    localStorage.setItem("viet_stylist_auth_token", "expired-test-token");
+    localStorage.setItem("viet_stylist_user", JSON.stringify({ id: "account-a", email: "a@example.invalid", displayName: "A", roles: ["user"] }));
+  }, { key: DRAFT_KEY, document: { ...INITIAL_DOCUMENT, title: "Account A private draft" } });
+  await page.route("**/api/auth/me", route => route.fulfill({ status: 401, json: { error: { code: "TOKEN_EXPIRED", message: "expired" } } }));
+  await page.goto("/studio");
+  await expect(page.locator("input").first()).toHaveValue(INITIAL_DOCUMENT.title);
+  const archived = await page.evaluate(key => JSON.parse(localStorage.getItem(`${key}:account-a`) || "null"), DRAFT_KEY);
+  expect(archived.title).toBe("Account A private draft");
+  expect((await readDraft(page)).ownerId).toBeUndefined();
+});
+
+test("opening an outfit link requires choosing before replacing unsaved work", async ({ page }) => {
+  await mockApi(page);
+  let reads = 0;
+  await page.route("**/api/outfits/from-link", route => {
+    reads++;
+    return route.fulfill({ json: { id: "from-link", revision: 3, title: "Bộ phối từ liên kết", current_snapshot: INITIAL_DOCUMENT.snapshot } });
+  });
+  await page.goto("/studio");
+  await page.locator("input").first().fill("Nháp chưa lưu cần giữ");
+  await page.goto("/studio?loadOutfit=from-link");
+  await expect(page.locator("input").first()).toHaveValue("Nháp chưa lưu cần giữ");
+  await expect(page.getByRole("button", { name: "Mở bộ phối từ liên kết" })).toBeVisible();
+  expect(reads).toBe(0);
+  await page.getByRole("button", { name: "Mở bộ phối từ liên kết" }).click();
+  await expect(page.locator("input").first()).toHaveValue("Bộ phối từ liên kết");
+  expect((await readDraft(page)).revision).toBe(3);
+  await page.getByTitle("Hoàn tác (Ctrl+Z)").click();
+  await expect(page.locator("input").first()).toHaveValue("Nháp chưa lưu cần giữ");
+});
+
+test("an outfit load finishing after a new edit cannot overwrite it", async ({ page }) => {
+  await mockApi(page);
+  let release!: () => void;
+  const held = new Promise<void>(resolve => { release = resolve; });
+  let reads = 0;
+  await page.route("**/api/outfits/slow-link", async route => {
+    reads++;
+    await held;
+    await route.fulfill({ json: { id: "slow-link", revision: 5, title: "Response muộn", current_snapshot: INITIAL_DOCUMENT.snapshot } });
+  });
+  await page.goto("/studio?loadOutfit=slow-link");
+  await expect.poll(() => reads).toBeGreaterThan(0);
+  await page.locator("input").first().fill("Thao tác mới trong lúc tải");
+  const completed = page.waitForResponse("**/api/outfits/slow-link");
+  release(); await completed;
+  await expect(page.locator("input").first()).toHaveValue("Thao tác mới trong lúc tải");
+  expect((await readDraft(page)).outfitId).toBeUndefined();
+});
+
+test("an account switch in another tab hides old work and ignores its pending save", async ({ page, context }) => {
+  await mockApi(page);
+  const account = (id: string) => ({ id, email: `${id}@example.invalid`, displayName: id, roles: ["user"] });
+  await page.goto("/studio");
+  await page.evaluate(user => {
+    localStorage.setItem("viet_stylist_user", JSON.stringify(user));
+    localStorage.setItem("viet_stylist_auth_token", "token-a");
+  }, account("account-a"));
+  await page.route("**/api/auth/me", route => {
+    const id = route.request().headers().authorization === "Bearer token-b" ? "account-b" : "account-a";
+    return route.fulfill({ json: { ...account(id), display_name: id } });
+  });
+  await page.reload();
+  await page.locator("input").first().fill("Riêng tư tài khoản A");
+  let release!: () => void;
+  const held = new Promise<void>(resolve => { release = resolve; });
+  let saves = 0;
+  await page.route("**/api/outfits", async route => {
+    const body = route.request().postDataJSON(); saves++;
+    await held;
+    await route.fulfill({ json: { id: "owned-by-a", revision: 1, title: body.title, current_snapshot: body.snapshot } });
+  });
+  await page.getByRole("button", { name: "Lưu bộ phối", exact: true }).click();
+  await expect.poll(() => saves).toBe(1);
+  const otherTab = await context.newPage();
+  await otherTab.goto("/favicon.ico");
+  await otherTab.evaluate(user => {
+    localStorage.setItem("viet_stylist_user", JSON.stringify(user));
+    localStorage.setItem("viet_stylist_auth_token", "token-b");
+  }, account("account-b"));
+  await expect(page.locator("input").first()).toHaveValue(INITIAL_DOCUMENT.title);
+  const completed = page.waitForResponse("**/api/outfits");
+  release(); await completed;
+  await page.locator("input").first().fill("Bản nháp B");
+  const draft = await readDraft(page);
+  expect(draft.ownerId).toBe("account-b");
+  expect(draft.outfitId).toBeUndefined();
+  expect(await page.evaluate(key => JSON.parse(localStorage.getItem(`${key}:account-a`) || "null").title, DRAFT_KEY)).toBe("Riêng tư tài khoản A");
+  await otherTab.close();
+});

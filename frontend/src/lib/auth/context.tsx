@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useState, useEffect, useRef } from "react";
 import { api } from "@/lib/api/client";
 import { AuthUser, AuthResponse } from "@/lib/types/api";
 
@@ -21,6 +21,7 @@ interface AuthContextType {
   isStylist: boolean;
   isEditor: boolean;
   isLoading: boolean;
+  isReady: boolean;
   loginWithCredentials: (email: string, password: string) => Promise<AuthResponse>;
   registerWithCredentials: (payload: {
     email: string;
@@ -42,6 +43,7 @@ const AuthContext = createContext<AuthContextType>({
   isStylist: false,
   isEditor: false,
   isLoading: false,
+  isReady: false,
   loginWithCredentials: async () => {
     throw new Error("AuthProvider not found");
   },
@@ -71,38 +73,60 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isReady, setIsReady] = useState(false);
+  const authGeneration = useRef(0);
 
-  // Khôi phục phiên từ localStorage khi load trang và kiểm tra token với backend
+  // Restore identity before account-scoped drafts are read; observe other tabs.
   useEffect(() => {
-    const savedToken = localStorage.getItem("viet_stylist_auth_token");
-    const savedUser = localStorage.getItem("viet_stylist_user");
-
-    if (savedToken && savedUser) {
+    let cancelled = false;
+    const restore = async () => {
+      const generation = ++authGeneration.current;
+      setIsReady(false);
       try {
+        const savedToken = localStorage.getItem("viet_stylist_auth_token");
+        const savedUser = localStorage.getItem("viet_stylist_user");
+        if (!savedToken || !savedUser) {
+          setToken(null);
+          setUser(null);
+          return;
+        }
+        const cached = JSON.parse(savedUser);
         setToken(savedToken);
-        setUser(JSON.parse(savedUser));
-
-        // Kiểm tra tính hợp lệ của token với /api/auth/me
-        api.getMe()
-          .then((meUser) => {
-            const mapped = mapAuthUserToUser(meUser);
-            setUser(mapped);
-            localStorage.setItem("viet_stylist_user", JSON.stringify(mapped));
-          })
-          .catch((err) => {
-            console.warn("Phiên đăng nhập hết hạn hoặc không hợp lệ:", err?.message);
-            // Nếu lỗi 401 hoặc xác thực thất bại
-            if (err?.status === 401 || err?.statusCode === 401 || err?.message?.includes("401") || err?.code === "UNAUTHORIZED") {
-              logout();
-            }
-          });
+        setUser(cached);
+        try {
+          const mapped = mapAuthUserToUser(await api.getMe());
+          if (cancelled || generation !== authGeneration.current) return;
+          setUser(mapped);
+          localStorage.setItem("viet_stylist_user", JSON.stringify(mapped));
+        } catch (err: any) {
+          if (cancelled || generation !== authGeneration.current) return;
+          if (err?.statusCode === 401) {
+            setToken(null);
+            setUser(null);
+            localStorage.removeItem("viet_stylist_auth_token");
+            localStorage.removeItem("viet_stylist_user");
+          }
+        }
       } catch {
-        logout();
+        if (!cancelled && generation === authGeneration.current) {
+          setToken(null);
+          setUser(null);
+        }
+      } finally {
+        if (!cancelled && generation === authGeneration.current) setIsReady(true);
       }
-    }
+    };
+    void restore();
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === null || event.key === "viet_stylist_auth_token") void restore();
+    };
+    window.addEventListener("storage", onStorage);
+    return () => { cancelled = true; window.removeEventListener("storage", onStorage); };
   }, []);
 
   const handleAuthSuccess = (res: AuthResponse): User => {
+    authGeneration.current++;
+    setIsReady(true);
     const mappedUser = mapAuthUserToUser(res.user);
     setToken(res.access_token);
     setUser(mappedUser);
@@ -169,6 +193,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const logout = () => {
+    authGeneration.current++;
+    setIsReady(true);
     setToken(null);
     setUser(null);
     localStorage.removeItem("viet_stylist_auth_token");
@@ -189,6 +215,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isStylist,
         isEditor,
         isLoading,
+        isReady,
         loginWithCredentials,
         registerWithCredentials,
         googleLogin,

@@ -34,6 +34,8 @@ export interface Canvas2DProps {
   backgroundTheme?: "white" | "dopaper";
   selectedSlot?: string | null;
   onSelectItem?: (slot: string) => void;
+  lockedSlots?: string[];
+  onTransformsCommit?: (changes: Record<string, ItemTransform | undefined>) => void;
   className?: string;
 }
 
@@ -321,6 +323,8 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
       backgroundTheme = "white",
       selectedSlot: externalSelectedSlot,
       onSelectItem,
+      lockedSlots = [],
+      onTransformsCommit,
       className = "",
     },
     ref
@@ -338,7 +342,14 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
     }, [externalSelectedSlot]);
 
     // Trạng thái biến đổi của từng slot (dx, dy, scale, rotation)
-    const [transforms, setTransforms] = useState<Record<string, ItemTransform>>({});
+    const [transforms, renderTransforms] = useState<Record<string, ItemTransform>>({});
+    const transformsRef = useRef(transforms);
+    const setTransforms = (update: React.SetStateAction<Record<string, ItemTransform>>) => {
+      const next = typeof update === "function" ? update(transformsRef.current) : update;
+      transformsRef.current = next;
+      renderTransforms(next);
+    };
+    useEffect(() => { setTransforms({}); }, [equippedItems]);
 
     // Trạng thái kéo chuột đang diễn ra
     const [dragSession, setDragSession] = useState<{
@@ -361,6 +372,7 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
     // Lấy transform hiện hành của món đồ
     const getTransform = (eq: SnapshotItem): ItemTransform => {
       if (transforms[eq.slot]) return transforms[eq.slot];
+      if (eq.transform) return eq.transform;
       const geom = getItemGeometry(eq);
       return {
         dx: geom.defaultDx,
@@ -384,6 +396,7 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
 
     // Bắt đầu kéo di chuyển
     const handlePointerDownMove = (e: React.PointerEvent, slot: string) => {
+      if (lockedSlots.includes(slot)) return;
       e.stopPropagation();
       e.currentTarget.setPointerCapture(e.pointerId);
       setActiveSlot(slot);
@@ -404,6 +417,7 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
 
     // Bắt đầu kéo tay cầm co dãn (Resize)
     const handlePointerDownResize = (e: React.PointerEvent, slot: string) => {
+      if (lockedSlots.includes(slot)) return;
       e.stopPropagation();
       e.currentTarget.setPointerCapture(e.pointerId);
 
@@ -422,6 +436,7 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
 
     // Bắt đầu kéo tay cầm xoay (Rotate)
     const handlePointerDownRotate = (e: React.PointerEvent, slot: string) => {
+      if (lockedSlots.includes(slot)) return;
       e.stopPropagation();
       e.currentTarget.setPointerCapture(e.pointerId);
 
@@ -501,18 +516,29 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
     };
 
     const handlePointerUp = () => {
+      const changes = transformsRef.current;
+      if (Object.keys(changes).length) {
+        onTransformsCommit?.(changes);
+        if (onTransformsCommit) setTransforms({});
+      }
       setDragSession(null);
     };
 
     useEffect(() => {
       const handleGlobalPointerUp = () => {
-        if (dragSession) setDragSession(null);
+        if (dragSession) handlePointerUp();
       };
       window.addEventListener("pointerup", handleGlobalPointerUp);
       return () => window.removeEventListener("pointerup", handleGlobalPointerUp);
-    }, [dragSession]);
+    }, [dragSession, onTransformsCommit]);
 
     const resetSlotTransform = (slot: string) => {
+      if (lockedSlots.includes(slot)) return;
+      if (onTransformsCommit) {
+        onTransformsCommit({ [slot]: undefined });
+        setTransforms({});
+        return;
+      }
       const currentEq = equippedItems.find((it) => it.slot === slot);
       if (!currentEq) return;
       const geom = getItemGeometry(currentEq);
@@ -528,6 +554,7 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
     };
 
     const resetAllTransforms = () => {
+      onTransformsCommit?.(Object.fromEntries(equippedItems.filter(item => !lockedSlots.includes(item.slot)).map(item => [item.slot, undefined])));
       setTransforms({});
       setActiveSlot(null);
     };
@@ -541,7 +568,31 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
         await new Promise((r) => setTimeout(r, 50));
 
         try {
-          const svgElement = svgRef.current;
+          const svgElement = svgRef.current.cloneNode(true) as SVGSVGElement;
+          svgElement.querySelectorAll('[id^="selection-overlay-"]').forEach(node => node.remove());
+          // SVG used as an image cannot fetch external image references. Embed every
+          // asset into a detached snapshot; fail clearly if CORS prevents retrieval.
+          await Promise.all(Array.from(svgElement.querySelectorAll("image")).map(async node => {
+            const href = node.getAttribute("href") || node.getAttributeNS("http://www.w3.org/1999/xlink", "href");
+            if (!href || href.startsWith("data:")) return;
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), 10000);
+            try {
+              const response = await fetch(href, { signal: controller.signal, credentials: "same-origin" });
+              if (!response.ok) throw new Error("Không tải được ảnh trang phục để xuất PNG.");
+              const blob = await response.blob();
+              const dataUrl = await new Promise<string>((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(String(reader.result));
+                reader.onerror = () => reject(new Error("Không đọc được ảnh trang phục."));
+                reader.readAsDataURL(blob);
+              });
+              node.removeAttributeNS("http://www.w3.org/1999/xlink", "href");
+              node.setAttribute("href", dataUrl);
+            } catch {
+              throw new Error("Không tải được ảnh trang phục để xuất PNG. Kiểm tra kết nối và quyền truy cập ảnh.");
+            } finally { clearTimeout(timer); }
+          }));
           const svgString = new XMLSerializer().serializeToString(svgElement);
           const svgBlob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
           const URL = window.URL || window.webkitURL || window;
@@ -551,6 +602,7 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
             const img = new Image();
             img.crossOrigin = "anonymous";
             img.onload = () => {
+              try {
               const canvas = document.createElement("canvas");
               const targetWidth = 1400;
               const targetHeight = ratio === "1:1" ? 1400 : 2488;
@@ -559,8 +611,7 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
               canvas.height = targetHeight;
               const ctx = canvas.getContext("2d");
               if (!ctx) {
-                reject(new Error("Không thể khởi tạo Canvas 2D context"));
-                return;
+                throw new Error("Không thể khởi tạo Canvas 2D context");
               }
 
               if (backgroundTheme === "white") {
@@ -599,8 +650,10 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
                 targetHeight - (ratio === "1:1" ? 18 : 55)
               );
 
-              URL.revokeObjectURL(blobURL);
               resolve(canvas.toDataURL("image/png"));
+              } catch (err) {
+                reject(err);
+              } finally { URL.revokeObjectURL(blobURL); }
             };
             img.onerror = (e) => {
               URL.revokeObjectURL(blobURL);
@@ -763,6 +816,11 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
               onDoubleClick={(e) => {
                 e.stopPropagation();
                 // Nhấn đúp vào góc để trở về cỡ gốc 100%
+                if (lockedSlots.includes(eq.slot)) return;
+                if (onTransformsCommit) {
+                  onTransformsCommit({ [eq.slot]: { ...getTransform(eq), scale: 1 } });
+                  return;
+                }
                 setTransforms((prev) => ({
                   ...prev,
                   [eq.slot]: {
@@ -811,6 +869,11 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
               onDoubleClick={(e) => {
                 e.stopPropagation();
                 // Nhấn đúp để trở về góc 0°
+                if (lockedSlots.includes(eq.slot)) return;
+                if (onTransformsCommit) {
+                  onTransformsCommit({ [eq.slot]: { ...getTransform(eq), rotation: 0 } });
+                  return;
+                }
                 setTransforms((prev) => ({
                   ...prev,
                   [eq.slot]: {

@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
   GarmentType,
@@ -13,11 +14,14 @@ import {
   CulturalCheckResponse,
 } from "@/lib/types/api";
 import { api } from "@/lib/api/client";
+import { useStudioDocument } from "@/features/studio/useStudioDocument";
+import { mergeUnlockedItems } from "@/features/studio/state";
 import { useAuth } from "@/lib/auth/context";
 import { useCatalog } from "@/lib/catalog/CatalogProvider";
 import Canvas2D, { Canvas2DHandle } from "@/features/studio/Canvas2D";
 import SwatchPicker from "@/features/studio/SwatchPicker";
 import CulturalCheckBadge from "@/features/studio/CulturalCheckBadge";
+const StudioComposerPanel = dynamic(() => import("@/features/composer/components/StudioComposerPanel"), { ssr: false });
 import WeatherWidget from "@/features/studio/WeatherWidget";
 import ColorAnalysisPanel from "@/features/studio/ColorAnalysisPanel";
 import CompareModal from "@/features/studio/CompareModal";
@@ -50,7 +54,10 @@ import {
 } from "lucide-react";
 
 export default function StudioPage() {
-  const { user, isLoggedIn } = useAuth();
+  const { user, isLoggedIn, isReady: authReady } = useAuth();
+  const studio = useStudioDocument(user?.id, authReady);
+  const document = studio.history.present;
+  const snapshot = document.snapshot;
   const canvasRef = useRef<Canvas2DHandle | null>(null);
 
   // Dữ liệu danh mục từ CatalogProvider dùng chung
@@ -61,42 +68,25 @@ export default function StudioPage() {
     avatars,
     isLoading: isInitialLoading,
   } = useCatalog();
-  const [currentAvatar, setCurrentAvatar] = useState<Avatar | null>(null);
-
-  // Khởi tạo avatar mặc định khi avatars sẵn sàng
-  useEffect(() => {
-    if (avatars.length > 0 && !currentAvatar) {
-      setCurrentAvatar(avatars[0]);
-    }
-  }, [avatars, currentAvatar]);
-
-  // Bộ lọc
-  const [selectedGarmentType, setSelectedGarmentType] = useState<string>("all");
-  const [selectedOccasion, setSelectedOccasion] = useState<string>("ky_yeu");
-  const [activeSlot, setActiveSlot] = useState<string>("outerwear");
-
-  // State bộ phối hiện hành (Snapshot F01-F03)
-  const [outfitTitle, setOutfitTitle] = useState<string>("Bản phối Kỷ yếu Cổ phong");
-  const [styleMode, setStyleMode] = useState<"traditional" | "remix">("traditional");
-  const [overlapDirection, setOverlapDirection] = useState<"right_over_left" | "left_over_right">("right_over_left");
-  const [equippedItems, setEquippedItems] = useState<SnapshotItem[]>([
-    { slot: "outerwear", itemId: "item_ngu_than_nam_xanh", variantId: "var_ngu_than_nam_xanh_cham", assetVersion: 1, colorHex: "#1A365D" },
-    { slot: "undergarment", itemId: "item_ao_lot_trang", variantId: "var_ao_lot_trang", assetVersion: 1, colorHex: "#FFFFFF" },
-    { slot: "bottom", itemId: "item_quan_trang_lua", variantId: "var_quan_trang", assetVersion: 1, colorHex: "#FFFFFF" },
-    { slot: "headwear", itemId: "item_khan_van_den", variantId: "var_khan_van_den", assetVersion: 1, colorHex: "#171923" },
-    { slot: "accessory_front", itemId: "item_quat_xep_giay_do", variantId: "var_quat_xep", assetVersion: 1, colorHex: "#9C4221" },
-    { slot: "footwear", itemId: "item_guoc_moc_quai_nhung", variantId: "var_guoc_moc", assetVersion: 1, colorHex: "#4A5568" },
-  ]);
-
-  // Khóa món (Item lock F02)
-  const [lockedSlots, setLockedSlots] = useState<Set<string>>(new Set());
-
-  // Lịch sử Undo/Redo (F02)
-  const [historyStack, setHistoryStack] = useState<SnapshotItem[][]>([]);
-  const [historyIndex, setHistoryIndex] = useState<number>(-1);
-
-  // Lớp vẽ render
-  const [layers, setLayers] = useState<AssetLayer[]>([]);
+  const currentAvatar = avatars.find(a => a.id === snapshot.avatarId) || null;
+  const [selectedGarmentType, setSelectedGarmentType] = useState("all");
+  const [activeSlot, setActiveSlot] = useState("outerwear");
+  const outfitTitle = document.title;
+  const selectedOccasion = snapshot.occasionId;
+  const styleMode = snapshot.styleMode;
+  const overlapDirection = snapshot.overlapDirection;
+  const equippedItems = snapshot.items;
+  const lockedSlots = useMemo(() => new Set(snapshot.lockedSlots || []), [snapshot.lockedSlots]);
+  const setOutfitTitle = (title: string) => studio.dispatch({ type: "commit", update: doc => ({ ...doc, title }) });
+  const setSelectedOccasion = (occasionId: string) => studio.updateSnapshot({ occasionId });
+  const setStyleMode = (styleMode: OutfitSnapshot["styleMode"]) => studio.updateSnapshot({ styleMode });
+  const setOverlapDirection = (overlapDirection: OutfitSnapshot["overlapDirection"]) => studio.updateSnapshot({ overlapDirection });
+  const setEquippedItems = (items: SnapshotItem[]) => studio.updateSnapshot({ items });
+  const setLockedSlots = (slots: Set<string>) => studio.updateSnapshot({ lockedSlots: [...slots] });
+  const layers = useMemo(() => equippedItems.flatMap(it => {
+    const layer = catalogItems.find(ci => ci.id === it.itemId)?.default_layer;
+    return layer ? [layer] : [];
+  }), [equippedItems, catalogItems]);
 
   // Kiểm tra văn hóa thời gian thực (F10)
   const [culturalCheck, setCulturalCheck] = useState<CulturalCheckResponse | null>(null);
@@ -109,20 +99,23 @@ export default function StudioPage() {
   const [isCompareOpen, setIsCompareOpen] = useState(false);
   const [isExportOpen, setIsExportOpen] = useState(false);
   const [isTryOnOpen, setIsTryOnOpen] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [saveSuccessMessage, setSaveSuccessMessage] = useState<string | null>(null);
+  const isSaving = studio.saving;
+  const saveSuccessMessage = studio.message;
 
   // AI Prompt nhanh
   const [aiPrompt, setAiPrompt] = useState("");
   const [isAiLoading, setIsAiLoading] = useState(false);
 
   // Tỷ lệ khung hình hiển thị
-  const [displayRatio, setDisplayRatio] = useState<"1:1" | "9:16">("9:16");
+  const displayRatio = snapshot.aspectRatio || "9:16";
+  const setDisplayRatio = (aspectRatio: "1:1" | "9:16") => studio.updateSnapshot({ aspectRatio });
 
-  const [canvasBackgroundTheme, setCanvasBackgroundTheme] = useState<"white" | "dopaper">("white");
+  const canvasBackgroundTheme = snapshot.backgroundTheme || "white";
+  const setCanvasBackgroundTheme = (backgroundTheme: "white" | "dopaper") => studio.updateSnapshot({ backgroundTheme });
 
   // Thông báo khôi phục bản nháp & giải thích văn hóa Hữu nhậm
-  const [draftNotice, setDraftNotice] = useState<any | null>(null);
+  const draftNotice = studio.draftNotice;
+  const handleRestoreDraft = studio.dismissDraft;
   const [showHuuNhamInfo, setShowHuuNhamInfo] = useState(false);
 
   // Bảng phối màu Ngũ Hành 1 chạm (Tối ưu trải nghiệm F02/F07)
@@ -177,108 +170,27 @@ export default function StudioPage() {
 
 
 
-  // Cập nhật lớp vẽ dựa trên các món đang chọn
+  // Only inputs that influence cultural rules trigger a request. Ignore stale responses.
+  const culturalPayload = JSON.stringify({
+    garment_type_id: selectedGarmentType === "all" ? undefined : selectedGarmentType,
+    occasion_id: selectedOccasion, style_mode: styleMode, overlap_direction: overlapDirection,
+    items: equippedItems.map(it => ({ slot: it.slot, item_id: it.itemId, variant_id: it.variantId, color_hex: it.colorHex })),
+  });
   useEffect(() => {
-    const loadedLayers: AssetLayer[] = [];
-    equippedItems.forEach((it) => {
-      const dbItem = catalogItems.find((ci) => ci.id === it.itemId);
-      if (dbItem?.default_layer) {
-        loadedLayers.push(dbItem.default_layer);
-      }
-    });
-    setLayers(loadedLayers);
+    if (!studio.hydrated) return;
+    let active = true;
+    setCulturalCheck(null);
+    const timer = setTimeout(() => {
+      api.checkCulturalCompliance(JSON.parse(culturalPayload))
+        .then(result => { if (active) setCulturalCheck(result); })
+        .catch(() => { if (active) setCulturalCheck(null); });
+    }, 200);
+    return () => { active = false; clearTimeout(timer); };
+  }, [culturalPayload, studio.hydrated]);
 
-    // Chạy kiểm tra quy chuẩn văn hóa thời gian thực (F10)
-    api
-      .checkCulturalCompliance({
-        garment_type_id: selectedGarmentType === "all" ? undefined : selectedGarmentType,
-        occasion_id: selectedOccasion,
-        style_mode: styleMode,
-        overlap_direction: overlapDirection,
-        items: equippedItems.map((it) => ({
-          slot: it.slot,
-          item_id: it.itemId,
-          variant_id: it.variantId,
-          color_hex: it.colorHex,
-        })),
-      })
-      .then((res) => setCulturalCheck(res))
-      .catch((err) => console.error("Lỗi kiểm tra văn hóa:", err));
-
-    // Tự động lưu bản nháp Studio cục bộ (F13 - khách vãng lai)
-    try {
-      if (typeof window !== "undefined") {
-        localStorage.setItem(
-          "viet_stylist_current_draft",
-          JSON.stringify({
-            title: outfitTitle,
-            occasionId: selectedOccasion,
-            styleMode: styleMode,
-            overlapDirection: overlapDirection,
-            snapshot: {
-              schemaVersion: 1,
-              avatarId: currentAvatar?.id || "avatar_nam_chuan",
-              poseId: "front_01",
-              occasionId: selectedOccasion,
-              styleMode: styleMode,
-              overlapDirection: overlapDirection,
-              items: equippedItems,
-            },
-          })
-        );
-      }
-    } catch {
-      // Bỏ qua lỗi quota
-    }
-  }, [equippedItems, catalogItems, selectedGarmentType, selectedOccasion, styleMode, overlapDirection, outfitTitle, currentAvatar]);
-
-  // Kiểm tra tham số tải bộ phối từ URL (?loadOutfit=id)
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const params = new URLSearchParams(window.location.search);
-      const loadId = params.get("loadOutfit");
-      if (loadId) {
-        api.getOutfit(loadId)
-          .then((saved) => {
-            if (saved) {
-              setOutfitTitle(saved.title);
-              if (saved.occasion_id) setSelectedOccasion(saved.occasion_id);
-              if (saved.style_mode) setStyleMode(saved.style_mode as any);
-              if (saved.current_snapshot?.items) {
-                setEquippedItems(saved.current_snapshot.items);
-              }
-              if (saved.current_snapshot?.overlapDirection) {
-                setOverlapDirection(saved.current_snapshot.overlapDirection as any);
-              }
-            }
-          })
-          .catch((err) => console.warn("Không tải được outfit từ link:", err));
-      }
-    }
-  }, []);
-
-  // Lưu lịch sử Undo/Redo khi đổi đồ
-  const pushHistory = (newItems: SnapshotItem[]) => {
-    const nextStack = historyStack.slice(0, historyIndex + 1);
-    nextStack.push(newItems);
-    setHistoryStack(nextStack);
-    setHistoryIndex(nextStack.length - 1);
-    setEquippedItems(newItems);
-  };
-
-  const handleUndo = () => {
-    if (historyIndex > 0) {
-      setHistoryIndex(historyIndex - 1);
-      setEquippedItems(historyStack[historyIndex - 1]);
-    }
-  };
-
-  const handleRedo = () => {
-    if (historyIndex < historyStack.length - 1) {
-      setHistoryIndex(historyIndex + 1);
-      setEquippedItems(historyStack[historyIndex + 1]);
-    }
-  };
+  const pushHistory = setEquippedItems;
+  const handleUndo = () => studio.dispatch({ type: "undo" });
+  const handleRedo = () => studio.dispatch({ type: "redo" });
 
   // Lắng nghe phím tắt: Ctrl+Z, Ctrl+Y, Esc, Phím số 1-6 đổi slot
   useEffect(() => {
@@ -305,37 +217,7 @@ export default function StudioPage() {
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [historyIndex, historyStack]);
-
-  // Kiểm tra xem có bản nháp từ phiên trước không
-  useEffect(() => {
-    try {
-      if (typeof window !== "undefined") {
-        const saved = localStorage.getItem("viet_stylist_current_draft");
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          if (parsed?.snapshot?.items && parsed.snapshot.items.length > 0) {
-            setDraftNotice(parsed);
-          }
-        }
-      }
-    } catch {
-      // Bỏ qua
-    }
-  }, []);
-
-  const handleRestoreDraft = () => {
-    if (!draftNotice) return;
-    if (draftNotice.title) setOutfitTitle(draftNotice.title);
-    if (draftNotice.occasionId) setSelectedOccasion(draftNotice.occasionId);
-    if (draftNotice.styleMode) setStyleMode(draftNotice.styleMode);
-    if (draftNotice.overlapDirection) setOverlapDirection(draftNotice.overlapDirection);
-    if (draftNotice.snapshot?.items) {
-      setEquippedItems(draftNotice.snapshot.items);
-      pushHistory(draftNotice.snapshot.items);
-    }
-    setDraftNotice(null);
-  };
+  }, [studio.dispatch]);
 
   const toggleLockSlot = (slot: string) => {
     const next = new Set(lockedSlots);
@@ -363,7 +245,7 @@ export default function StudioPage() {
   // Chọn biến thể màu
   const handleSelectVariant = (variant: ItemVariant) => {
     const activeItemConfig = equippedItems.find((it) => it.slot === activeSlot);
-    if (!activeItemConfig) return;
+    if (!activeItemConfig || lockedSlots.has(activeSlot)) return;
 
     const newItems = equippedItems.map((it) => {
       if (it.slot === activeSlot) {
@@ -391,9 +273,7 @@ export default function StudioPage() {
 
   // Nạp Starter Outfit (F01)
   const handleLoadStarter = (starter: any) => {
-    setSelectedOccasion(starter.occasion_id);
     setSelectedGarmentType(starter.garment_type_id);
-    setOutfitTitle(starter.title);
 
     const newItems: SnapshotItem[] = starter.items.map((it: any) => {
       const dbItem = catalogItems.find((ci) => ci.id === it.item_id);
@@ -406,38 +286,10 @@ export default function StudioPage() {
         colorHex: chosenVar?.hex_color,
       };
     });
-    pushHistory(newItems);
+    studio.dispatch({ type: "commit", update: doc => ({ ...doc, title: starter.title, snapshot: { ...doc.snapshot, occasionId: starter.occasion_id, items: mergeUnlockedItems(doc.snapshot.items, newItems, doc.snapshot.lockedSlots || []) } }) });
   };
 
-  // Lưu bộ phối vào database (F08, F13)
-  const handleSaveOutfit = async () => {
-    setIsSaving(true);
-    try {
-      const currentSnapshot: OutfitSnapshot = {
-        schemaVersion: 1,
-        avatarId: currentAvatar?.id || "avatar_nam_chuan",
-        poseId: "front_01",
-        occasionId: selectedOccasion,
-        styleMode: styleMode,
-        overlapDirection: overlapDirection,
-        items: equippedItems,
-      };
-
-      await api.createOutfit({
-        title: outfitTitle,
-        occasion_id: selectedOccasion,
-        style_mode: styleMode,
-        snapshot: currentSnapshot,
-      });
-
-      setSaveSuccessMessage("Đã lưu bộ phối thành công!");
-      setTimeout(() => setSaveSuccessMessage(null), 3000);
-    } catch (err: any) {
-      alert("Lỗi khi lưu bộ phối: " + err.message);
-    } finally {
-      setIsSaving(false);
-    }
-  };
+  const handleSaveOutfit = () => studio.save();
 
   // Trợ lý AI Gemini gợi ý phối đồ (F11)
   const handleAskAIStylist = async () => {
@@ -458,7 +310,6 @@ export default function StudioPage() {
 
       if (res.outfits && res.outfits.length > 0) {
         const recOutfit = res.outfits[0];
-        setOutfitTitle(recOutfit.title);
 
         const newItems: SnapshotItem[] = recOutfit.items.map((it: any) => ({
           slot: it.slot,
@@ -467,7 +318,7 @@ export default function StudioPage() {
           assetVersion: 1,
           colorHex: it.hex_color,
         }));
-        pushHistory(newItems);
+        studio.dispatch({ type: "commit", update: doc => ({ ...doc, title: recOutfit.title, snapshot: { ...doc.snapshot, items: mergeUnlockedItems(doc.snapshot.items, newItems, doc.snapshot.lockedSlots || []) } }) });
       }
     } catch (err: any) {
       alert("Trợ lý AI bận: " + err.message);
@@ -505,9 +356,25 @@ export default function StudioPage() {
     });
   }, [catalogItems, selectedGarmentType, activeSlot]);
 
+  if (!studio.hydrated) return <div role="status" className="p-8">Đang khôi phục bộ phối…</div>;
+
   return (
     <div className="max-w-[1720px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+      {studio.error && <div role="alert" aria-label="Lưu bộ phối" className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm">
+        <p>{studio.error}</p>
+        {studio.conflict && <div className="mt-3 flex gap-3">
+          <button onClick={() => studio.loadServerCopy()} className="underline">Tải bản máy chủ</button>
+          <button onClick={() => studio.save(true)} disabled={isSaving} className="underline">Lưu thành bộ mới</button>
+        </div>}
+      </div>}
       {/* Banner thông báo khôi phục bản nháp */}
+      {studio.requestedOutfit && !studio.conflict && <div role="status" className="rounded-xl border border-stone-200 bg-white p-4 text-sm">
+        <p>Bạn đang có bản nháp chưa lưu. Liên kết vừa mở yêu cầu tải bộ phối trên máy chủ.</p>
+        <div className="mt-3 flex gap-3">
+          <button onClick={() => studio.loadServerCopy()} className="underline">Mở bộ phối từ liên kết</button>
+          <button onClick={studio.keepLocal} className="underline">Tiếp tục bản nháp</button>
+        </div>
+      </div>}
       {draftNotice && (
         <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200/90 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3 shadow-xs">
           <div className="flex items-center space-x-3">
@@ -531,7 +398,7 @@ export default function StudioPage() {
               Khôi phục bản phối
             </button>
             <button
-              onClick={() => setDraftNotice(null)}
+              onClick={studio.dismissDraft}
               className="px-3 py-1.5 bg-white border border-stone-200 hover:bg-stone-50 text-stone-600 text-xs font-medium rounded-lg transition-colors"
             >
               Bỏ qua
@@ -582,7 +449,7 @@ export default function StudioPage() {
             <div className="flex items-center bg-stone-100 rounded-lg p-0.5 border border-stone-200">
               <button
                 onClick={handleUndo}
-                disabled={historyIndex <= 0}
+                disabled={!studio.history.past.length}
                 className="p-1.5 rounded-md hover:bg-white text-stone-700 disabled:opacity-30 transition-all"
                 title="Hoàn tác (Ctrl+Z)"
               >
@@ -590,7 +457,7 @@ export default function StudioPage() {
               </button>
               <button
                 onClick={handleRedo}
-                disabled={historyIndex >= historyStack.length - 1}
+                disabled={!studio.history.future.length}
                 className="p-1.5 rounded-md hover:bg-white text-stone-700 disabled:opacity-30 transition-all"
                 title="Làm lại (Ctrl+Y)"
               >
@@ -617,15 +484,7 @@ export default function StudioPage() {
           <button
             onClick={() => {
               if (!pinnedSnapshotA) {
-                setPinnedSnapshotA({
-                  schemaVersion: 1,
-                  avatarId: currentAvatar?.id || "avatar_nam_chuan",
-                  poseId: "front_01",
-                  occasionId: selectedOccasion,
-                  styleMode: styleMode,
-                  overlapDirection: overlapDirection,
-                  items: equippedItems,
-                });
+                setPinnedSnapshotA(structuredClone(snapshot));
               } else {
                 setIsCompareOpen(true);
               }
@@ -661,7 +520,7 @@ export default function StudioPage() {
           {/* Lưu bộ phối */}
           <button
             onClick={handleSaveOutfit}
-            disabled={isSaving}
+            disabled={isSaving || !studio.hydrated}
             className="flex items-center space-x-1 px-3.5 py-1.5 rounded-lg bg-heritage-red hover:bg-heritage-red-dark text-white text-xs font-semibold transition-all shadow-xs disabled:opacity-50"
           >
             <Save className="w-3.5 h-3.5" />
@@ -968,6 +827,8 @@ export default function StudioPage() {
             backgroundTheme={canvasBackgroundTheme}
             selectedSlot={activeSlot}
             onSelectItem={(slot) => setActiveSlot(slot)}
+            lockedSlots={[...lockedSlots]}
+            onTransformsCommit={(changes) => studio.dispatch({ type: "commit", update: doc => ({ ...doc, snapshot: { ...doc.snapshot, items: doc.snapshot.items.map(item => item.slot in changes ? { ...item, transform: changes[item.slot] } : item) } }) })}
             className="w-full"
           />
 
@@ -1005,10 +866,10 @@ export default function StudioPage() {
         {/* CỘT PHẢI (3 cols): Swatch Màu (F02), Cảnh báo văn hóa (F10), Hài hòa màu (F07), Thời tiết (F06) */}
         <div className="lg:col-span-3 xl:col-span-3 space-y-4">
           {/* Cảnh báo Quy Chuẩn Văn Hóa (F10) */}
-          <CulturalCheckBadge
+          {process.env.NEXT_PUBLIC_STUDIO_V3 === "true" ? <StudioComposerPanel snapshot={snapshot} onSettingsChange={culturalSettings => studio.dispatch({ type: "commit", update: doc => ({ ...doc, snapshot: { ...doc.snapshot, culturalSettings } }) })} /> : <CulturalCheckBadge
             checkData={culturalCheck}
             onApplyFix={handleApplyCulturalFix}
-          />
+          />}
 
           {/* Bảng phối màu Ngũ Hành 1 chạm (Tối ưu trải nghiệm F02/F07) */}
           <div className="bg-white p-4 rounded-2xl border border-stone-200/80 shadow-xs space-y-2.5">
@@ -1100,19 +961,9 @@ export default function StudioPage() {
           isOpen={isCompareOpen}
           onClose={() => setIsCompareOpen(false)}
           snapshotA={pinnedSnapshotA}
-          snapshotB={{
-            schemaVersion: 1,
-            avatarId: currentAvatar?.id || "avatar_nam_chuan",
-            poseId: "front_01",
-            occasionId: selectedOccasion,
-            styleMode: styleMode,
-            overlapDirection: overlapDirection,
-            items: equippedItems,
-          }}
+          snapshotB={snapshot}
           onSelectOutfit={(chosen) => {
-            setEquippedItems(chosen.items);
-            setStyleMode(chosen.styleMode as any);
-            setOverlapDirection(chosen.overlapDirection as any);
+            studio.dispatch({ type: "commit", update: doc => ({ ...doc, snapshot: chosen }) });
           }}
         />
       )}
@@ -1130,15 +981,7 @@ export default function StudioPage() {
       <AITryOnModal
         isOpen={isTryOnOpen}
         onClose={() => setIsTryOnOpen(false)}
-        snapshot={{
-          schemaVersion: 1,
-          avatarId: currentAvatar?.id || "avatar_nam_chuan",
-          poseId: "front_01",
-          occasionId: selectedOccasion,
-          styleMode: styleMode,
-          overlapDirection: overlapDirection,
-          items: equippedItems,
-        }}
+        snapshot={snapshot}
         outfitTitle={outfitTitle}
       />
 
