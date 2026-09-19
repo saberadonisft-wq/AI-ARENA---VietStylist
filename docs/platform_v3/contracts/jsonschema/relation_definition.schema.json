@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "RelationDefinition",
+  "type": "object",
+  "required": [
+    "key",
+    "label_vi",
+    "source_types",
+    "target_types",
+    "directional",
+    "contextual",
+    "inheritable",
+    "status",
+    "version"
+  ],
+  "properties": {
+    "key": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_.-]+$"
+    },
+    "label_vi": {
+      "type": "string"
+    },
+    "source_types": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "target_types": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "directional": {
+      "type": "boolean"
+    },
+    "inverse_relation_key": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "contextual": {
+      "type": "boolean"
+    },
+    "inheritable": {
+      "type": "boolean"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "draft",
+        "active",
+        "deprecated"
+      ]
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1
+    }
+  },
+  "additionalProperties": false
+}

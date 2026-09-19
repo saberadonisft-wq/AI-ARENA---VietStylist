@@ -1,0 +1,35 @@
+[
+  {
+    "key": "regional_variant_of",
+    "label_vi": "Biến thể vùng của",
+    "source_types": [
+      "garment_variant"
+    ],
+    "target_types": [
+      "garment"
+    ],
+    "directional": true,
+    "inverse_relation_key": null,
+    "contextual": true,
+    "inheritable": false,
+    "status": "draft",
+    "version": 1
+  },
+  {
+    "key": "modern_adaptation_of",
+    "label_vi": "Biến thể hiện đại của",
+    "source_types": [
+      "garment_variant"
+    ],
+    "target_types": [
+      "garment",
+      "garment_variant"
+    ],
+    "directional": true,
+    "inverse_relation_key": null,
+    "contextual": true,
+    "inheritable": false,
+    "status": "draft",
+    "version": 1
+  }
+]

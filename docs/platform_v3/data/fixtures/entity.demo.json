@@ -1,0 +1,12 @@
+{
+  "id": "garment_demo_current",
+  "entity_type": "garment",
+  "schema_version": "1.0",
+  "identity": {
+    "name_vi": "Trang phục demo hiện đại",
+    "aliases": []
+  },
+  "status": "draft",
+  "version": 1,
+  "extensions": {}
+}

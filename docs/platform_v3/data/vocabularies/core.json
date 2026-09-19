@@ -1,0 +1,57 @@
+{
+  "missing_states": [
+    "known",
+    "unknown",
+    "not_collected",
+    "not_applicable",
+    "disputed",
+    "inferred",
+    "withheld"
+  ],
+  "entity_types": [
+    "garment",
+    "garment_variant",
+    "garment_component",
+    "accessory",
+    "material",
+    "technique",
+    "pattern",
+    "motif",
+    "period",
+    "region",
+    "place",
+    "community",
+    "occasion",
+    "social_context"
+  ],
+  "source_types": [
+    "museum_record",
+    "archival_record",
+    "academic_paper",
+    "academic_book",
+    "specialist_book",
+    "official_institution_web",
+    "expert_interview",
+    "historical_image",
+    "community_documentation",
+    "commercial_reference",
+    "other"
+  ],
+  "relation_types": [
+    "derived_from",
+    "influenced_by",
+    "regional_variant_of",
+    "modern_adaptation_of",
+    "reconstructed_from",
+    "documented_before",
+    "documented_after",
+    "used_with",
+    "layered_over",
+    "layered_under",
+    "made_from",
+    "produced_by",
+    "used_during",
+    "associated_with",
+    "documented_in"
+  ]
+}

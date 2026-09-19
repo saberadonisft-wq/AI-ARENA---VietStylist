@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "EntityRelation",
+  "type": "object",
+  "required": [
+    "id",
+    "subject_id",
+    "relation_type",
+    "object_id",
+    "state",
+    "qualifiers",
+    "assertion_ids"
+  ],
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "subject_id": {
+      "type": "string"
+    },
+    "relation_type": {
+      "type": "string"
+    },
+    "object_id": {
+      "type": "string"
+    },
+    "state": {
+      "type": "string",
+      "enum": [
+        "known",
+        "unknown",
+        "not_collected",
+        "not_applicable",
+        "disputed",
+        "inferred",
+        "withheld"
+      ]
+    },
+    "qualifiers": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "assertion_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,42 @@
+[
+  {
+    "key": "construction.closure.direction",
+    "label_vi": "Hướng khép vạt",
+    "description": "Fixture kỹ thuật, không phải cultural fact.",
+    "value_type": "enum",
+    "cardinality": "single",
+    "allowed_values": [
+      "right_over_left",
+      "left_over_right"
+    ],
+    "applies_to": [
+      "garment",
+      "garment_variant"
+    ],
+    "contextual": true,
+    "queryable": true,
+    "inheritable": true,
+    "default_missing_state": "not_collected",
+    "status": "draft",
+    "version": 1
+  },
+  {
+    "key": "material.primary",
+    "label_vi": "Chất liệu chính",
+    "description": "Fixture kỹ thuật.",
+    "value_type": "entity_ref",
+    "cardinality": "single",
+    "allowed_values": null,
+    "applies_to": [
+      "garment",
+      "garment_variant",
+      "accessory"
+    ],
+    "contextual": true,
+    "queryable": true,
+    "inheritable": true,
+    "default_missing_state": "not_collected",
+    "status": "draft",
+    "version": 1
+  }
+]

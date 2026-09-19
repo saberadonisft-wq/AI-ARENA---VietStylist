@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "OutfitSpecV2",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "dataset_version",
+    "selections",
+    "context"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "2.0"
+    },
+    "dataset_version": {
+      "type": "string"
+    },
+    "ruleset_version": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "selections": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "selection_id",
+          "slot",
+          "canonical_entity_id",
+          "style"
+        ],
+        "properties": {
+          "selection_id": {
+            "type": "string"
+          },
+          "slot": {
+            "type": "string"
+          },
+          "canonical_entity_id": {
+            "type": "string"
+          },
+          "canonical_variant_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "renderable_item_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "render_variant_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "style": {
+            "type": "object"
+          },
+          "transform": {
+            "type": [
+              "object",
+              "null"
+            ]
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "context": {
+      "type": "object"
+    },
+    "metadata": {
+      "type": "object"
+    }
+  },
+  "additionalProperties": false
+}
