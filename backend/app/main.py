@@ -33,6 +33,7 @@ from app.modules.solution_forms.router import router as solution_forms_router
 from app.modules.admin.router import router as admin_router
 from app.modules.auth.router import router as auth_router
 from app.modules.auth.service import AuthService
+from app.modules.cultural_data_v3.router import router as cultural_v3_router
 
 
 from app.core.http_client import close_shared_async_client
@@ -220,6 +221,7 @@ def create_app():
     app.include_router(solution_forms_router, prefix=api_prefix)
     app.include_router(admin_router, prefix=api_prefix)
     app.include_router(auth_router, prefix=api_prefix)
+    app.include_router(cultural_v3_router, prefix=api_prefix)
     return app
 
 

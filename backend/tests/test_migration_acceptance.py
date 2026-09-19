@@ -128,7 +128,7 @@ def test_cli_dry_run_is_read_only_and_reports_duplicates(tmp_path):
     before = path.read_bytes()
     env = {**os.environ, "DATABASE_URL": "sqlite:///" + str(path)}
     result = subprocess.run(
-        [sys.executable, "backend/scripts/migrate.py", "--dry-run"],
+        [sys.executable, str(Path(__file__).resolve().parents[1] / "scripts" / "migrate.py"), "--dry-run"],
         env=env,
         capture_output=True,
         text=True,
@@ -149,7 +149,7 @@ def test_cli_upgrade_backup_and_restore(tmp_path):
     conn.close()
     env = {**os.environ, "DATABASE_URL": "sqlite:///" + str(path)}
     result = subprocess.run(
-        [sys.executable, "backend/scripts/migrate.py"],
+        [sys.executable, str(Path(__file__).resolve().parents[1] / "scripts" / "migrate.py")],
         env=env,
         capture_output=True,
         text=True,

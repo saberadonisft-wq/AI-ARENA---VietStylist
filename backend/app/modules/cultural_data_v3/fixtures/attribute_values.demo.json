@@ -1,0 +1,87 @@
+[
+  {
+    "id": "av_ngu_than_closure",
+    "entity_id": "garment_ngu_than",
+    "attribute_key": "construction.closure.direction",
+    "state": "known",
+    "value": "right_over_left",
+    "candidate_values": [],
+    "qualifiers": {
+      "period_ids": [],
+      "region_ids": [],
+      "place_ids": [],
+      "community_ids": [],
+      "occasion_ids": [],
+      "social_context_ids": []
+    },
+    "assertion_ids": []
+  },
+  {
+    "id": "av_ngu_than_panels",
+    "entity_id": "garment_ngu_than",
+    "attribute_key": "construction.body_panels",
+    "state": "known",
+    "value": 5,
+    "candidate_values": [],
+    "qualifiers": {
+      "period_ids": [],
+      "region_ids": [],
+      "place_ids": [],
+      "community_ids": [],
+      "occasion_ids": [],
+      "social_context_ids": []
+    },
+    "assertion_ids": []
+  },
+  {
+    "id": "av_ngu_than_sleeve",
+    "entity_id": "garment_ngu_than",
+    "attribute_key": "construction.sleeve.shape",
+    "state": "known",
+    "value": "tay_chen",
+    "candidate_values": [],
+    "qualifiers": {
+      "period_ids": [],
+      "region_ids": [],
+      "place_ids": [],
+      "community_ids": [],
+      "occasion_ids": [],
+      "social_context_ids": []
+    },
+    "assertion_ids": []
+  },
+  {
+    "id": "av_ngu_than_material",
+    "entity_id": "garment_ngu_than",
+    "attribute_key": "material.primary",
+    "state": "not_collected",
+    "value": null,
+    "candidate_values": [],
+    "qualifiers": {
+      "period_ids": [],
+      "region_ids": [],
+      "place_ids": [],
+      "community_ids": [],
+      "occasion_ids": [],
+      "social_context_ids": []
+    },
+    "assertion_ids": []
+  },
+  {
+    "id": "av_ngu_than_collar",
+    "entity_id": "garment_ngu_than",
+    "attribute_key": "visual.collar.style",
+    "state": "known",
+    "value": "co_dung",
+    "candidate_values": [],
+    "qualifiers": {
+      "period_ids": [],
+      "region_ids": [],
+      "place_ids": [],
+      "community_ids": [],
+      "occasion_ids": [],
+      "social_context_ids": []
+    },
+    "assertion_ids": []
+  }
+]

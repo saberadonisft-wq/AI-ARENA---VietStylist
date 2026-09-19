@@ -142,6 +142,305 @@ def cleanup_schedule(conn):
     )
 
 
+def cultural_data_v3(conn):
+    """V3 Cultural Knowledge Graph — 11 additive tables, zero legacy changes."""
+
+    # 1. Entity registry
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS entity_registry (
+            id TEXT PRIMARY KEY,
+            entity_type TEXT NOT NULL,
+            schema_version TEXT NOT NULL DEFAULT '1.0',
+            identity_json TEXT NOT NULL DEFAULT '{}',
+            status TEXT NOT NULL DEFAULT 'draft'
+                CHECK (status IN ('draft','under_review','verified','published','deprecated')),
+            version INTEGER NOT NULL DEFAULT 1,
+            extensions_json TEXT NOT NULL DEFAULT '{}',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_entity_type ON entity_registry(entity_type)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_entity_status ON entity_registry(status)")
+
+    # 2. Attribute definitions registry
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS attribute_definitions (
+            key TEXT PRIMARY KEY,
+            label_vi TEXT NOT NULL,
+            description TEXT,
+            value_type TEXT NOT NULL,
+            cardinality TEXT NOT NULL DEFAULT 'single',
+            allowed_values_json TEXT,
+            applies_to_json TEXT NOT NULL DEFAULT '[]',
+            contextual INTEGER NOT NULL DEFAULT 1,
+            queryable INTEGER NOT NULL DEFAULT 1,
+            inheritable INTEGER NOT NULL DEFAULT 1,
+            default_missing_state TEXT NOT NULL DEFAULT 'not_collected',
+            status TEXT NOT NULL DEFAULT 'draft',
+            version INTEGER NOT NULL DEFAULT 1,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    # 3. Attribute values
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS attribute_values (
+            id TEXT PRIMARY KEY,
+            entity_id TEXT NOT NULL REFERENCES entity_registry(id) ON DELETE CASCADE,
+            attribute_key TEXT NOT NULL REFERENCES attribute_definitions(key) ON DELETE CASCADE,
+            state TEXT NOT NULL DEFAULT 'not_collected',
+            value_json TEXT,
+            candidate_values_json TEXT DEFAULT '[]',
+            qualifiers_json TEXT DEFAULT '{}',
+            assertion_ids_json TEXT DEFAULT '[]',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_attrval_entity ON attribute_values(entity_id)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_attrval_key ON attribute_values(attribute_key)")
+
+    # 4. Relation definitions registry
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS relation_definitions (
+            key TEXT PRIMARY KEY,
+            label_vi TEXT NOT NULL,
+            source_types_json TEXT NOT NULL DEFAULT '[]',
+            target_types_json TEXT NOT NULL DEFAULT '[]',
+            directional INTEGER NOT NULL DEFAULT 1,
+            inverse_relation_key TEXT,
+            contextual INTEGER NOT NULL DEFAULT 1,
+            inheritable INTEGER NOT NULL DEFAULT 1,
+            status TEXT NOT NULL DEFAULT 'draft',
+            version INTEGER NOT NULL DEFAULT 1,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    # 5. Entity relations
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS entity_relations (
+            id TEXT PRIMARY KEY,
+            subject_id TEXT NOT NULL REFERENCES entity_registry(id) ON DELETE CASCADE,
+            relation_type TEXT NOT NULL REFERENCES relation_definitions(key) ON DELETE CASCADE,
+            object_id TEXT NOT NULL REFERENCES entity_registry(id) ON DELETE CASCADE,
+            state TEXT NOT NULL DEFAULT 'known',
+            qualifiers_json TEXT DEFAULT '{}',
+            assertion_ids_json TEXT DEFAULT '[]',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_rel_subject ON entity_relations(subject_id)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_rel_object ON entity_relations(object_id)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_rel_type ON entity_relations(relation_type)")
+
+    # 6. Cultural sources V3 — with rights and trust tiers
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS cultural_sources_v3 (
+            id TEXT PRIMARY KEY,
+            source_type TEXT NOT NULL,
+            title TEXT NOT NULL,
+            creator TEXT,
+            institution TEXT,
+            publication_date TEXT,
+            url TEXT,
+            accessed_at TEXT NOT NULL,
+            rights_json TEXT NOT NULL DEFAULT '{}',
+            trust_tier TEXT NOT NULL DEFAULT 'F_UNVERIFIED',
+            review_status TEXT NOT NULL DEFAULT 'draft',
+            version INTEGER NOT NULL DEFAULT 1,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    # 7. Cultural assertions V3 — atomic cultural claims
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS cultural_assertions_v3 (
+            id TEXT PRIMARY KEY,
+            subject_id TEXT NOT NULL REFERENCES entity_registry(id) ON DELETE CASCADE,
+            predicate TEXT NOT NULL,
+            value_json TEXT NOT NULL,
+            qualifiers_json TEXT DEFAULT '{}',
+            statement_vi TEXT DEFAULT '',
+            confidence REAL NOT NULL DEFAULT 0.5 CHECK (confidence >= 0 AND confidence <= 1),
+            consensus TEXT NOT NULL DEFAULT 'single_source',
+            review_status TEXT NOT NULL DEFAULT 'draft',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_assertion_subject ON cultural_assertions_v3(subject_id)")
+
+    # 8. Assertion evidence V3 — links assertions to sources
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS assertion_evidence_v3 (
+            id TEXT PRIMARY KEY,
+            assertion_id TEXT NOT NULL REFERENCES cultural_assertions_v3(id) ON DELETE CASCADE,
+            source_id TEXT NOT NULL REFERENCES cultural_sources_v3(id) ON DELETE CASCADE,
+            locator TEXT NOT NULL DEFAULT '',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_evidence_assertion ON assertion_evidence_v3(assertion_id)")
+
+    # 9. Cultural media bindings V3
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS cultural_media_bindings_v3 (
+            id TEXT PRIMARY KEY,
+            entity_id TEXT NOT NULL REFERENCES entity_registry(id) ON DELETE CASCADE,
+            media_asset_id TEXT NOT NULL,
+            view_type TEXT NOT NULL DEFAULT 'front',
+            source_id TEXT REFERENCES cultural_sources_v3(id) ON DELETE SET NULL,
+            rights_json TEXT NOT NULL DEFAULT '{}',
+            sort_order INTEGER NOT NULL DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_media_bind_entity ON cultural_media_bindings_v3(entity_id)")
+
+    # 10. Dataset snapshots V3 — immutable version snapshots
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS dataset_snapshots_v3 (
+            id TEXT PRIMARY KEY,
+            label TEXT NOT NULL,
+            entity_count INTEGER NOT NULL DEFAULT 0,
+            attribute_count INTEGER NOT NULL DEFAULT 0,
+            relation_count INTEGER NOT NULL DEFAULT 0,
+            snapshot_hash TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    # 11. Legacy entity mappings V3 — map old tables to canonical entities
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS legacy_entity_mappings_v3 (
+            legacy_table TEXT NOT NULL,
+            legacy_id TEXT NOT NULL,
+            entity_id TEXT NOT NULL REFERENCES entity_registry(id) ON DELETE CASCADE,
+            mapping_kind TEXT NOT NULL DEFAULT 'identity',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (legacy_table, legacy_id)
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_legacy_map_entity ON legacy_entity_mappings_v3(entity_id)")
+
+
+def render_generation_v3(conn):
+    """V3 Render & Generation tables — 4 additive tables."""
+
+    # 1. Renderable items V3
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS renderable_items_v3 (
+            id TEXT PRIMARY KEY,
+            canonical_entity_id TEXT NOT NULL REFERENCES entity_registry(id) ON DELETE CASCADE,
+            slot TEXT NOT NULL,
+            name TEXT NOT NULL,
+            asset_format TEXT NOT NULL DEFAULT 'svg',
+            metadata_json TEXT DEFAULT '{}',
+            is_active INTEGER NOT NULL DEFAULT 1,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_renderable_entity ON renderable_items_v3(canonical_entity_id)")
+
+    # 2. Renderable variants V3
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS renderable_variants_v3 (
+            id TEXT PRIMARY KEY,
+            renderable_item_id TEXT NOT NULL REFERENCES renderable_items_v3(id) ON DELETE CASCADE,
+            color_name TEXT,
+            hex_color TEXT,
+            material TEXT,
+            style_json TEXT DEFAULT '{}',
+            is_default INTEGER NOT NULL DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_rvar_item ON renderable_variants_v3(renderable_item_id)")
+
+    # 3. Render profiles V3
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS render_profiles_v3 (
+            id TEXT PRIMARY KEY,
+            renderable_item_id TEXT NOT NULL REFERENCES renderable_items_v3(id) ON DELETE CASCADE,
+            variant_id TEXT REFERENCES renderable_variants_v3(id) ON DELETE CASCADE,
+            avatar_id TEXT,
+            pose TEXT DEFAULT 'front_01',
+            z_index INTEGER NOT NULL DEFAULT 10,
+            svg_content TEXT,
+            media_asset_id TEXT,
+            transform_json TEXT DEFAULT '{}',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_rprofile_item ON render_profiles_v3(renderable_item_id)")
+
+    # 4. Generation profiles V3
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS generation_profiles_v3 (
+            id TEXT PRIMARY KEY,
+            canonical_entity_id TEXT NOT NULL REFERENCES entity_registry(id) ON DELETE CASCADE,
+            must_preserve_json TEXT NOT NULL DEFAULT '[]',
+            may_vary_json TEXT NOT NULL DEFAULT '[]',
+            forbidden_json TEXT NOT NULL DEFAULT '[]',
+            reference_media_ids_json TEXT NOT NULL DEFAULT '[]',
+            version INTEGER NOT NULL DEFAULT 1,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_genprof_entity ON generation_profiles_v3(canonical_entity_id)")
+
+
+def dataset_content_v3(conn):
+    """Immutable dataset content and persisted cultural rules; additive only."""
+    conn.execute("""CREATE TABLE IF NOT EXISTS cultural_rules_v3 (
+        id TEXT PRIMARY KEY,
+        entity_id TEXT REFERENCES entity_registry(id),
+        name TEXT NOT NULL,
+        condition_json TEXT NOT NULL,
+        severity TEXT NOT NULL CHECK(severity IN ('strict','warning','info')),
+        explanation TEXT NOT NULL,
+        suggested_fix TEXT,
+        qualifiers_json TEXT NOT NULL DEFAULT '{}',
+        assertion_ids_json TEXT NOT NULL DEFAULT '[]',
+        status TEXT NOT NULL DEFAULT 'draft' CHECK(status IN ('draft','published','deprecated')),
+        version INTEGER NOT NULL DEFAULT 1 CHECK(version>=1)
+    )""")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_rules_v3_entity_status ON cultural_rules_v3(entity_id,status)")
+    conn.execute("""CREATE TABLE IF NOT EXISTS dataset_contents_v3 (
+        dataset_id TEXT PRIMARY KEY REFERENCES dataset_snapshots_v3(id),
+        format_version INTEGER NOT NULL,
+        ruleset_version TEXT NOT NULL,
+        content_json TEXT NOT NULL,
+        content_hash TEXT NOT NULL,
+        created_by TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )""")
+    for table in ("dataset_snapshots_v3", "dataset_contents_v3"):
+        for event in ("UPDATE", "DELETE"):
+            conn.execute(f"CREATE TRIGGER IF NOT EXISTS {table}_immutable_{event.lower()} BEFORE {event} ON {table} BEGIN SELECT RAISE(ABORT,'immutable dataset'); END")
+
+
+def dataset_replace_guard_v3(conn):
+    """REPLACE can bypass delete triggers when recursive_triggers is disabled."""
+    for table, key in (("dataset_snapshots_v3", "id"), ("dataset_contents_v3", "dataset_id")):
+        conn.execute(f"""CREATE TRIGGER IF NOT EXISTS {table}_immutable_insert
+            BEFORE INSERT ON {table}
+            WHEN EXISTS(SELECT 1 FROM {table} WHERE {key}=NEW.{key})
+            BEGIN SELECT RAISE(ABORT,'immutable dataset'); END""")
+
+
+def performance_indexes_v3(conn):
+    """Compound indexes for V3 list and resolver hot paths."""
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_entity_status_type_id_v3 ON entity_registry(status, entity_type, id)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_attrval_entity_key_id_v3 ON attribute_values(entity_id, attribute_key, id)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_rel_subject_type_id_v3 ON entity_relations(subject_id, relation_type, id)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_assertion_subject_status_v3 ON cultural_assertions_v3(subject_id, review_status, id)")
+
+
 MIGRATIONS = [
     ("001_initial_schema", initial),
     ("002_add_blog_articles_fields", blog),
@@ -150,6 +449,11 @@ MIGRATIONS = [
     ("005_media_lifecycle", media_lifecycle),
     ("006_operational_guards", operational_guards),
     ("007_cleanup_schedule", cleanup_schedule),
+    ("008_cultural_data_v3", cultural_data_v3),
+    ("009_render_generation_v3", render_generation_v3),
+    ("010_dataset_content_v3", dataset_content_v3),
+    ("011_dataset_replace_guard_v3", dataset_replace_guard_v3),
+    ("012_performance_indexes_v3", performance_indexes_v3),
 ]
 
 

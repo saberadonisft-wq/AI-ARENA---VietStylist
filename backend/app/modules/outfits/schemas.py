@@ -1,5 +1,14 @@
 from typing import List, Optional, Dict, Any, Literal
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+from app.modules.cultural_data_v3.domain.models import ContextQualifier, Identifier
+
+
+class CulturalSettings(BaseModel):
+    """Persist interpretation settings without storing a second copy of the outfit."""
+    model_config = ConfigDict(extra="forbid")
+    dataset_version: Identifier = "dev"
+    ruleset_version: Optional[Identifier] = None
+    context: ContextQualifier = Field(default_factory=ContextQualifier)
 
 
 class ItemTransform(BaseModel):
@@ -30,6 +39,7 @@ class OutfitSnapshot(BaseModel):
     lockedSlots: List[str] = Field(default_factory=list)
     backgroundTheme: Literal["white", "dopaper"] = "white"
     aspectRatio: Literal["1:1", "9:16"] = "9:16"
+    culturalSettings: Optional[CulturalSettings] = None
 
     @model_validator(mode="after")
     def unique_slots(self):
