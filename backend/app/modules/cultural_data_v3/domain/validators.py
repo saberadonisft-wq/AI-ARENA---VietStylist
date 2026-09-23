@@ -59,6 +59,14 @@ def validate_attribute_value(
 def validate_typed_value(actual: Any, definition: AttributeDefinition) -> str | None:
     kind = definition.value_type
     number = lambda x: isinstance(x, (int, float)) and not isinstance(x, bool) and math.isfinite(x)
+
+    def measurement(value):
+        if not isinstance(value, dict) or not isinstance(value.get("unit"), str) or not value["unit"]:
+            return False
+        if number(value.get("value")):
+            return True
+        return number(value.get("min")) and number(value.get("max")) and value["min"] <= value["max"]
+
     checks = {
         "string": lambda x: isinstance(x, str),
         "number": number,
@@ -66,7 +74,7 @@ def validate_typed_value(actual: Any, definition: AttributeDefinition) -> str | 
         "enum": lambda x: definition.allowed_values is not None and any(type(x) is type(v) and x == v for v in definition.allowed_values),
         "entity_ref": lambda x: isinstance(x, str) and bool(x),
         "entity_ref_list": lambda x: isinstance(x, list) and all(isinstance(v, str) and bool(v) for v in x) and len(x) == len(set(x)),
-        "measurement": lambda x: isinstance(x, dict) and number(x.get("value")) and isinstance(x.get("unit"), str) and bool(x["unit"]),
+        "measurement": measurement,
         "color": lambda x: isinstance(x, str) and re.fullmatch(r"#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})", x) is not None,
         "date_range": lambda x: isinstance(x, dict) and number(x.get("start")) and number(x.get("end")) and x["start"] <= x["end"],
         "geo_ref": lambda x: isinstance(x, str) and bool(x),

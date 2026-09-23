@@ -1,0 +1,3055 @@
+{
+  "manifest": {
+    "package": "VietStylist_AoTuThan_Pilot_v1",
+    "dataset_version": "ao-tu-than-pilot-1",
+    "created_date": "2026-09-19",
+    "status": "under_review",
+    "accuracy_mode": "strict",
+    "accuracy_claim": "No 100% guarantee; hard constraints are gated by source/review/confidence.",
+    "counts": {
+      "sources": 10,
+      "entities": 27,
+      "assertions": 24,
+      "attribute_definitions": 19,
+      "attribute_values": 26,
+      "relation_definitions": 6,
+      "relations": 18,
+      "rules": 4,
+      "media_candidates": 3,
+      "generation_profiles": 3
+    },
+    "validation": "passed",
+    "tests": "passed",
+    "strict_generation_profiles_built": 2
+  },
+  "entities": [
+    {
+      "id": "garment_ao_tu_than",
+      "entity_type": "garment",
+      "schema_version": "1.0",
+      "identity": {
+        "name_vi": "Áo tứ thân",
+        "aliases": [
+          "áo bốn thân"
+        ]
+      },
+      "status": "under_review",
+      "version": 1,
+      "extensions": {}
+    },
+    {
+      "id": "garment_ao_canh_ngan",
+      "entity_type": "garment",
+      "schema_version": "1.0",
+      "identity": {
+        "name_vi": "Áo cánh ngắn",
+        "aliases": []
+      },
+      "status": "under_review",
+      "version": 1,
+      "extensions": {}
+    },
+    {
+      "id": "garment_yem",
+      "entity_type": "garment",
+      "schema_version": "1.0",
+      "identity": {
+        "name_vi": "Yếm",
+        "aliases": [
+          "áo yếm"
+        ]
+      },
+      "status": "under_review",
+      "version": 1,
+      "extensions": {}
+    },
+    {
+      "id": "garment_vay_quay",
+      "entity_type": "garment",
+      "schema_version": "1.0",
+      "identity": {
+        "name_vi": "Váy quây / váy đụp",
+        "aliases": [
+          "váy đụp"
+        ]
+      },
+      "status": "under_review",
+      "version": 1,
+      "extensions": {}
+    },
+    {
+      "id": "accessory_that_lung_lua",
+      "entity_type": "accessory",
+      "schema_version": "1.0",
+      "identity": {
+        "name_vi": "Thắt lưng lụa",
+        "aliases": []
+      },
+      "status": "under_review",
+      "version": 1,
+      "extensions": {}
+    },
+    {
+      "id": "accessory_khan_mo_qua",
+      "entity_type": "accessory",
+      "schema_version": "1.0",
+      "identity": {
+        "name_vi": "Khăn mỏ quạ",
+        "aliases": []
+      },
+      "status": "under_review",
+      "version": 1,
+      "extensions": {}
+    },
+    {
+      "id": "accessory_non_ba_tam",
+      "entity_type": "accessory",
+      "schema_version": "1.0",
+      "identity": {
+        "name_vi": "Nón ba tầm",
+        "aliases": [
+          "nón tầm"
+        ]
+      },
+      "status": "under_review",
+      "version": 1,
+      "extensions": {}
+    },
+    {
+      "id": "accessory_non_thung_quai_thao",
+      "entity_type": "accessory",
+      "schema_version": "1.0",
+      "identity": {
+        "name_vi": "Nón thúng quai thao",
+        "aliases": [
+          "nón quai thao"
+        ]
+      },
+      "status": "under_review",
+      "version": 1,
+      "extensions": {}
+    },
+    {
+      "id": "ensemble_ao_tu_than_rural_north",
+      "entity_type": "wearing_ensemble",
+      "schema_version": "1.0",
+      "identity": {
+        "name_vi": "Bộ áo tứ thân nông thôn Bắc Bộ truyền thống",
+        "aliases": []
+      },
+      "status": "under_review",
+      "version": 1,
+      "extensions": {}
+    },
+    {
+      "id": "ensemble_ao_tu_than_hanoi_1914_1920",
+      "entity_type": "wearing_ensemble",
+      "schema_version": "1.0",
+      "identity": {
+        "name_vi": "Bộ áo tứ thân Hà Nội đầu thế kỷ XX (1914–1920)",
+        "aliases": []
+      },
+      "status": "under_review",
+      "version": 1,
+      "extensions": {}
+    },
+    {
+      "id": "ensemble_quan_ho_female",
+      "entity_type": "wearing_ensemble",
+      "schema_version": "1.0",
+      "identity": {
+        "name_vi": "Trang phục nữ trong bối cảnh Quan họ",
+        "aliases": [
+          "trang phục liền chị"
+        ]
+      },
+      "status": "under_review",
+      "version": 1,
+      "extensions": {}
+    },
+    {
+      "id": "variant_ao_tu_than_modern_stage",
+      "entity_type": "garment_variant",
+      "schema_version": "1.0",
+      "identity": {
+        "name_vi": "Áo tứ thân sân khấu/cách tân hiện đại",
+        "aliases": []
+      },
+      "status": "under_review",
+      "version": 1,
+      "extensions": {}
+    },
+    {
+      "id": "region_northern_delta",
+      "entity_type": "region",
+      "schema_version": "1.0",
+      "identity": {
+        "name_vi": "Đồng bằng Bắc Bộ",
+        "aliases": []
+      },
+      "status": "under_review",
+      "version": 1,
+      "extensions": {}
+    },
+    {
+      "id": "region_north_central",
+      "entity_type": "region",
+      "schema_version": "1.0",
+      "identity": {
+        "name_vi": "Bắc Trung Bộ",
+        "aliases": []
+      },
+      "status": "under_review",
+      "version": 1,
+      "extensions": {}
+    },
+    {
+      "id": "region_hanoi",
+      "entity_type": "region",
+      "schema_version": "1.0",
+      "identity": {
+        "name_vi": "Hà Nội",
+        "aliases": []
+      },
+      "status": "under_review",
+      "version": 1,
+      "extensions": {}
+    },
+    {
+      "id": "region_kinh_bac",
+      "entity_type": "region",
+      "schema_version": "1.0",
+      "identity": {
+        "name_vi": "Kinh Bắc",
+        "aliases": [
+          "Bắc Ninh - Bắc Giang cultural area"
+        ]
+      },
+      "status": "under_review",
+      "version": 1,
+      "extensions": {}
+    },
+    {
+      "id": "period_ly_tran",
+      "entity_type": "period",
+      "schema_version": "1.0",
+      "identity": {
+        "name_vi": "Thời Lý–Trần",
+        "aliases": []
+      },
+      "status": "under_review",
+      "version": 1,
+      "extensions": {}
+    },
+    {
+      "id": "period_17_19c",
+      "entity_type": "period",
+      "schema_version": "1.0",
+      "identity": {
+        "name_vi": "Thế kỷ XVII–XIX",
+        "aliases": []
+      },
+      "status": "under_review",
+      "version": 1,
+      "extensions": {}
+    },
+    {
+      "id": "period_early20",
+      "entity_type": "period",
+      "schema_version": "1.0",
+      "identity": {
+        "name_vi": "Đầu thế kỷ XX",
+        "aliases": []
+      },
+      "status": "under_review",
+      "version": 1,
+      "extensions": {}
+    },
+    {
+      "id": "period_1914_1920",
+      "entity_type": "period",
+      "schema_version": "1.0",
+      "identity": {
+        "name_vi": "1914–1920",
+        "aliases": []
+      },
+      "status": "under_review",
+      "version": 1,
+      "extensions": {}
+    },
+    {
+      "id": "period_modern_stage",
+      "entity_type": "period",
+      "schema_version": "1.0",
+      "identity": {
+        "name_vi": "Hiện đại / sân khấu",
+        "aliases": []
+      },
+      "status": "under_review",
+      "version": 1,
+      "extensions": {}
+    },
+    {
+      "id": "context_daily_labor",
+      "entity_type": "occasion",
+      "schema_version": "1.0",
+      "identity": {
+        "name_vi": "Lao động / sinh hoạt thường nhật",
+        "aliases": []
+      },
+      "status": "under_review",
+      "version": 1,
+      "extensions": {}
+    },
+    {
+      "id": "context_market_trade",
+      "entity_type": "occasion",
+      "schema_version": "1.0",
+      "identity": {
+        "name_vi": "Tiểu thương / chợ",
+        "aliases": []
+      },
+      "status": "under_review",
+      "version": 1,
+      "extensions": {}
+    },
+    {
+      "id": "context_festival",
+      "entity_type": "occasion",
+      "schema_version": "1.0",
+      "identity": {
+        "name_vi": "Lễ hội",
+        "aliases": []
+      },
+      "status": "under_review",
+      "version": 1,
+      "extensions": {}
+    },
+    {
+      "id": "context_religious_visit",
+      "entity_type": "occasion",
+      "schema_version": "1.0",
+      "identity": {
+        "name_vi": "Đi lễ đình/chùa",
+        "aliases": []
+      },
+      "status": "under_review",
+      "version": 1,
+      "extensions": {}
+    },
+    {
+      "id": "context_quan_ho",
+      "entity_type": "occasion",
+      "schema_version": "1.0",
+      "identity": {
+        "name_vi": "Sinh hoạt/hội hát Quan họ",
+        "aliases": []
+      },
+      "status": "under_review",
+      "version": 1,
+      "extensions": {}
+    },
+    {
+      "id": "accessory_quan_ho_large_round_hat",
+      "entity_type": "accessory",
+      "schema_version": "1.0",
+      "identity": {
+        "name_vi": "Mũ/nón tròn lớn trong phục trang nữ Quan họ",
+        "aliases": []
+      },
+      "status": "under_review",
+      "version": 1,
+      "extensions": {}
+    }
+  ],
+  "attribute_definitions": [
+    {
+      "key": "historical.origin_exact",
+      "label_vi": "Nguồn gốc chính xác",
+      "description": null,
+      "value_type": "string",
+      "cardinality": "single",
+      "allowed_values": null,
+      "applies_to": [
+        "garment"
+      ],
+      "contextual": true,
+      "queryable": true,
+      "inheritable": false,
+      "default_missing_state": "not_collected",
+      "status": "active",
+      "version": 1
+    },
+    {
+      "key": "construction.panel.count",
+      "label_vi": "Số thân/panel chính",
+      "description": null,
+      "value_type": "number",
+      "cardinality": "single",
+      "allowed_values": null,
+      "applies_to": [
+        "garment",
+        "garment_variant"
+      ],
+      "contextual": true,
+      "queryable": true,
+      "inheritable": true,
+      "default_missing_state": "not_collected",
+      "status": "active",
+      "version": 1
+    },
+    {
+      "key": "construction.fabric.width_cm",
+      "label_vi": "Khổ vải truyền thống ước tính",
+      "description": null,
+      "value_type": "measurement",
+      "cardinality": "single",
+      "allowed_values": null,
+      "applies_to": [
+        "garment"
+      ],
+      "contextual": true,
+      "queryable": true,
+      "inheritable": true,
+      "default_missing_state": "not_collected",
+      "status": "active",
+      "version": 1
+    },
+    {
+      "key": "construction.back.join",
+      "label_vi": "Cách ghép thân sau",
+      "description": null,
+      "value_type": "enum",
+      "cardinality": "single",
+      "allowed_values": [
+        "center_back_seam",
+        "varied"
+      ],
+      "applies_to": [
+        "garment"
+      ],
+      "contextual": true,
+      "queryable": true,
+      "inheritable": true,
+      "default_missing_state": "not_collected",
+      "status": "active",
+      "version": 1
+    },
+    {
+      "key": "construction.front.panels",
+      "label_vi": "Trạng thái hai thân trước",
+      "description": null,
+      "value_type": "enum",
+      "cardinality": "single",
+      "allowed_values": [
+        "separate_open",
+        "overlapping_closure",
+        "varied"
+      ],
+      "applies_to": [
+        "garment"
+      ],
+      "contextual": true,
+      "queryable": true,
+      "inheritable": true,
+      "default_missing_state": "not_collected",
+      "status": "active",
+      "version": 1
+    },
+    {
+      "key": "construction.front.button_closure",
+      "label_vi": "Cúc đóng hai vạt trước",
+      "description": null,
+      "value_type": "boolean",
+      "cardinality": "single",
+      "allowed_values": null,
+      "applies_to": [
+        "garment"
+      ],
+      "contextual": true,
+      "queryable": true,
+      "inheritable": true,
+      "default_missing_state": "not_collected",
+      "status": "active",
+      "version": 1
+    },
+    {
+      "key": "construction.side.slits",
+      "label_vi": "Xẻ hai bên sườn",
+      "description": null,
+      "value_type": "boolean",
+      "cardinality": "single",
+      "allowed_values": null,
+      "applies_to": [
+        "garment"
+      ],
+      "contextual": true,
+      "queryable": true,
+      "inheritable": true,
+      "default_missing_state": "not_collected",
+      "status": "active",
+      "version": 1
+    },
+    {
+      "key": "construction.armhole.system",
+      "label_vi": "Kết cấu vai/nách/tay",
+      "description": null,
+      "value_type": "enum",
+      "cardinality": "single",
+      "allowed_values": [
+        "no_modern_armscye_shoulder_sleeve_join",
+        "modern_set_in",
+        "varied"
+      ],
+      "applies_to": [
+        "garment"
+      ],
+      "contextual": true,
+      "queryable": true,
+      "inheritable": true,
+      "default_missing_state": "not_collected",
+      "status": "active",
+      "version": 1
+    },
+    {
+      "key": "construction.body.length",
+      "label_vi": "Độ dài thân áo",
+      "description": null,
+      "value_type": "enum",
+      "cardinality": "single",
+      "allowed_values": [
+        "below_knee",
+        "near_ankle",
+        "varied"
+      ],
+      "applies_to": [
+        "garment",
+        "garment_variant",
+        "wearing_ensemble"
+      ],
+      "contextual": true,
+      "queryable": true,
+      "inheritable": true,
+      "default_missing_state": "not_collected",
+      "status": "active",
+      "version": 1
+    },
+    {
+      "key": "construction.cuff.form",
+      "label_vi": "Cổ tay",
+      "description": null,
+      "value_type": "enum",
+      "cardinality": "single",
+      "allowed_values": [
+        "narrow_with_small_slit",
+        "wide",
+        "varied"
+      ],
+      "applies_to": [
+        "garment"
+      ],
+      "contextual": true,
+      "queryable": true,
+      "inheritable": true,
+      "default_missing_state": "not_collected",
+      "status": "active",
+      "version": 1
+    },
+    {
+      "key": "wearing.front_panel.mode",
+      "label_vi": "Cách xử lý hai vạt trước khi mặc",
+      "description": null,
+      "value_type": "enum",
+      "cardinality": "single",
+      "allowed_values": [
+        "overlap",
+        "tie_at_waist",
+        "hang_loose",
+        "varied"
+      ],
+      "applies_to": [
+        "garment",
+        "wearing_ensemble"
+      ],
+      "contextual": true,
+      "queryable": true,
+      "inheritable": true,
+      "default_missing_state": "not_collected",
+      "status": "active",
+      "version": 1
+    },
+    {
+      "key": "wearing.lower_garment",
+      "label_vi": "Trang phục phần dưới",
+      "description": null,
+      "value_type": "entity_ref",
+      "cardinality": "single",
+      "allowed_values": null,
+      "applies_to": [
+        "wearing_ensemble"
+      ],
+      "contextual": true,
+      "queryable": true,
+      "inheritable": true,
+      "default_missing_state": "not_collected",
+      "status": "active",
+      "version": 1
+    },
+    {
+      "key": "wearing.inner_blouse",
+      "label_vi": "Áo lớp trong",
+      "description": null,
+      "value_type": "entity_ref",
+      "cardinality": "single",
+      "allowed_values": null,
+      "applies_to": [
+        "wearing_ensemble"
+      ],
+      "contextual": true,
+      "queryable": true,
+      "inheritable": true,
+      "default_missing_state": "not_collected",
+      "status": "active",
+      "version": 1
+    },
+    {
+      "key": "wearing.base_bodice",
+      "label_vi": "Lớp yếm",
+      "description": null,
+      "value_type": "entity_ref",
+      "cardinality": "single",
+      "allowed_values": null,
+      "applies_to": [
+        "wearing_ensemble"
+      ],
+      "contextual": true,
+      "queryable": true,
+      "inheritable": true,
+      "default_missing_state": "not_collected",
+      "status": "active",
+      "version": 1
+    },
+    {
+      "key": "wearing.waist_sash",
+      "label_vi": "Thắt lưng",
+      "description": null,
+      "value_type": "entity_ref",
+      "cardinality": "single",
+      "allowed_values": null,
+      "applies_to": [
+        "wearing_ensemble"
+      ],
+      "contextual": true,
+      "queryable": true,
+      "inheritable": true,
+      "default_missing_state": "not_collected",
+      "status": "active",
+      "version": 1
+    },
+    {
+      "key": "visual.outer.palette",
+      "label_vi": "Bảng màu áo ngoài",
+      "description": null,
+      "value_type": "enum",
+      "cardinality": "single",
+      "allowed_values": [
+        "dark_brown_black",
+        "muted_natural",
+        "bright_stage",
+        "varied"
+      ],
+      "applies_to": [
+        "wearing_ensemble",
+        "garment_variant"
+      ],
+      "contextual": true,
+      "queryable": true,
+      "inheritable": true,
+      "default_missing_state": "not_collected",
+      "status": "active",
+      "version": 1
+    },
+    {
+      "key": "visual.inner.palette",
+      "label_vi": "Bảng màu lớp trong",
+      "description": null,
+      "value_type": "enum",
+      "cardinality": "single",
+      "allowed_values": [
+        "bright_accents",
+        "muted",
+        "varied"
+      ],
+      "applies_to": [
+        "wearing_ensemble"
+      ],
+      "contextual": true,
+      "queryable": true,
+      "inheritable": true,
+      "default_missing_state": "not_collected",
+      "status": "active",
+      "version": 1
+    },
+    {
+      "key": "material.outer.options",
+      "label_vi": "Chất liệu áo ngoài được ghi nhận",
+      "description": null,
+      "value_type": "entity_ref_list",
+      "cardinality": "multiple",
+      "allowed_values": null,
+      "applies_to": [
+        "wearing_ensemble"
+      ],
+      "contextual": true,
+      "queryable": true,
+      "inheritable": true,
+      "default_missing_state": "not_collected",
+      "status": "active",
+      "version": 1
+    },
+    {
+      "key": "usage.profile",
+      "label_vi": "Profile sử dụng",
+      "description": null,
+      "value_type": "enum",
+      "cardinality": "single",
+      "allowed_values": [
+        "daily_rural",
+        "urban_working_early20",
+        "festival",
+        "quan_ho",
+        "stage",
+        "varied"
+      ],
+      "applies_to": [
+        "wearing_ensemble",
+        "garment_variant"
+      ],
+      "contextual": true,
+      "queryable": true,
+      "inheritable": true,
+      "default_missing_state": "not_collected",
+      "status": "active",
+      "version": 1
+    }
+  ],
+  "attribute_values": [
+    {
+      "id": "av_origin",
+      "entity_id": "garment_ao_tu_than",
+      "attribute_key": "historical.origin_exact",
+      "state": "unknown",
+      "value": null,
+      "candidate_values": [],
+      "qualifiers": {
+        "period_ids": [],
+        "region_ids": [],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "assertion_ids": [
+        "assert_origin_unknown"
+      ]
+    },
+    {
+      "id": "av_panel_count",
+      "entity_id": "garment_ao_tu_than",
+      "attribute_key": "construction.panel.count",
+      "state": "known",
+      "value": 4,
+      "candidate_values": [],
+      "qualifiers": {
+        "period_ids": [],
+        "region_ids": [],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "assertion_ids": [
+        "assert_four_panel_structure"
+      ]
+    },
+    {
+      "id": "av_fabric_width",
+      "entity_id": "garment_ao_tu_than",
+      "attribute_key": "construction.fabric.width_cm",
+      "state": "known",
+      "value": {
+        "min": 35,
+        "max": 40,
+        "unit": "cm"
+      },
+      "candidate_values": [],
+      "qualifiers": {
+        "period_ids": [],
+        "region_ids": [],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "assertion_ids": [
+        "assert_narrow_fabric_width"
+      ]
+    },
+    {
+      "id": "av_back_join",
+      "entity_id": "garment_ao_tu_than",
+      "attribute_key": "construction.back.join",
+      "state": "known",
+      "value": "center_back_seam",
+      "candidate_values": [],
+      "qualifiers": {
+        "period_ids": [],
+        "region_ids": [],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "assertion_ids": [
+        "assert_four_panel_structure"
+      ]
+    },
+    {
+      "id": "av_front_panels",
+      "entity_id": "garment_ao_tu_than",
+      "attribute_key": "construction.front.panels",
+      "state": "known",
+      "value": "separate_open",
+      "candidate_values": [],
+      "qualifiers": {
+        "period_ids": [],
+        "region_ids": [],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "assertion_ids": [
+        "assert_four_panel_structure"
+      ]
+    },
+    {
+      "id": "av_front_buttons",
+      "entity_id": "garment_ao_tu_than",
+      "attribute_key": "construction.front.button_closure",
+      "state": "known",
+      "value": false,
+      "candidate_values": [],
+      "qualifiers": {
+        "period_ids": [],
+        "region_ids": [],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "assertion_ids": [
+        "assert_no_front_buttons"
+      ]
+    },
+    {
+      "id": "av_side_slits",
+      "entity_id": "garment_ao_tu_than",
+      "attribute_key": "construction.side.slits",
+      "state": "known",
+      "value": true,
+      "candidate_values": [],
+      "qualifiers": {
+        "period_ids": [],
+        "region_ids": [],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "assertion_ids": [
+        "assert_side_slits"
+      ]
+    },
+    {
+      "id": "av_armhole",
+      "entity_id": "garment_ao_tu_than",
+      "attribute_key": "construction.armhole.system",
+      "state": "known",
+      "value": "no_modern_armscye_shoulder_sleeve_join",
+      "candidate_values": [],
+      "qualifiers": {
+        "period_ids": [],
+        "region_ids": [],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "assertion_ids": [
+        "assert_armhole_construction"
+      ]
+    },
+    {
+      "id": "av_body_length",
+      "entity_id": "garment_ao_tu_than",
+      "attribute_key": "construction.body.length",
+      "state": "known",
+      "value": "below_knee",
+      "candidate_values": [],
+      "qualifiers": {
+        "period_ids": [],
+        "region_ids": [],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "assertion_ids": [
+        "assert_length_below_knee"
+      ]
+    },
+    {
+      "id": "av_cuff",
+      "entity_id": "garment_ao_tu_than",
+      "attribute_key": "construction.cuff.form",
+      "state": "known",
+      "value": "narrow_with_small_slit",
+      "candidate_values": [],
+      "qualifiers": {
+        "period_ids": [],
+        "region_ids": [],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "assertion_ids": [
+        "assert_cuff_small_slit"
+      ]
+    },
+    {
+      "id": "av_front_wearing_family",
+      "entity_id": "garment_ao_tu_than",
+      "attribute_key": "wearing.front_panel.mode",
+      "state": "known",
+      "value": "varied",
+      "candidate_values": [],
+      "qualifiers": {
+        "period_ids": [],
+        "region_ids": [],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "assertion_ids": [
+        "assert_front_mode_contextual"
+      ]
+    },
+    {
+      "id": "av_rural_inner_blouse",
+      "entity_id": "ensemble_ao_tu_than_rural_north",
+      "attribute_key": "wearing.inner_blouse",
+      "state": "known",
+      "value": "garment_ao_canh_ngan",
+      "candidate_values": [],
+      "qualifiers": {
+        "period_ids": [],
+        "region_ids": [
+          "region_northern_delta"
+        ],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "assertion_ids": [
+        "assert_layering_bktt"
+      ]
+    },
+    {
+      "id": "av_rural_yem",
+      "entity_id": "ensemble_ao_tu_than_rural_north",
+      "attribute_key": "wearing.base_bodice",
+      "state": "known",
+      "value": "garment_yem",
+      "candidate_values": [],
+      "qualifiers": {
+        "period_ids": [],
+        "region_ids": [
+          "region_northern_delta"
+        ],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "assertion_ids": [
+        "assert_layering_bktt"
+      ]
+    },
+    {
+      "id": "av_rural_lower",
+      "entity_id": "ensemble_ao_tu_than_rural_north",
+      "attribute_key": "wearing.lower_garment",
+      "state": "known",
+      "value": "garment_vay_quay",
+      "candidate_values": [],
+      "qualifiers": {
+        "period_ids": [],
+        "region_ids": [
+          "region_northern_delta"
+        ],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "assertion_ids": [
+        "assert_layering_bktt"
+      ]
+    },
+    {
+      "id": "av_rural_outer_palette",
+      "entity_id": "ensemble_ao_tu_than_rural_north",
+      "attribute_key": "visual.outer.palette",
+      "state": "known",
+      "value": "dark_brown_black",
+      "candidate_values": [],
+      "qualifiers": {
+        "period_ids": [],
+        "region_ids": [
+          "region_northern_delta"
+        ],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [
+          "context_daily_labor"
+        ],
+        "social_context_ids": []
+      },
+      "assertion_ids": [
+        "assert_daily_dark_outer"
+      ]
+    },
+    {
+      "id": "av_rural_inner_palette",
+      "entity_id": "ensemble_ao_tu_than_rural_north",
+      "attribute_key": "visual.inner.palette",
+      "state": "known",
+      "value": "bright_accents",
+      "candidate_values": [],
+      "qualifiers": {
+        "period_ids": [],
+        "region_ids": [
+          "region_northern_delta"
+        ],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "assertion_ids": [
+        "assert_bright_inner_accents"
+      ]
+    },
+    {
+      "id": "av_hanoi_front_mode",
+      "entity_id": "ensemble_ao_tu_than_hanoi_1914_1920",
+      "attribute_key": "wearing.front_panel.mode",
+      "state": "known",
+      "value": "tie_at_waist",
+      "candidate_values": [],
+      "qualifiers": {
+        "period_ids": [
+          "period_1914_1920"
+        ],
+        "region_ids": [
+          "region_hanoi"
+        ],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "assertion_ids": [
+        "assert_hanoi_1914_1920_profile"
+      ]
+    },
+    {
+      "id": "av_hanoi_yem",
+      "entity_id": "ensemble_ao_tu_than_hanoi_1914_1920",
+      "attribute_key": "wearing.base_bodice",
+      "state": "known",
+      "value": "garment_yem",
+      "candidate_values": [],
+      "qualifiers": {
+        "period_ids": [
+          "period_1914_1920"
+        ],
+        "region_ids": [
+          "region_hanoi"
+        ],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "assertion_ids": [
+        "assert_hanoi_1914_1920_profile"
+      ]
+    },
+    {
+      "id": "av_hanoi_lower",
+      "entity_id": "ensemble_ao_tu_than_hanoi_1914_1920",
+      "attribute_key": "wearing.lower_garment",
+      "state": "known",
+      "value": "garment_vay_quay",
+      "candidate_values": [],
+      "qualifiers": {
+        "period_ids": [
+          "period_1914_1920"
+        ],
+        "region_ids": [
+          "region_hanoi"
+        ],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "assertion_ids": [
+        "assert_hanoi_1914_1920_profile"
+      ]
+    },
+    {
+      "id": "av_hanoi_sash",
+      "entity_id": "ensemble_ao_tu_than_hanoi_1914_1920",
+      "attribute_key": "wearing.waist_sash",
+      "state": "known",
+      "value": "accessory_that_lung_lua",
+      "candidate_values": [],
+      "qualifiers": {
+        "period_ids": [
+          "period_1914_1920"
+        ],
+        "region_ids": [
+          "region_hanoi"
+        ],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "assertion_ids": [
+        "assert_hanoi_1914_1920_profile"
+      ]
+    },
+    {
+      "id": "av_hanoi_outer_palette",
+      "entity_id": "ensemble_ao_tu_than_hanoi_1914_1920",
+      "attribute_key": "visual.outer.palette",
+      "state": "known",
+      "value": "dark_brown_black",
+      "candidate_values": [],
+      "qualifiers": {
+        "period_ids": [
+          "period_1914_1920"
+        ],
+        "region_ids": [
+          "region_hanoi"
+        ],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "assertion_ids": [
+        "assert_hanoi_1914_1920_profile"
+      ]
+    },
+    {
+      "id": "av_hanoi_inner_palette",
+      "entity_id": "ensemble_ao_tu_than_hanoi_1914_1920",
+      "attribute_key": "visual.inner.palette",
+      "state": "known",
+      "value": "bright_accents",
+      "candidate_values": [],
+      "qualifiers": {
+        "period_ids": [
+          "period_1914_1920"
+        ],
+        "region_ids": [
+          "region_hanoi"
+        ],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "assertion_ids": [
+        "assert_hanoi_1914_1920_profile"
+      ]
+    },
+    {
+      "id": "av_hanoi_materials",
+      "entity_id": "ensemble_ao_tu_than_hanoi_1914_1920",
+      "attribute_key": "material.outer.options",
+      "state": "known",
+      "value": [
+        "brown_cloth",
+        "the",
+        "raw_silk"
+      ],
+      "candidate_values": [],
+      "qualifiers": {
+        "period_ids": [
+          "period_1914_1920"
+        ],
+        "region_ids": [
+          "region_hanoi"
+        ],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "assertion_ids": [
+        "assert_hanoi_materials"
+      ]
+    },
+    {
+      "id": "av_hanoi_usage",
+      "entity_id": "ensemble_ao_tu_than_hanoi_1914_1920",
+      "attribute_key": "usage.profile",
+      "state": "known",
+      "value": "urban_working_early20",
+      "candidate_values": [],
+      "qualifiers": {
+        "period_ids": [
+          "period_1914_1920"
+        ],
+        "region_ids": [
+          "region_hanoi"
+        ],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "assertion_ids": [
+        "assert_hanoi_1914_1920_profile"
+      ]
+    },
+    {
+      "id": "av_stage_palette",
+      "entity_id": "variant_ao_tu_than_modern_stage",
+      "attribute_key": "visual.outer.palette",
+      "state": "known",
+      "value": "bright_stage",
+      "candidate_values": [],
+      "qualifiers": {
+        "period_ids": [
+          "period_modern_stage"
+        ],
+        "region_ids": [],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "assertion_ids": [
+        "assert_stage_colorful_modern"
+      ]
+    },
+    {
+      "id": "av_stage_usage",
+      "entity_id": "variant_ao_tu_than_modern_stage",
+      "attribute_key": "usage.profile",
+      "state": "known",
+      "value": "stage",
+      "candidate_values": [],
+      "qualifiers": {
+        "period_ids": [
+          "period_modern_stage"
+        ],
+        "region_ids": [],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "assertion_ids": [
+        "assert_stage_colorful_modern"
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "id": "src_bktt_ao_tu_than",
+      "source_type": "national_encyclopedia",
+      "title": "Áo tứ thân",
+      "institution": "Bách khoa Toàn thư Việt Nam / Đề án Biên soạn Bách khoa toàn thư Việt Nam",
+      "publication_date": null,
+      "url": "https://bktt.vn/%C3%81o_t%E1%BB%A9_th%C3%A2n",
+      "accessed_at": "2026-09-19",
+      "trust_tier": "B_SCHOLARLY_INSTITUTIONAL",
+      "review_status": "verified_source",
+      "rights": {
+        "may_store_metadata": true,
+        "may_store_full_text": false,
+        "may_display_publicly": false,
+        "may_use_for_ai_reference": false,
+        "license_note": "Page indicates CC BY-SA site content; image rights may differ.",
+        "status": "text_fact_extraction_only"
+      }
+    },
+    {
+      "id": "src_mofa_slovakia_2026_traditional_clothing",
+      "source_type": "official_institution_web",
+      "title": "Tradičné vietnamské odevy",
+      "institution": "Đại sứ quán Việt Nam tại Slovakia / Bộ Ngoại giao",
+      "publication_date": "2026-09-18",
+      "url": "https://vnembassy-bratislava.mofa.gov.vn/en/tin-chi-tiet/chi-tiet/tradicne-vietnamske-odevy-62130-1638.html",
+      "accessed_at": "2026-09-19",
+      "trust_tier": "C_INSTITUTIONAL",
+      "review_status": "verified_source",
+      "rights": {
+        "may_store_metadata": true,
+        "may_store_full_text": false,
+        "may_display_publicly": false,
+        "may_use_for_ai_reference": false,
+        "status": "review_required"
+      }
+    },
+    {
+      "id": "src_hanoi_museum_2026_early20_women",
+      "source_type": "museum_research_web",
+      "title": "Phụ nữ Hà Nội trong trang phục truyền thống đầu thế kỉ 20: Vẻ đẹp của sự giao thời",
+      "institution": "Bảo tàng Hà Nội",
+      "publication_date": "2026-09-11",
+      "url": "https://baotanghanoi.com.vn/en/phu-nu-ha-noi-trong-trang-phuc-truyen-thong-dau-the-ki-20-ve-dep-cua-su-giao-thoi/",
+      "accessed_at": "2026-09-19",
+      "trust_tier": "B_MUSEUM_INSTITUTIONAL",
+      "review_status": "verified_source",
+      "rights": {
+        "may_store_metadata": true,
+        "may_store_full_text": false,
+        "may_display_publicly": false,
+        "may_use_for_ai_reference": false,
+        "status": "review_required"
+      }
+    },
+    {
+      "id": "src_vwu_2017_ao_tu_than",
+      "source_type": "official_association_web",
+      "title": "Áo tứ thân - trang phục truyền thống của phụ nữ Việt",
+      "institution": "Hội Liên hiệp Phụ nữ Việt Nam",
+      "publication_date": "2017-08-09",
+      "url": "https://vwu.vn/en_US/web/guest/tin-chi-tiet/-/chi-tiet/ao-tu-than-trang-phuc-truyen-thong-cua-phu-nu-viet-25511-4513.html",
+      "accessed_at": "2026-09-19",
+      "trust_tier": "C_INSTITUTIONAL",
+      "review_status": "verified_source_selective_use",
+      "rights": {
+        "may_store_metadata": true,
+        "may_store_full_text": false,
+        "may_display_publicly": false,
+        "may_use_for_ai_reference": false,
+        "status": "review_required"
+      },
+      "quality_note": "Có các đoạn truyền thuyết/giả thuyết nguồn gốc; strict mode chỉ dùng các mô tả cấu trúc/current usage có thể đối chiếu."
+    },
+    {
+      "id": "src_vietnam_womens_museum_fashion",
+      "source_type": "museum_web",
+      "title": "Thời trang và nghệ thuật tạo hoa văn",
+      "institution": "Bảo tàng Phụ nữ Việt Nam",
+      "publication_date": null,
+      "url": "https://baotangphunu.org.vn/thoi-trang-va-nghe-thuat-tao-hoa-van/",
+      "accessed_at": "2026-09-19",
+      "trust_tier": "B_MUSEUM_INSTITUTIONAL",
+      "review_status": "verified_source",
+      "rights": {
+        "may_store_metadata": true,
+        "may_store_full_text": false,
+        "may_display_publicly": false,
+        "may_use_for_ai_reference": false,
+        "status": "review_required"
+      }
+    },
+    {
+      "id": "src_vnmh_2015_ao_dai_culture",
+      "source_type": "national_museum_web",
+      "title": "Nét đẹp văn hóa trong tà áo dài của phụ nữ Việt",
+      "institution": "Bảo tàng Lịch sử Quốc gia",
+      "publication_date": "2015-07-29",
+      "url": "https://baotanglichsuquocgia.vn/vi/Articles/2001/66839/net-djep-van-hoa-trong-ta-ao-dai-cua-phu-nu-viet.html",
+      "accessed_at": "2026-09-19",
+      "trust_tier": "C_INSTITUTIONAL",
+      "review_status": "verified_source_selective_use",
+      "rights": {
+        "may_store_metadata": true,
+        "may_store_full_text": false,
+        "may_display_publicly": false,
+        "may_use_for_ai_reference": false,
+        "status": "review_required"
+      }
+    },
+    {
+      "id": "src_unesco_2009_quan_ho",
+      "source_type": "international_heritage_record",
+      "title": "Quan Họ Bắc Ninh folk songs",
+      "institution": "UNESCO Intangible Cultural Heritage",
+      "publication_date": "2009",
+      "url": "https://ich.unesco.org/en/RL/quan-ho-bac-ninh-folk-songs-00183",
+      "accessed_at": "2026-09-19",
+      "trust_tier": "A_PRIMARY_FOR_HERITAGE_STATUS",
+      "review_status": "verified_source",
+      "rights": {
+        "may_store_metadata": true,
+        "may_store_full_text": false,
+        "may_display_publicly": false,
+        "may_use_for_ai_reference": false,
+        "status": "review_required"
+      }
+    },
+    {
+      "id": "src_bacninh_svhttdl_2026_tram_kinh_bac",
+      "source_type": "official_institution_web",
+      "title": "Độc đáo không gian Trải nghiệm văn hóa “Trạm Kinh Bắc”",
+      "institution": "Sở Văn hóa, Thể thao và Du lịch Bắc Ninh",
+      "publication_date": "2026-06-12",
+      "url": "https://svhttdl.bacninh.gov.vn/vi/news/-/details/188850/-oc-ao-khong-gian-trai-nghiem-van-hoa-tram-kinh-bac-126206401",
+      "accessed_at": "2026-09-19",
+      "trust_tier": "C_INSTITUTIONAL",
+      "review_status": "verified_source",
+      "rights": {
+        "may_store_metadata": true,
+        "may_store_full_text": false,
+        "may_display_publicly": false,
+        "may_use_for_ai_reference": false,
+        "status": "review_required"
+      }
+    },
+    {
+      "id": "src_commons_ao_tu_than_2006",
+      "source_type": "open_media_record",
+      "title": "File: Áo tứ thân.jpg",
+      "institution": "Wikimedia Commons",
+      "publication_date": "2006-11-14",
+      "url": "https://commons.wikimedia.org/wiki/File:%C3%81o_t%E1%BB%A9_th%C3%A2n.jpg",
+      "accessed_at": "2026-09-19",
+      "trust_tier": "MEDIA_ONLY",
+      "review_status": "license_verified_classification_under_review",
+      "rights": {
+        "may_store_metadata": true,
+        "may_store_full_text": false,
+        "may_display_publicly": true,
+        "may_use_for_ai_reference": false,
+        "license": "CC BY-SA 2.0",
+        "status": "classification_and_ai_use_review_required"
+      }
+    },
+    {
+      "id": "src_commons_ao_tu_than_2017",
+      "source_type": "open_media_record",
+      "title": "File: Ao Tu Than.jpg",
+      "institution": "Wikimedia Commons",
+      "publication_date": "2017-02-08",
+      "url": "https://commons.wikimedia.org/wiki/File:Ao_Tu_Than.jpg",
+      "accessed_at": "2026-09-19",
+      "trust_tier": "MEDIA_ONLY",
+      "review_status": "license_verified_modern_representation",
+      "rights": {
+        "may_store_metadata": true,
+        "may_store_full_text": false,
+        "may_display_publicly": true,
+        "may_use_for_ai_reference": false,
+        "license": "CC BY-SA 4.0",
+        "status": "ai_reference_policy_review_required"
+      }
+    }
+  ],
+  "assertions": [
+    {
+      "id": "assert_origin_unknown",
+      "subject_id": "garment_ao_tu_than",
+      "predicate": "historical.origin_exact",
+      "value": "unknown",
+      "qualifiers": {
+        "period_ids": [],
+        "region_ids": [],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "statement_vi": "Nguồn gốc chính xác của áo tứ thân không nên được khóa thành một năm hay một truyền thuyết duy nhất.",
+      "evidence": [
+        {
+          "source_id": "src_vwu_2017_ao_tu_than",
+          "locator": "đoạn nêu chưa biết rõ nguồn gốc chính xác"
+        },
+        {
+          "source_id": "src_bktt_ao_tu_than",
+          "locator": "mục từ mô tả phạm vi lịch sử nhưng không xác lập một năm khởi nguyên"
+        }
+      ],
+      "confidence": 0.95,
+      "consensus": "corroborated",
+      "review_status": "verified",
+      "version": 1
+    },
+    {
+      "id": "assert_four_panel_structure",
+      "subject_id": "garment_ao_tu_than",
+      "predicate": "construction.panel_structure",
+      "value": {
+        "panel_count": 4,
+        "back": "two_joined_center_seam",
+        "front": "two_separate"
+      },
+      "qualifiers": {
+        "period_ids": [],
+        "region_ids": [],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "statement_vi": "Áo tứ thân truyền thống có bốn khổ/thân chính; hai thân sau ghép dọc sống lưng và hai thân trước để tách rời.",
+      "evidence": [
+        {
+          "source_id": "src_bktt_ao_tu_than",
+          "locator": "đoạn cấu trúc bốn khổ vải và đường may sống lưng"
+        },
+        {
+          "source_id": "src_mofa_slovakia_2026_traditional_clothing",
+          "locator": "mục Tứ Thân: four panels, back center seam, front separated"
+        }
+      ],
+      "confidence": 0.99,
+      "consensus": "strong_consensus",
+      "review_status": "verified",
+      "version": 1
+    },
+    {
+      "id": "assert_narrow_fabric_width",
+      "subject_id": "garment_ao_tu_than",
+      "predicate": "construction.fabric_width_cm",
+      "value": {
+        "min": 35,
+        "max": 40
+      },
+      "qualifiers": {
+        "period_ids": [],
+        "region_ids": [],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "statement_vi": "Nhiều mô tả giải thích cấu trúc bốn thân trong bối cảnh khổ vải dệt thủ công hẹp khoảng 35–40 cm.",
+      "evidence": [
+        {
+          "source_id": "src_bktt_ao_tu_than",
+          "locator": "đoạn khổ vải truyền thống khoảng 40 cm"
+        },
+        {
+          "source_id": "src_mofa_slovakia_2026_traditional_clothing",
+          "locator": "mục Tứ Thân: 35–40 cm"
+        }
+      ],
+      "confidence": 0.94,
+      "consensus": "corroborated",
+      "review_status": "verified",
+      "version": 1
+    },
+    {
+      "id": "assert_no_front_buttons",
+      "subject_id": "garment_ao_tu_than",
+      "predicate": "construction.front_button_closure",
+      "value": false,
+      "qualifiers": {
+        "period_ids": [],
+        "region_ids": [],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "statement_vi": "Hai thân trước của profile truyền thống không dùng hàng cúc để đóng kín như áo ngũ thân.",
+      "evidence": [
+        {
+          "source_id": "src_bktt_ao_tu_than",
+          "locator": "đoạn hai vạt trước tách rời, không có cúc cài"
+        }
+      ],
+      "confidence": 0.93,
+      "consensus": "single_source",
+      "review_status": "verified_high_confidence",
+      "version": 1
+    },
+    {
+      "id": "assert_side_slits",
+      "subject_id": "garment_ao_tu_than",
+      "predicate": "construction.side_slits",
+      "value": true,
+      "qualifiers": {
+        "period_ids": [],
+        "region_ids": [],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "statement_vi": "Áo có xẻ tà ở hai bên sườn trong mô tả cấu trúc truyền thống.",
+      "evidence": [
+        {
+          "source_id": "src_bktt_ao_tu_than",
+          "locator": "đoạn xẻ tà hai bên sườn"
+        }
+      ],
+      "confidence": 0.92,
+      "consensus": "single_source",
+      "review_status": "verified_high_confidence",
+      "version": 1
+    },
+    {
+      "id": "assert_armhole_construction",
+      "subject_id": "garment_ao_tu_than",
+      "predicate": "construction.armhole_system",
+      "value": "no_modern_armscye_shoulder_sleeve_join",
+      "qualifiers": {
+        "period_ids": [],
+        "region_ids": [],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "statement_vi": "Mô tả Bách khoa ghi áo không có đường khoét nách kiểu hiện đại, mà có đường nối vai với tay áo.",
+      "evidence": [
+        {
+          "source_id": "src_bktt_ao_tu_than",
+          "locator": "đoạn không có đường khoét nách, nối vai với tay áo"
+        }
+      ],
+      "confidence": 0.9,
+      "consensus": "single_source",
+      "review_status": "verified_high_confidence",
+      "version": 1
+    },
+    {
+      "id": "assert_cuff_small_slit",
+      "subject_id": "garment_ao_tu_than",
+      "predicate": "construction.cuff_form",
+      "value": "narrow_with_small_slit",
+      "qualifiers": {
+        "period_ids": [],
+        "region_ids": [],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "statement_vi": "Một mô tả cấu trúc truyền thống ghi cổ tay hẹp và có rãnh xẻ nhỏ để dễ xỏ tay.",
+      "evidence": [
+        {
+          "source_id": "src_bktt_ao_tu_than",
+          "locator": "đoạn cổ tay hẹp, xẻ rãnh vài phân"
+        }
+      ],
+      "confidence": 0.86,
+      "consensus": "single_source",
+      "review_status": "verified_high_confidence",
+      "version": 1
+    },
+    {
+      "id": "assert_length_below_knee",
+      "subject_id": "garment_ao_tu_than",
+      "predicate": "construction.body_length",
+      "value": "below_knee",
+      "qualifiers": {
+        "period_ids": [],
+        "region_ids": [],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "statement_vi": "Mục từ Bách khoa mô tả áo tứ thân dài quá gối.",
+      "evidence": [
+        {
+          "source_id": "src_bktt_ao_tu_than",
+          "locator": "đoạn áo tứ thân dài quá gối"
+        }
+      ],
+      "confidence": 0.91,
+      "consensus": "single_source",
+      "review_status": "verified_high_confidence",
+      "version": 1
+    },
+    {
+      "id": "assert_layering_bktt",
+      "subject_id": "ensemble_ao_tu_than_rural_north",
+      "predicate": "wearing.layering",
+      "value": {
+        "outer": "garment_ao_tu_than",
+        "inner_blouse": "garment_ao_canh_ngan",
+        "base_bodice": "garment_yem",
+        "lower": "garment_vay_quay"
+      },
+      "qualifiers": {
+        "period_ids": [],
+        "region_ids": [
+          "region_northern_delta"
+        ],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "statement_vi": "Profile Bắc Bộ truyền thống: áo tứ thân khoác ngoài áo cánh ngắn và yếm, phần dưới là váy.",
+      "evidence": [
+        {
+          "source_id": "src_bktt_ao_tu_than",
+          "locator": "đoạn mô tả cách mặc ngoài áo cánh, yếm và váy"
+        },
+        {
+          "source_id": "src_vietnam_womens_museum_fashion",
+          "locator": "đoạn Bắc Bộ: váy và áo tứ thân phổ biến đến đầu thế kỷ XX"
+        }
+      ],
+      "confidence": 0.95,
+      "consensus": "corroborated",
+      "review_status": "verified",
+      "version": 1
+    },
+    {
+      "id": "assert_front_mode_contextual",
+      "subject_id": "garment_ao_tu_than",
+      "predicate": "wearing.front_panel_mode",
+      "value": "varied",
+      "qualifiers": {
+        "period_ids": [],
+        "region_ids": [],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "statement_vi": "Hai vạt trước có cách xử lý theo bối cảnh: nguồn mô tả cả vắt/quàng và buộc ở eo.",
+      "evidence": [
+        {
+          "source_id": "src_bktt_ao_tu_than",
+          "locator": "đoạn hai vạt trước thường vắt quàng; các mô tả thắt lưng"
+        },
+        {
+          "source_id": "src_mofa_slovakia_2026_traditional_clothing",
+          "locator": "mục Tứ Thân: front panels thường buộc ở eo"
+        },
+        {
+          "source_id": "src_hanoi_museum_2026_early20_women",
+          "locator": "mô tả Hà Nội đầu XX: hai thân trước buộc gọn"
+        }
+      ],
+      "confidence": 0.97,
+      "consensus": "corroborated",
+      "review_status": "verified",
+      "version": 1
+    },
+    {
+      "id": "assert_daily_dark_outer",
+      "subject_id": "ensemble_ao_tu_than_rural_north",
+      "predicate": "visual.outer_palette",
+      "value": "dark_brown_black",
+      "qualifiers": {
+        "period_ids": [],
+        "region_ids": [
+          "region_northern_delta"
+        ],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [
+          "context_daily_labor"
+        ],
+        "social_context_ids": []
+      },
+      "statement_vi": "Áo ngoài thường nhật/bình dân được ghi nhận với các gam nâu, thâm, đen.",
+      "evidence": [
+        {
+          "source_id": "src_bktt_ao_tu_than",
+          "locator": "đoạn the màu nâu đen hay thâm"
+        },
+        {
+          "source_id": "src_hanoi_museum_2026_early20_women",
+          "locator": "mô tả nâu non, nâu già, đen"
+        }
+      ],
+      "confidence": 0.94,
+      "consensus": "corroborated",
+      "review_status": "verified",
+      "version": 1
+    },
+    {
+      "id": "assert_bright_inner_accents",
+      "subject_id": "ensemble_ao_tu_than_rural_north",
+      "predicate": "visual.inner_palette",
+      "value": "bright_accents",
+      "qualifiers": {
+        "period_ids": [],
+        "region_ids": [
+          "region_northern_delta"
+        ],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "statement_vi": "Yếm và thắt lưng có thể dùng màu sáng hơn, đặc biệt trong dịp lễ hội/cưới hỏi hoặc phối trang phục.",
+      "evidence": [
+        {
+          "source_id": "src_bktt_ao_tu_than",
+          "locator": "đoạn yếm hồng đào/hoàng yến/vàng chanh, thắt lưng xanh"
+        },
+        {
+          "source_id": "src_hanoi_museum_2026_early20_women",
+          "locator": "yếm hồng/vàng/xanh, thắt lưng lụa"
+        }
+      ],
+      "confidence": 0.91,
+      "consensus": "corroborated",
+      "review_status": "verified",
+      "version": 1
+    },
+    {
+      "id": "assert_hanoi_1914_1920_profile",
+      "subject_id": "ensemble_ao_tu_than_hanoi_1914_1920",
+      "predicate": "wearing.documented_profile",
+      "value": {
+        "front_mode": "tie_at_waist",
+        "lower": "garment_vay_quay",
+        "waist": "accessory_that_lung_lua",
+        "outer_palette": "dark_brown_black"
+      },
+      "qualifiers": {
+        "period_ids": [
+          "period_1914_1920"
+        ],
+        "region_ids": [
+          "region_hanoi"
+        ],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "statement_vi": "Bảo tàng Hà Nội mô tả phụ nữ Hà Nội 1914–1920 với áo tứ thân, hai thân trước buộc gọn, yếm, váy đụp nâu sẫm đến mắt cá và thắt lưng lụa.",
+      "evidence": [
+        {
+          "source_id": "src_hanoi_museum_2026_early20_women",
+          "locator": "đoạn phụ nữ Hà Nội mặc áo tứ thân, 1914–1920"
+        }
+      ],
+      "confidence": 0.98,
+      "consensus": "single_source",
+      "review_status": "verified_high_confidence",
+      "version": 1
+    },
+    {
+      "id": "assert_hanoi_materials",
+      "subject_id": "ensemble_ao_tu_than_hanoi_1914_1920",
+      "predicate": "material.outer_options",
+      "value": [
+        "brown_cloth",
+        "the",
+        "raw_silk"
+      ],
+      "qualifiers": {
+        "period_ids": [
+          "period_1914_1920"
+        ],
+        "region_ids": [
+          "region_hanoi"
+        ],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "statement_vi": "Bảo tàng Hà Nội ghi chất liệu thường gặp gồm vải nâu, the hoặc lụa mộc trong profile đầu thế kỷ XX.",
+      "evidence": [
+        {
+          "source_id": "src_hanoi_museum_2026_early20_women",
+          "locator": "đoạn chất liệu áo tứ thân"
+        }
+      ],
+      "confidence": 0.94,
+      "consensus": "single_source",
+      "review_status": "verified_high_confidence",
+      "version": 1
+    },
+    {
+      "id": "assert_period_bktt_broad",
+      "subject_id": "garment_ao_tu_than",
+      "predicate": "historical.documented_usage_range",
+      "value": "Ly-Tran_to_end_Nguyen",
+      "qualifiers": {
+        "period_ids": [],
+        "region_ids": [],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "statement_vi": "Bách khoa mô tả phạm vi sử dụng phổ biến rất dài, từ Lý–Trần đến hết Nguyễn.",
+      "evidence": [
+        {
+          "source_id": "src_bktt_ao_tu_than",
+          "locator": "câu mở đầu mục từ"
+        }
+      ],
+      "confidence": 0.78,
+      "consensus": "single_source",
+      "review_status": "under_review",
+      "version": 1
+    },
+    {
+      "id": "assert_period_mofa_17_19",
+      "subject_id": "garment_ao_tu_than",
+      "predicate": "historical.representative_period",
+      "value": "17th_to_19th_century",
+      "qualifiers": {
+        "period_ids": [],
+        "region_ids": [],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "statement_vi": "Bài tổng hợp của Bộ Ngoại giao mô tả áo tứ thân là dạng nữ phục tiêu biểu miền Bắc thế kỷ XVII–XIX.",
+      "evidence": [
+        {
+          "source_id": "src_mofa_slovakia_2026_traditional_clothing",
+          "locator": "mục Tứ Thân 17.–19. storočie"
+        }
+      ],
+      "confidence": 0.82,
+      "consensus": "single_source",
+      "review_status": "under_review",
+      "version": 1
+    },
+    {
+      "id": "assert_regions_bktt",
+      "subject_id": "garment_ao_tu_than",
+      "predicate": "historical.documented_regions",
+      "value": [
+        "region_northern_delta",
+        "region_north_central"
+      ],
+      "qualifiers": {
+        "period_ids": [],
+        "region_ids": [],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "statement_vi": "Bách khoa mô tả áo tứ thân ở phụ nữ Kinh vùng đồng bằng Bắc Bộ và Bắc Trung Bộ.",
+      "evidence": [
+        {
+          "source_id": "src_bktt_ao_tu_than",
+          "locator": "câu mở đầu mục từ"
+        }
+      ],
+      "confidence": 0.91,
+      "consensus": "single_source",
+      "review_status": "verified_high_confidence",
+      "version": 1
+    },
+    {
+      "id": "assert_quan_ho_older_artists",
+      "subject_id": "garment_ao_tu_than",
+      "predicate": "usage.quan_ho",
+      "value": "used_as_festival_attire_by_some_older_artists",
+      "qualifiers": {
+        "period_ids": [],
+        "region_ids": [
+          "region_kinh_bac"
+        ],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [
+          "context_quan_ho"
+        ],
+        "social_context_ids": []
+      },
+      "statement_vi": "Bách khoa ghi một số nghệ nhân lớn tuổi tại hội Quan họ Bắc Ninh vẫn dùng áo tứ thân như lễ phục.",
+      "evidence": [
+        {
+          "source_id": "src_bktt_ao_tu_than",
+          "locator": "đoạn về hội Quan họ Bắc Ninh"
+        }
+      ],
+      "confidence": 0.88,
+      "consensus": "single_source",
+      "review_status": "verified_high_confidence",
+      "version": 1
+    },
+    {
+      "id": "assert_unesco_quan_ho_hats_scarves",
+      "subject_id": "ensemble_quan_ho_female",
+      "predicate": "wearing.head_accessories",
+      "value": "distinctive_large_round_hats_and_scarves",
+      "qualifiers": {
+        "period_ids": [],
+        "region_ids": [
+          "region_kinh_bac"
+        ],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [
+          "context_quan_ho"
+        ],
+        "social_context_ids": []
+      },
+      "statement_vi": "UNESCO mô tả phụ nữ Quan họ truyền thống có mũ tròn lớn và khăn đặc trưng; assertion này không đồng nghĩa áo tứ thân là bắt buộc cho mọi thực hành Quan họ.",
+      "evidence": [
+        {
+          "source_id": "src_unesco_2009_quan_ho",
+          "locator": "nomination/inscription description"
+        }
+      ],
+      "confidence": 0.99,
+      "consensus": "strong_consensus",
+      "review_status": "verified",
+      "version": 1
+    },
+    {
+      "id": "assert_current_kinh_bac_presentation",
+      "subject_id": "ensemble_quan_ho_female",
+      "predicate": "usage.current_cultural_presentation",
+      "value": "ao_tu_than_and_khan_mo_qua_used_in_current_experience",
+      "qualifiers": {
+        "period_ids": [],
+        "region_ids": [
+          "region_kinh_bac"
+        ],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [
+          "context_quan_ho"
+        ],
+        "social_context_ids": []
+      },
+      "statement_vi": "Sở VH-TT&DL Bắc Ninh ghi nhận hoạt động trải nghiệm hiện nay dùng áo tứ thân và khăn mỏ quạ để gợi không gian liền anh/liền chị.",
+      "evidence": [
+        {
+          "source_id": "src_bacninh_svhttdl_2026_tram_kinh_bac",
+          "locator": "đoạn trải nghiệm mặc áo tứ thân, khăn mỏ quạ"
+        }
+      ],
+      "confidence": 0.88,
+      "consensus": "single_source",
+      "review_status": "verified_high_confidence",
+      "version": 1
+    },
+    {
+      "id": "assert_stage_colorful_modern",
+      "subject_id": "variant_ao_tu_than_modern_stage",
+      "predicate": "visual.stage_adaptation",
+      "value": "bright_colorful_stylized",
+      "qualifiers": {
+        "period_ids": [
+          "period_modern_stage"
+        ],
+        "region_ids": [],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "statement_vi": "Một nguồn thể chế ghi áo tứ thân hiện nay thường xuất hiện trong trình diễn/sân khấu và có thể dùng màu sắc sặc sỡ/cách tân.",
+      "evidence": [
+        {
+          "source_id": "src_vwu_2017_ao_tu_than",
+          "locator": "đoạn về sử dụng sân khấu hiện nay"
+        }
+      ],
+      "confidence": 0.85,
+      "consensus": "single_source",
+      "review_status": "verified_high_confidence",
+      "version": 1
+    },
+    {
+      "id": "assert_vwu_black_trousers_claim",
+      "subject_id": "garment_ao_tu_than",
+      "predicate": "wearing.lower_garment_claim",
+      "value": "black_trousers",
+      "qualifiers": {
+        "period_ids": [],
+        "region_ids": [],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "statement_vi": "Bài tổng hợp của Hội LHPN Việt Nam có một đoạn mô tả áo tứ thân đi cùng quần lĩnh đen. Claim này không được dùng trong strict historical North/Hanoi profile vì các nguồn Bách khoa và Bảo tàng Hà Nội mô tả váy.",
+      "evidence": [
+        {
+          "source_id": "src_vwu_2017_ao_tu_than",
+          "locator": "đoạn trang phục đi kèm"
+        }
+      ],
+      "confidence": 0.45,
+      "consensus": "mixed",
+      "review_status": "disputed",
+      "version": 1
+    },
+    {
+      "id": "assert_hanoi_ba_tam_hat",
+      "subject_id": "ensemble_ao_tu_than_hanoi_1914_1920",
+      "predicate": "wearing.headwear",
+      "value": "accessory_non_ba_tam",
+      "qualifiers": {
+        "period_ids": [
+          "period_1914_1920"
+        ],
+        "region_ids": [
+          "region_hanoi"
+        ],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "statement_vi": "Bảo tàng Hà Nội mô tả nón tầm/ba tầm đi cùng áo tứ thân hoặc áo ngũ thân ở phụ nữ Hà Nội đầu thế kỷ XX.",
+      "evidence": [
+        {
+          "source_id": "src_hanoi_museum_2026_early20_women",
+          "locator": "đoạn mô tả nón tầm/ba tầm đi cùng áo tứ thân hay áo ngũ thân"
+        }
+      ],
+      "confidence": 0.96,
+      "consensus": "single_source",
+      "review_status": "verified_high_confidence",
+      "version": 1
+    },
+    {
+      "id": "assert_bktt_non_thung_quai_thao_association",
+      "subject_id": "garment_ao_tu_than",
+      "predicate": "wearing.associated_accessory",
+      "value": "accessory_non_thung_quai_thao",
+      "qualifiers": {
+        "period_ids": [],
+        "region_ids": [
+          "region_northern_delta"
+        ],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [
+          "context_festival"
+        ],
+        "social_context_ids": []
+      },
+      "statement_vi": "Bách khoa mô tả áo tứ thân trong di sản nữ phục Bắc Bộ cùng khăn mỏ quạ và nón thúng quai thao; đây là association, không phải phụ kiện bắt buộc của mọi cách mặc.",
+      "evidence": [
+        {
+          "source_id": "src_bktt_ao_tu_than",
+          "locator": "đoạn kết mục từ về di sản nữ phục, khăn mỏ quạ, nón thúng quai thao"
+        }
+      ],
+      "confidence": 0.84,
+      "consensus": "single_source",
+      "review_status": "under_review",
+      "version": 1
+    }
+  ],
+  "relation_definitions": [
+    {
+      "key": "ensemble_uses_garment",
+      "label_vi": "Ensemble dùng garment",
+      "source_types": [
+        "wearing_ensemble"
+      ],
+      "target_types": [
+        "garment"
+      ],
+      "directional": true,
+      "contextual": true,
+      "inheritable": false,
+      "status": "active",
+      "version": 1
+    },
+    {
+      "key": "ensemble_uses_accessory",
+      "label_vi": "Ensemble dùng phụ kiện",
+      "source_types": [
+        "wearing_ensemble"
+      ],
+      "target_types": [
+        "accessory"
+      ],
+      "directional": true,
+      "contextual": true,
+      "inheritable": false,
+      "status": "active",
+      "version": 1
+    },
+    {
+      "key": "documented_in_region",
+      "label_vi": "Được ghi nhận tại vùng",
+      "source_types": [
+        "garment",
+        "wearing_ensemble"
+      ],
+      "target_types": [
+        "region"
+      ],
+      "directional": true,
+      "contextual": true,
+      "inheritable": false,
+      "status": "active",
+      "version": 1
+    },
+    {
+      "key": "documented_in_context",
+      "label_vi": "Được ghi nhận trong bối cảnh",
+      "source_types": [
+        "garment",
+        "wearing_ensemble"
+      ],
+      "target_types": [
+        "occasion"
+      ],
+      "directional": true,
+      "contextual": true,
+      "inheritable": false,
+      "status": "active",
+      "version": 1
+    },
+    {
+      "key": "contextual_ensemble_for",
+      "label_vi": "Ensemble theo bối cảnh",
+      "source_types": [
+        "wearing_ensemble"
+      ],
+      "target_types": [
+        "garment"
+      ],
+      "directional": true,
+      "contextual": true,
+      "inheritable": false,
+      "status": "active",
+      "version": 1
+    },
+    {
+      "key": "modern_stage_adaptation_of",
+      "label_vi": "Bản sân khấu/cách tân hiện đại của",
+      "source_types": [
+        "garment_variant"
+      ],
+      "target_types": [
+        "garment"
+      ],
+      "directional": true,
+      "contextual": true,
+      "inheritable": false,
+      "status": "active",
+      "version": 1
+    }
+  ],
+  "relations": [
+    {
+      "id": "rel_rural_outer",
+      "subject_id": "ensemble_ao_tu_than_rural_north",
+      "relation_type": "ensemble_uses_garment",
+      "object_id": "garment_ao_tu_than",
+      "state": "known",
+      "qualifiers": {
+        "period_ids": [],
+        "region_ids": [
+          "region_northern_delta"
+        ],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "assertion_ids": [
+        "assert_layering_bktt"
+      ]
+    },
+    {
+      "id": "rel_rural_inner",
+      "subject_id": "ensemble_ao_tu_than_rural_north",
+      "relation_type": "ensemble_uses_garment",
+      "object_id": "garment_ao_canh_ngan",
+      "state": "known",
+      "qualifiers": {
+        "period_ids": [],
+        "region_ids": [
+          "region_northern_delta"
+        ],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "assertion_ids": [
+        "assert_layering_bktt"
+      ]
+    },
+    {
+      "id": "rel_rural_yem",
+      "subject_id": "ensemble_ao_tu_than_rural_north",
+      "relation_type": "ensemble_uses_garment",
+      "object_id": "garment_yem",
+      "state": "known",
+      "qualifiers": {
+        "period_ids": [],
+        "region_ids": [
+          "region_northern_delta"
+        ],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "assertion_ids": [
+        "assert_layering_bktt"
+      ]
+    },
+    {
+      "id": "rel_rural_skirt",
+      "subject_id": "ensemble_ao_tu_than_rural_north",
+      "relation_type": "ensemble_uses_garment",
+      "object_id": "garment_vay_quay",
+      "state": "known",
+      "qualifiers": {
+        "period_ids": [],
+        "region_ids": [
+          "region_northern_delta"
+        ],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "assertion_ids": [
+        "assert_layering_bktt"
+      ]
+    },
+    {
+      "id": "rel_rural_sash",
+      "subject_id": "ensemble_ao_tu_than_rural_north",
+      "relation_type": "ensemble_uses_accessory",
+      "object_id": "accessory_that_lung_lua",
+      "state": "known",
+      "qualifiers": {
+        "period_ids": [],
+        "region_ids": [
+          "region_northern_delta"
+        ],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "assertion_ids": [
+        "assert_bright_inner_accents"
+      ]
+    },
+    {
+      "id": "rel_hanoi_outer",
+      "subject_id": "ensemble_ao_tu_than_hanoi_1914_1920",
+      "relation_type": "ensemble_uses_garment",
+      "object_id": "garment_ao_tu_than",
+      "state": "known",
+      "qualifiers": {
+        "period_ids": [
+          "period_1914_1920"
+        ],
+        "region_ids": [
+          "region_hanoi"
+        ],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "assertion_ids": [
+        "assert_hanoi_1914_1920_profile"
+      ]
+    },
+    {
+      "id": "rel_hanoi_yem",
+      "subject_id": "ensemble_ao_tu_than_hanoi_1914_1920",
+      "relation_type": "ensemble_uses_garment",
+      "object_id": "garment_yem",
+      "state": "known",
+      "qualifiers": {
+        "period_ids": [
+          "period_1914_1920"
+        ],
+        "region_ids": [
+          "region_hanoi"
+        ],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "assertion_ids": [
+        "assert_hanoi_1914_1920_profile"
+      ]
+    },
+    {
+      "id": "rel_hanoi_skirt",
+      "subject_id": "ensemble_ao_tu_than_hanoi_1914_1920",
+      "relation_type": "ensemble_uses_garment",
+      "object_id": "garment_vay_quay",
+      "state": "known",
+      "qualifiers": {
+        "period_ids": [
+          "period_1914_1920"
+        ],
+        "region_ids": [
+          "region_hanoi"
+        ],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "assertion_ids": [
+        "assert_hanoi_1914_1920_profile"
+      ]
+    },
+    {
+      "id": "rel_hanoi_sash",
+      "subject_id": "ensemble_ao_tu_than_hanoi_1914_1920",
+      "relation_type": "ensemble_uses_accessory",
+      "object_id": "accessory_that_lung_lua",
+      "state": "known",
+      "qualifiers": {
+        "period_ids": [
+          "period_1914_1920"
+        ],
+        "region_ids": [
+          "region_hanoi"
+        ],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "assertion_ids": [
+        "assert_hanoi_1914_1920_profile"
+      ]
+    },
+    {
+      "id": "rel_hanoi_hat",
+      "subject_id": "ensemble_ao_tu_than_hanoi_1914_1920",
+      "relation_type": "ensemble_uses_accessory",
+      "object_id": "accessory_non_ba_tam",
+      "state": "known",
+      "qualifiers": {
+        "period_ids": [
+          "period_1914_1920"
+        ],
+        "region_ids": [
+          "region_hanoi"
+        ],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "assertion_ids": [
+        "assert_hanoi_ba_tam_hat"
+      ]
+    },
+    {
+      "id": "rel_family_north_delta",
+      "subject_id": "garment_ao_tu_than",
+      "relation_type": "documented_in_region",
+      "object_id": "region_northern_delta",
+      "state": "known",
+      "qualifiers": {
+        "period_ids": [],
+        "region_ids": [],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "assertion_ids": [
+        "assert_regions_bktt"
+      ]
+    },
+    {
+      "id": "rel_family_north_central",
+      "subject_id": "garment_ao_tu_than",
+      "relation_type": "documented_in_region",
+      "object_id": "region_north_central",
+      "state": "known",
+      "qualifiers": {
+        "period_ids": [],
+        "region_ids": [],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "assertion_ids": [
+        "assert_regions_bktt"
+      ]
+    },
+    {
+      "id": "rel_family_quanho",
+      "subject_id": "garment_ao_tu_than",
+      "relation_type": "documented_in_context",
+      "object_id": "context_quan_ho",
+      "state": "known",
+      "qualifiers": {
+        "period_ids": [],
+        "region_ids": [
+          "region_kinh_bac"
+        ],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [
+          "context_quan_ho"
+        ],
+        "social_context_ids": []
+      },
+      "assertion_ids": [
+        "assert_quan_ho_older_artists"
+      ]
+    },
+    {
+      "id": "rel_quanho_context",
+      "subject_id": "ensemble_quan_ho_female",
+      "relation_type": "documented_in_context",
+      "object_id": "context_quan_ho",
+      "state": "known",
+      "qualifiers": {
+        "period_ids": [],
+        "region_ids": [
+          "region_kinh_bac"
+        ],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [
+          "context_quan_ho"
+        ],
+        "social_context_ids": []
+      },
+      "assertion_ids": [
+        "assert_unesco_quan_ho_hats_scarves"
+      ]
+    },
+    {
+      "id": "rel_quanho_khan",
+      "subject_id": "ensemble_quan_ho_female",
+      "relation_type": "ensemble_uses_accessory",
+      "object_id": "accessory_khan_mo_qua",
+      "state": "known",
+      "qualifiers": {
+        "period_ids": [],
+        "region_ids": [
+          "region_kinh_bac"
+        ],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [
+          "context_quan_ho"
+        ],
+        "social_context_ids": []
+      },
+      "assertion_ids": [
+        "assert_current_kinh_bac_presentation"
+      ]
+    },
+    {
+      "id": "rel_quanho_hat",
+      "subject_id": "ensemble_quan_ho_female",
+      "relation_type": "ensemble_uses_accessory",
+      "object_id": "accessory_quan_ho_large_round_hat",
+      "state": "known",
+      "qualifiers": {
+        "period_ids": [],
+        "region_ids": [
+          "region_kinh_bac"
+        ],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [
+          "context_quan_ho"
+        ],
+        "social_context_ids": []
+      },
+      "assertion_ids": [
+        "assert_unesco_quan_ho_hats_scarves"
+      ]
+    },
+    {
+      "id": "rel_stage_variant",
+      "subject_id": "variant_ao_tu_than_modern_stage",
+      "relation_type": "modern_stage_adaptation_of",
+      "object_id": "garment_ao_tu_than",
+      "state": "known",
+      "qualifiers": {
+        "period_ids": [
+          "period_modern_stage"
+        ],
+        "region_ids": [],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "assertion_ids": [
+        "assert_stage_colorful_modern"
+      ]
+    },
+    {
+      "id": "rel_tuthan_non_quai_thao_association",
+      "subject_id": "ensemble_ao_tu_than_rural_north",
+      "relation_type": "ensemble_uses_accessory",
+      "object_id": "accessory_non_thung_quai_thao",
+      "state": "known",
+      "qualifiers": {
+        "period_ids": [],
+        "region_ids": [
+          "region_northern_delta"
+        ],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [
+          "context_festival"
+        ],
+        "social_context_ids": []
+      },
+      "assertion_ids": [
+        "assert_bktt_non_thung_quai_thao_association"
+      ]
+    }
+  ],
+  "rules": [
+    {
+      "id": "rule_historical_no_modern_front_closure",
+      "category": "STRUCTURAL",
+      "severity": "strong_warning",
+      "version": 1,
+      "status": "draft",
+      "scope": [
+        "garment_ao_tu_than"
+      ],
+      "when": {
+        "operator": "all",
+        "conditions": [
+          {
+            "field": "context.mode",
+            "operator": "eq",
+            "value": "historical_recreation"
+          },
+          {
+            "field": "style.front_button_closure",
+            "operator": "eq",
+            "value": true
+          }
+        ]
+      },
+      "then": {
+        "status": "warning",
+        "message_vi": "Profile áo tứ thân lịch sử trong dataset dùng hai thân trước tách rời, không đóng bằng hàng cúc phía trước.",
+        "assertion_ids": [
+          "assert_four_panel_structure",
+          "assert_no_front_buttons"
+        ]
+      }
+    },
+    {
+      "id": "rule_historical_stage_mix_warning",
+      "category": "HISTORICAL_CONTEXT",
+      "severity": "warning",
+      "version": 1,
+      "status": "draft",
+      "scope": [
+        "garment_ao_tu_than"
+      ],
+      "when": {
+        "operator": "all",
+        "conditions": [
+          {
+            "field": "context.mode",
+            "operator": "eq",
+            "value": "historical_recreation"
+          },
+          {
+            "field": "context.variant_id",
+            "operator": "eq",
+            "value": "variant_ao_tu_than_modern_stage"
+          }
+        ]
+      },
+      "then": {
+        "status": "warning",
+        "message_vi": "Bạn đang chọn historical recreation nhưng variant là bản sân khấu/cách tân hiện đại. Hãy đổi profile hoặc chuyển sang remix.",
+        "assertion_ids": [
+          "assert_stage_colorful_modern"
+        ]
+      }
+    },
+    {
+      "id": "rule_quanho_accessory_context",
+      "category": "ACCESSORY",
+      "severity": "info",
+      "version": 1,
+      "status": "draft",
+      "scope": [
+        "garment_ao_tu_than"
+      ],
+      "when": {
+        "field": "context.occasion_id",
+        "operator": "eq",
+        "value": "context_quan_ho"
+      },
+      "then": {
+        "status": "info",
+        "message_vi": "Trong bối cảnh Quan họ, khăn và nón tròn lớn là các yếu tố phục trang được ghi nhận; không mặc định rằng mọi áo tứ thân đều phải có chúng.",
+        "assertion_ids": [
+          "assert_unesco_quan_ho_hats_scarves",
+          "assert_quan_ho_older_artists"
+        ]
+      }
+    },
+    {
+      "id": "rule_unknown_origin_no_claim",
+      "category": "GENERATION_GUARDRAIL",
+      "severity": "info",
+      "version": 1,
+      "status": "draft",
+      "scope": [
+        "garment_ao_tu_than"
+      ],
+      "when": {
+        "field": "context.include_history_caption",
+        "operator": "eq",
+        "value": true
+      },
+      "then": {
+        "status": "info",
+        "message_vi": "Không ghi một năm hoặc truyền thuyết duy nhất như nguồn gốc chắc chắn của áo tứ thân.",
+        "assertion_ids": [
+          "assert_origin_unknown"
+        ]
+      }
+    }
+  ],
+  "generation_profiles": [
+    {
+      "id": "gp_ao_tu_than_hanoi_1914_1920_strict_v1",
+      "subject_id": "ensemble_ao_tu_than_hanoi_1914_1920",
+      "version": 1,
+      "mode": "historical_recreation",
+      "strict_accuracy_mode": true,
+      "semantic_grounding_ready": true,
+      "generation_ready": false,
+      "not_ready_reason": "Chưa có reference image lịch sử được cleared cho AI; semantic prompt vẫn build được.",
+      "must_preserve": [
+        {
+          "feature": "construction.panel.count",
+          "value": 4,
+          "assertion_ids": [
+            "assert_four_panel_structure"
+          ]
+        },
+        {
+          "feature": "construction.back.join",
+          "value": "center_back_seam",
+          "assertion_ids": [
+            "assert_four_panel_structure"
+          ]
+        },
+        {
+          "feature": "construction.front.panels",
+          "value": "separate_open",
+          "assertion_ids": [
+            "assert_four_panel_structure"
+          ]
+        },
+        {
+          "feature": "construction.front.button_closure",
+          "value": false,
+          "assertion_ids": [
+            "assert_no_front_buttons"
+          ]
+        },
+        {
+          "feature": "construction.side.slits",
+          "value": true,
+          "assertion_ids": [
+            "assert_side_slits"
+          ]
+        },
+        {
+          "feature": "construction.armhole.system",
+          "value": "no_modern_armscye_shoulder_sleeve_join",
+          "assertion_ids": [
+            "assert_armhole_construction"
+          ]
+        },
+        {
+          "feature": "wearing.front_panel.mode",
+          "value": "tie_at_waist",
+          "assertion_ids": [
+            "assert_hanoi_1914_1920_profile"
+          ]
+        },
+        {
+          "feature": "wearing.base_bodice",
+          "value": "garment_yem",
+          "assertion_ids": [
+            "assert_hanoi_1914_1920_profile"
+          ]
+        },
+        {
+          "feature": "wearing.lower_garment",
+          "value": "garment_vay_quay",
+          "assertion_ids": [
+            "assert_hanoi_1914_1920_profile"
+          ]
+        },
+        {
+          "feature": "wearing.waist_sash",
+          "value": "accessory_that_lung_lua",
+          "assertion_ids": [
+            "assert_hanoi_1914_1920_profile"
+          ]
+        },
+        {
+          "feature": "visual.outer.palette",
+          "value": "dark_brown_black",
+          "assertion_ids": [
+            "assert_hanoi_1914_1920_profile"
+          ]
+        }
+      ],
+      "recommended": [
+        {
+          "feature": "wearing.inner_blouse",
+          "value": "garment_ao_canh_ngan",
+          "assertion_ids": [
+            "assert_layering_bktt"
+          ]
+        },
+        {
+          "feature": "visual.inner.palette",
+          "value": "bright_accents",
+          "assertion_ids": [
+            "assert_bright_inner_accents"
+          ]
+        },
+        {
+          "feature": "accessory.headwear",
+          "value": "accessory_non_ba_tam",
+          "assertion_ids": [
+            "assert_hanoi_ba_tam_hat"
+          ]
+        }
+      ],
+      "may_vary": [
+        "outer_brown_tone",
+        "yem_color",
+        "sash_color",
+        "material_within_documented_options"
+      ],
+      "do_not_invent": [
+        "exact_origin_year",
+        "modern_front_zipper",
+        "full_front_button_placket",
+        "modern_fitted_darts_if_not_selected",
+        "neon_stage_embellishment"
+      ],
+      "reference_media_candidate_ids": [
+        "mc_hanoi_museum_1914_1920"
+      ]
+    },
+    {
+      "id": "gp_ao_tu_than_rural_north_strict_v1",
+      "subject_id": "ensemble_ao_tu_than_rural_north",
+      "version": 1,
+      "mode": "historical_recreation",
+      "strict_accuracy_mode": true,
+      "semantic_grounding_ready": true,
+      "generation_ready": false,
+      "not_ready_reason": "No cleared historical reference images.",
+      "must_preserve": [
+        {
+          "feature": "construction.panel.count",
+          "value": 4,
+          "assertion_ids": [
+            "assert_four_panel_structure"
+          ]
+        },
+        {
+          "feature": "construction.back.join",
+          "value": "center_back_seam",
+          "assertion_ids": [
+            "assert_four_panel_structure"
+          ]
+        },
+        {
+          "feature": "construction.front.panels",
+          "value": "separate_open",
+          "assertion_ids": [
+            "assert_four_panel_structure"
+          ]
+        },
+        {
+          "feature": "construction.front.button_closure",
+          "value": false,
+          "assertion_ids": [
+            "assert_no_front_buttons"
+          ]
+        },
+        {
+          "feature": "wearing.inner_blouse",
+          "value": "garment_ao_canh_ngan",
+          "assertion_ids": [
+            "assert_layering_bktt"
+          ]
+        },
+        {
+          "feature": "wearing.base_bodice",
+          "value": "garment_yem",
+          "assertion_ids": [
+            "assert_layering_bktt"
+          ]
+        },
+        {
+          "feature": "wearing.lower_garment",
+          "value": "garment_vay_quay",
+          "assertion_ids": [
+            "assert_layering_bktt"
+          ]
+        },
+        {
+          "feature": "visual.outer.palette",
+          "value": "dark_brown_black",
+          "assertion_ids": [
+            "assert_daily_dark_outer"
+          ]
+        }
+      ],
+      "recommended": [
+        {
+          "feature": "wearing.waist_sash",
+          "value": "accessory_that_lung_lua",
+          "assertion_ids": [
+            "assert_bright_inner_accents"
+          ]
+        }
+      ],
+      "may_vary": [
+        "front_panel_mode_by_context",
+        "yem_color",
+        "sash_color"
+      ],
+      "do_not_invent": [
+        "exact_origin_year",
+        "mandatory_quan_ho_hat",
+        "modern_stage_features"
+      ],
+      "reference_media_candidate_ids": []
+    },
+    {
+      "id": "gp_ao_tu_than_modern_stage_v1",
+      "subject_id": "variant_ao_tu_than_modern_stage",
+      "version": 1,
+      "mode": "remix",
+      "strict_accuracy_mode": false,
+      "semantic_grounding_ready": true,
+      "generation_ready": false,
+      "not_ready_reason": "Modern licensed/CC media still requires product policy decision for AI-reference.",
+      "must_preserve": [
+        {
+          "feature": "garment_identity",
+          "value": "four-panel áo tứ thân identity",
+          "assertion_ids": [
+            "assert_four_panel_structure"
+          ]
+        }
+      ],
+      "recommended": [],
+      "may_vary": [
+        "color",
+        "fabric",
+        "decorations",
+        "stage_silhouette",
+        "accessories"
+      ],
+      "do_not_invent": [
+        "claim_stage_design_is_historically_exact"
+      ],
+      "reference_media_candidate_ids": [
+        "mc_commons_ao_tu_than_2006",
+        "mc_commons_ao_tu_than_2017"
+      ]
+    }
+  ],
+  "media_candidates": [
+    {
+      "id": "mc_commons_ao_tu_than_2006",
+      "source_id": "src_commons_ao_tu_than_2006",
+      "subject_ids": [
+        "garment_ao_tu_than",
+        "variant_ao_tu_than_modern_stage"
+      ],
+      "view_type": "modern_representation_full_body",
+      "source_page_url": "https://commons.wikimedia.org/wiki/File:%C3%81o_t%E1%BB%A9_th%C3%A2n.jpg",
+      "description": "Ảnh hiện đại được Commons mô tả là cô gái mặc áo tứ thân.",
+      "rights_status": "CC_BY_SA_2_0",
+      "classification_status": "modern_representation_not_historical_reference",
+      "may_display_publicly": true,
+      "may_use_for_ai_reference": false,
+      "action_required": "Review AI-reference policy + verify garment details before enabling."
+    },
+    {
+      "id": "mc_commons_ao_tu_than_2017",
+      "source_id": "src_commons_ao_tu_than_2017",
+      "subject_ids": [
+        "garment_ao_tu_than",
+        "variant_ao_tu_than_modern_stage"
+      ],
+      "view_type": "modern_representation_full_body",
+      "source_page_url": "https://commons.wikimedia.org/wiki/File:Ao_Tu_Than.jpg",
+      "description": "Ảnh hiện đại, CC BY-SA 4.0, thuộc category áo tứ thân.",
+      "rights_status": "CC_BY_SA_4_0",
+      "classification_status": "modern_representation",
+      "may_display_publicly": true,
+      "may_use_for_ai_reference": false,
+      "action_required": "Legal/product policy review before AI reference."
+    },
+    {
+      "id": "mc_hanoi_museum_1914_1920",
+      "source_id": "src_hanoi_museum_2026_early20_women",
+      "subject_ids": [
+        "ensemble_ao_tu_than_hanoi_1914_1920"
+      ],
+      "view_type": "historical_context",
+      "source_page_url": "https://baotanghanoi.com.vn/en/phu-nu-ha-noi-trong-trang-phuc-truyen-thong-dau-the-ki-20-ve-dep-cua-su-giao-thoi/",
+      "description": "Bảo tàng Hà Nội dẫn ảnh Albert Kahn 1914–1920.",
+      "rights_status": "museum_source_rights_not_cleared",
+      "classification_status": "high_value_historical_candidate",
+      "may_display_publicly": false,
+      "may_use_for_ai_reference": false,
+      "action_required": "Acquire permission/licensed copy from rights holder."
+    }
+  ]
+}

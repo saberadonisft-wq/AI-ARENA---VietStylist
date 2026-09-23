@@ -1,4 +1,6 @@
 """Integration and unit tests for V3 AI Generation Pipeline."""
+import base64
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -247,9 +249,160 @@ async def test_unaccepted_provider_cannot_synthesize_mock_media():
     from app.core.errors import AppError
     from app.modules.cultural_data_v3.providers.gemini import GeminiGenerationProvider
     with pytest.raises(AppError) as error:
-        await GeminiGenerationProvider().generate(ProviderRequest(prompt="test"))
+        await GeminiGenerationProvider("dev-user-test-1").generate(ProviderRequest(prompt="test"))
     assert error.value.status_code == 503
     assert error.value.code == "GENERATION_UNAVAILABLE"
+
+
+@pytest.mark.asyncio
+async def test_gemini_provider_stores_a_real_private_image(monkeypatch, png_bytes):
+    from app.core.config import settings
+    from app.modules.cultural_data_v3.providers import gemini as gemini_module
+    from app.modules.media.repository import MediaRepository
+
+    captured = {}
+
+    class FakeResponse:
+        status_code = 200
+
+        def json(self):
+            return {
+                "candidates": [
+                    {
+                        "content": {
+                            "parts": [
+                                {
+                                    "inlineData": {
+                                        "mimeType": "image/png",
+                                        "data": base64.b64encode(png_bytes).decode("ascii"),
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ]
+            }
+
+    class FakeClient:
+        async def post(self, url, *, headers, json):
+            captured.update(url=url, headers=headers, payload=json)
+            return FakeResponse()
+
+    monkeypatch.setattr(settings, "GEMINI_TRY_ON_ENABLED", True)
+    monkeypatch.setattr(settings, "GEMINI_API_KEY", "test-only-key")
+    monkeypatch.setattr(gemini_module, "get_shared_async_client", lambda timeout: FakeClient())
+
+    result = await gemini_module.GeminiGenerationProvider("dev-user-test-1").generate(
+        ProviderRequest(prompt="Generate Vietnamese attire", idempotency_key="idem-1")
+    )
+
+    media = MediaRepository.get_media_by_id(result.result_media_id)
+    assert result.status == "completed"
+    assert media["status"] == "ready"
+    assert media["visibility"] == "private"
+    assert media["owner_id"] == "dev-user-test-1"
+    assert "test-only-key" not in captured["url"]
+    assert captured["headers"]["X-goog-api-key"] == "test-only-key"
+    assert captured["payload"]["generationConfig"]["responseModalities"] == ["Image"]
+
+
+@pytest.mark.asyncio
+async def test_gemini_provider_uses_requested_image_model(monkeypatch, png_bytes):
+    from app.core.config import settings
+    from app.modules.cultural_data_v3.providers import gemini as gemini_module
+
+    captured = {}
+
+    class FakeResponse:
+        status_code = 200
+
+        def json(self):
+            return {
+                "candidates": [{
+                    "content": {
+                        "parts": [{
+                            "inlineData": {
+                                "mimeType": "image/png",
+                                "data": base64.b64encode(png_bytes).decode("ascii"),
+                            }
+                        }]
+                    }
+                }]
+            }
+
+    class FakeClient:
+        async def post(self, url, *, headers, json):
+            captured["url"] = url
+            return FakeResponse()
+
+    monkeypatch.setattr(settings, "GEMINI_TRY_ON_ENABLED", True)
+    monkeypatch.setattr(settings, "GEMINI_API_KEY", "test-only-key")
+    monkeypatch.setattr(gemini_module, "get_shared_async_client", lambda timeout: FakeClient())
+
+    result = await gemini_module.GeminiGenerationProvider(
+        "dev-user-test-1", model_id="gemini-3.1-flash-image"
+    ).generate(ProviderRequest(prompt="Generate Vietnamese attire"))
+
+    assert result.model_id == "gemini-3.1-flash-image"
+    assert captured["url"].endswith("/v1/models/gemini-3.1-flash-image:generateContent")
+
+
+def test_synthesis_rejects_unknown_image_model():
+    response = client.post(
+        "/api/v3/generation/synthesize",
+        headers={"Authorization": auth_header("dev-user-test-1")},
+        json={
+            "outfit": {"schema_version": "2.0", "dataset_version": "dev", "selections": []},
+            "model_id": "gemini-unknown-image",
+        },
+    )
+
+    assert response.status_code == 422
+
+
+def test_api_generation_synthesize_success(monkeypatch, png_bytes):
+    from app.core.config import settings
+    from app.modules.cultural_data_v3.providers.gemini import GeminiGenerationProvider
+    from app.modules.media.service import MediaService
+
+    async def generate(_self, request):
+        media = MediaService.ingest_generated_image(
+            "dev-user-test-1", png_bytes, "image/png"
+        )
+        return ProviderResult(
+            status="completed",
+            model_id="gemini-test-image",
+            result_media_id=media.id,
+            prompt_used=request.prompt,
+            metadata={"provider": "gemini"},
+        )
+
+    monkeypatch.setattr(settings, "GEMINI_TRY_ON_ENABLED", True)
+    monkeypatch.setattr(settings, "GEMINI_API_KEY", "test-only-key")
+    monkeypatch.setattr(GeminiGenerationProvider, "generate", generate)
+    response = client.post(
+        "/api/v3/generation/synthesize",
+        headers={"Authorization": auth_header("dev-user-test-1")},
+        json={
+            "outfit": {
+                "schema_version": "2.0",
+                "dataset_version": "dev",
+                "selections": [
+                    {
+                        "selection_id": "sel_1",
+                        "slot": "outerwear",
+                        "canonical_entity_id": "garment_ngu_than",
+                    }
+                ],
+            },
+            "options": {},
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "completed"
+    assert payload["result_media_id"]
+    assert payload["post_validation"]["review_status"] == "not_evaluated"
 
 
 def test_reference_permission_requires_explicit_purpose_and_review():

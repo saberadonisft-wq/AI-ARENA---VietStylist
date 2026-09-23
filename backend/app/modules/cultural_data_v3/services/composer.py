@@ -66,6 +66,7 @@ def renderables_for(entity_id, reader):
 def validate_spec(outfit, resolver, metadata):
     slots = {s.slot: s.model_dump() for s in outfit.selections}
     rules = {}
+    rule_styles = {}
     missing, unchecked = [], []
     facts = {}
     definitions = {d["key"]: d for d in resolver.repo.list_attribute_definitions()}
@@ -92,6 +93,8 @@ def validate_spec(outfit, resolver, metadata):
         if not selected_rules:
             unchecked.append(entity_id)
         rules.update({r["id"]: r for r in selected_rules})
+        for selected_rule in selected_rules:
+            rule_styles.setdefault(selected_rule["id"], selection.style)
         facts[selection.slot] = {}
         citations = {c["assertion_id"]: c for c in evidence_for_facts(resolved["attributes"], reader=resolver.reader)}
         uncertain_keys = {f["attribute_key"] for f in resolved["attributes"] if f["state"] != "known" or constraint_evidence_issue(f, citations, reader=resolver.reader)}
@@ -108,8 +111,19 @@ def validate_spec(outfit, resolver, metadata):
                 current.setdefault(segments[-1], []).append(fact["value"])
             else:
                 current[segments[-1]] = fact["value"]
-    context = {"outfit": outfit.model_dump(), "slots": slots, "facts": facts}
-    evaluations = {id: evaluate_supported_condition(rule["condition"], context) for id, rule in rules.items()}
+    context = {
+        "outfit": outfit.model_dump(),
+        "slots": slots,
+        "facts": facts,
+        "context": outfit.context,
+    }
+    evaluations = {
+        id: evaluate_supported_condition(
+            rule["condition"],
+            {**context, "style": rule_styles.get(id, {})},
+        )
+        for id, rule in rules.items()
+    }
     unknown_rules = sorted(id for id, result in evaluations.items() if result is None)
     violations = [{"rule_id": rule["id"], "name": rule["name"], "severity": rule["severity"], "explanation": rule["explanation"], "suggested_fix": rule["suggested_fix"], "assertion_ids": rule["assertion_ids"]} for id, rule in rules.items() if evaluations[id] is True]
     status = "error" if any(v["severity"] == "strict" for v in violations) else "warning" if violations or missing else "not_evaluated" if unchecked or unknown_rules or not rules else "clear"

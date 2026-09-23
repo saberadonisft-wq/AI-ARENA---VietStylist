@@ -36,6 +36,7 @@ asyncio_mode = "auto"
 
 [tool.setuptools.package-data]
 "app.data" = ["*.sql"]
+"app.modules.cultural_data_v3" = ["fixtures/*.json", "fixtures/pilot_packages/*.json"]
 
 [tool.setuptools.packages.find]
 include = ["app*"]

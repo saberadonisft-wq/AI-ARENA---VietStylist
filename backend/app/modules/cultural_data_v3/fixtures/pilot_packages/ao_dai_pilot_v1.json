@@ -1,0 +1,2894 @@
+{
+  "manifest": {
+    "package": "VietStylist_AoDai_Pilot_v1",
+    "created_date": "2026-09-18",
+    "dataset_version": "ao-dai-pilot-1",
+    "status": "under_review",
+    "research_scope": "Áo dài family, key historical variants, contemporary structural trends, usage contexts, Hue heritage scope",
+    "counts": {
+      "sources": 11,
+      "entities": 26,
+      "assertions": 22,
+      "attribute_values": 29,
+      "relations": 19,
+      "rules": 4,
+      "media_candidates": 4,
+      "generation_profiles": 2
+    },
+    "validation": "passed",
+    "tests": "passed"
+  },
+  "entities": [
+    {
+      "id": "garment_ao_dai",
+      "entity_type": "garment",
+      "schema_version": "1.0",
+      "identity": {
+        "name_vi": "Áo dài",
+        "aliases": [
+          "ao dai",
+          "Áo dài Việt Nam"
+        ]
+      },
+      "status": "under_review",
+      "version": 1,
+      "extensions": {}
+    },
+    {
+      "id": "garment_ao_ngu_than",
+      "entity_type": "garment",
+      "schema_version": "1.0",
+      "identity": {
+        "name_vi": "Áo ngũ thân",
+        "aliases": [
+          "áo năm thân"
+        ]
+      },
+      "status": "under_review",
+      "version": 1,
+      "extensions": {}
+    },
+    {
+      "id": "variant_ao_dai_lemur_1930s",
+      "entity_type": "garment_variant",
+      "schema_version": "1.0",
+      "identity": {
+        "name_vi": "Áo dài Le Mur",
+        "aliases": [
+          "áo Lemur",
+          "áo Lơ-muya"
+        ]
+      },
+      "status": "under_review",
+      "version": 1,
+      "extensions": {}
+    },
+    {
+      "id": "variant_ao_dai_le_pho_1930s",
+      "entity_type": "garment_variant",
+      "schema_version": "1.0",
+      "identity": {
+        "name_vi": "Áo dài Lê Phổ",
+        "aliases": []
+      },
+      "status": "under_review",
+      "version": 1,
+      "extensions": {}
+    },
+    {
+      "id": "variant_ao_dai_raglan_1958_1960",
+      "entity_type": "garment_variant",
+      "schema_version": "1.0",
+      "identity": {
+        "name_vi": "Áo dài Raglan",
+        "aliases": [
+          "áo dài ráp-lăng",
+          "áo dài giắc-lăng"
+        ]
+      },
+      "status": "under_review",
+      "version": 1,
+      "extensions": {}
+    },
+    {
+      "id": "variant_ao_dai_miniraglan_1960s_1970s",
+      "entity_type": "garment_variant",
+      "schema_version": "1.0",
+      "identity": {
+        "name_vi": "Áo dài Miniraglan",
+        "aliases": []
+      },
+      "status": "under_review",
+      "version": 1,
+      "extensions": {}
+    },
+    {
+      "id": "variant_ao_dai_hippy_late1960s",
+      "entity_type": "garment_variant",
+      "schema_version": "1.0",
+      "identity": {
+        "name_vi": "Áo dài Hippy",
+        "aliases": []
+      },
+      "status": "under_review",
+      "version": 1,
+      "extensions": {}
+    },
+    {
+      "id": "variant_ao_dai_modern_classic",
+      "entity_type": "garment_variant",
+      "schema_version": "1.0",
+      "identity": {
+        "name_vi": "Áo dài nữ phom cổ điển hiện đại",
+        "aliases": []
+      },
+      "status": "under_review",
+      "version": 1,
+      "extensions": {}
+    },
+    {
+      "id": "variant_ao_dai_contemporary_relaxed",
+      "entity_type": "garment_variant",
+      "schema_version": "1.0",
+      "identity": {
+        "name_vi": "Áo dài đương đại phom suông/thoải mái",
+        "aliases": []
+      },
+      "status": "under_review",
+      "version": 1,
+      "extensions": {}
+    },
+    {
+      "id": "variant_ao_dai_contemporary_multilayer",
+      "entity_type": "garment_variant",
+      "schema_version": "1.0",
+      "identity": {
+        "name_vi": "Áo dài đương đại nhiều tà/nhiều lớp",
+        "aliases": []
+      },
+      "status": "under_review",
+      "version": 1,
+      "extensions": {}
+    },
+    {
+      "id": "practice_may_mac_ao_dai_hue",
+      "entity_type": "cultural_practice",
+      "schema_version": "1.0",
+      "identity": {
+        "name_vi": "Tri thức may, mặc áo dài Huế",
+        "aliases": []
+      },
+      "status": "under_review",
+      "version": 1,
+      "extensions": {}
+    },
+    {
+      "id": "region_hue",
+      "entity_type": "region",
+      "schema_version": "1.0",
+      "identity": {
+        "name_vi": "Vùng văn hóa Huế",
+        "aliases": [
+          "Huế"
+        ]
+      },
+      "status": "under_review",
+      "version": 1,
+      "extensions": {}
+    },
+    {
+      "id": "place_hanoi",
+      "entity_type": "place",
+      "schema_version": "1.0",
+      "identity": {
+        "name_vi": "Hà Nội",
+        "aliases": []
+      },
+      "status": "under_review",
+      "version": 1,
+      "extensions": {}
+    },
+    {
+      "id": "place_dakao_saigon",
+      "entity_type": "place",
+      "schema_version": "1.0",
+      "identity": {
+        "name_vi": "Đakao, Sài Gòn",
+        "aliases": [
+          "Đa Kao",
+          "Đakao"
+        ]
+      },
+      "status": "under_review",
+      "version": 1,
+      "extensions": {}
+    },
+    {
+      "id": "period_18c_nguyen_lords",
+      "entity_type": "period",
+      "schema_version": "1.0",
+      "identity": {
+        "name_vi": "Thế kỷ XVIII - thời chúa Nguyễn",
+        "aliases": []
+      },
+      "status": "under_review",
+      "version": 1,
+      "extensions": {}
+    },
+    {
+      "id": "period_1930s",
+      "entity_type": "period",
+      "schema_version": "1.0",
+      "identity": {
+        "name_vi": "Thập niên 1930",
+        "aliases": []
+      },
+      "status": "under_review",
+      "version": 1,
+      "extensions": {}
+    },
+    {
+      "id": "period_1958_1960",
+      "entity_type": "period",
+      "schema_version": "1.0",
+      "identity": {
+        "name_vi": "Khoảng 1958–1960",
+        "aliases": []
+      },
+      "status": "under_review",
+      "version": 1,
+      "extensions": {}
+    },
+    {
+      "id": "period_1960s_1970s",
+      "entity_type": "period",
+      "schema_version": "1.0",
+      "identity": {
+        "name_vi": "Thập niên 1960–1970",
+        "aliases": []
+      },
+      "status": "under_review",
+      "version": 1,
+      "extensions": {}
+    },
+    {
+      "id": "period_2017_2026",
+      "entity_type": "period",
+      "schema_version": "1.0",
+      "identity": {
+        "name_vi": "Giai đoạn 2017–2026",
+        "aliases": []
+      },
+      "status": "under_review",
+      "version": 1,
+      "extensions": {}
+    },
+    {
+      "id": "period_2024_2025",
+      "entity_type": "period",
+      "schema_version": "1.0",
+      "identity": {
+        "name_vi": "Giai đoạn 2024–2025",
+        "aliases": []
+      },
+      "status": "under_review",
+      "version": 1,
+      "extensions": {}
+    },
+    {
+      "id": "occasion_school_uniform",
+      "entity_type": "occasion",
+      "schema_version": "1.0",
+      "identity": {
+        "name_vi": "Đồng phục học đường",
+        "aliases": []
+      },
+      "status": "under_review",
+      "version": 1,
+      "extensions": {}
+    },
+    {
+      "id": "occasion_wedding",
+      "entity_type": "occasion",
+      "schema_version": "1.0",
+      "identity": {
+        "name_vi": "Lễ cưới",
+        "aliases": []
+      },
+      "status": "under_review",
+      "version": 1,
+      "extensions": {}
+    },
+    {
+      "id": "occasion_service_uniform",
+      "entity_type": "occasion",
+      "schema_version": "1.0",
+      "identity": {
+        "name_vi": "Đồng phục dịch vụ",
+        "aliases": []
+      },
+      "status": "under_review",
+      "version": 1,
+      "extensions": {}
+    },
+    {
+      "id": "person_nguyen_cat_tuong",
+      "entity_type": "person",
+      "schema_version": "1.0",
+      "identity": {
+        "name_vi": "Nguyễn Cát Tường",
+        "aliases": [
+          "Lemur Cát Tường"
+        ]
+      },
+      "status": "under_review",
+      "version": 1,
+      "extensions": {}
+    },
+    {
+      "id": "person_le_pho",
+      "entity_type": "person",
+      "schema_version": "1.0",
+      "identity": {
+        "name_vi": "Lê Phổ",
+        "aliases": []
+      },
+      "status": "under_review",
+      "version": 1,
+      "extensions": {}
+    },
+    {
+      "id": "workshop_dung_dakao",
+      "entity_type": "institution",
+      "schema_version": "1.0",
+      "identity": {
+        "name_vi": "Nhà may Dung Đakao",
+        "aliases": [
+          "Dung Dakao"
+        ]
+      },
+      "status": "under_review",
+      "version": 1,
+      "extensions": {}
+    }
+  ],
+  "attribute_definitions": [
+    {
+      "key": "historical.date_range",
+      "label_vi": "Khoảng thời gian",
+      "description": null,
+      "value_type": "date_range",
+      "cardinality": "single",
+      "allowed_values": null,
+      "applies_to": [
+        "garment",
+        "garment_variant",
+        "cultural_practice"
+      ],
+      "contextual": true,
+      "queryable": true,
+      "inheritable": false,
+      "default_missing_state": "not_collected",
+      "status": "active",
+      "version": 1
+    },
+    {
+      "key": "historical.exact_year",
+      "label_vi": "Năm cụ thể",
+      "description": null,
+      "value_type": "number",
+      "cardinality": "single",
+      "allowed_values": null,
+      "applies_to": [
+        "garment_variant",
+        "cultural_practice"
+      ],
+      "contextual": true,
+      "queryable": true,
+      "inheritable": false,
+      "default_missing_state": "not_collected",
+      "status": "active",
+      "version": 1
+    },
+    {
+      "key": "construction.body.fit",
+      "label_vi": "Phom thân",
+      "description": null,
+      "value_type": "enum",
+      "cardinality": "single",
+      "allowed_values": [
+        "loose",
+        "relaxed",
+        "semi_fitted",
+        "fitted",
+        "varied"
+      ],
+      "applies_to": [
+        "garment",
+        "garment_variant"
+      ],
+      "contextual": true,
+      "queryable": true,
+      "inheritable": true,
+      "default_missing_state": "not_collected",
+      "status": "active",
+      "version": 1
+    },
+    {
+      "key": "construction.waist.shaping",
+      "label_vi": "Mức chiết/nhấn eo",
+      "description": null,
+      "value_type": "enum",
+      "cardinality": "single",
+      "allowed_values": [
+        "none",
+        "minimal",
+        "moderate",
+        "strong",
+        "varied"
+      ],
+      "applies_to": [
+        "garment_variant"
+      ],
+      "contextual": true,
+      "queryable": true,
+      "inheritable": true,
+      "default_missing_state": "not_collected",
+      "status": "active",
+      "version": 1
+    },
+    {
+      "key": "construction.sleeve.assembly",
+      "label_vi": "Kiểu ráp tay",
+      "description": null,
+      "value_type": "enum",
+      "cardinality": "single",
+      "allowed_values": [
+        "set_in",
+        "raglan",
+        "integrated",
+        "varied",
+        "unknown"
+      ],
+      "applies_to": [
+        "garment",
+        "garment_variant"
+      ],
+      "contextual": true,
+      "queryable": true,
+      "inheritable": true,
+      "default_missing_state": "not_collected",
+      "status": "active",
+      "version": 1
+    },
+    {
+      "key": "construction.sleeve.length",
+      "label_vi": "Chiều dài tay",
+      "description": null,
+      "value_type": "enum",
+      "cardinality": "single",
+      "allowed_values": [
+        "short",
+        "elbow",
+        "three_quarter",
+        "long",
+        "varied"
+      ],
+      "applies_to": [
+        "garment",
+        "garment_variant"
+      ],
+      "contextual": true,
+      "queryable": true,
+      "inheritable": true,
+      "default_missing_state": "not_collected",
+      "status": "active",
+      "version": 1
+    },
+    {
+      "key": "construction.collar.type",
+      "label_vi": "Kiểu cổ",
+      "description": null,
+      "value_type": "enum",
+      "cardinality": "single",
+      "allowed_values": [
+        "standing_high",
+        "standing_low",
+        "round",
+        "boat",
+        "heart",
+        "geometric",
+        "collarless",
+        "varied"
+      ],
+      "applies_to": [
+        "garment",
+        "garment_variant"
+      ],
+      "contextual": true,
+      "queryable": true,
+      "inheritable": true,
+      "default_missing_state": "not_collected",
+      "status": "active",
+      "version": 1
+    },
+    {
+      "key": "construction.closure.system",
+      "label_vi": "Hệ đóng mở",
+      "description": null,
+      "value_type": "enum",
+      "cardinality": "single",
+      "allowed_values": [
+        "buttons",
+        "snaps",
+        "zipper",
+        "mixed",
+        "varied"
+      ],
+      "applies_to": [
+        "garment",
+        "garment_variant"
+      ],
+      "contextual": true,
+      "queryable": true,
+      "inheritable": true,
+      "default_missing_state": "not_collected",
+      "status": "active",
+      "version": 1
+    },
+    {
+      "key": "construction.tail.count",
+      "label_vi": "Số tà/lớp tà",
+      "description": null,
+      "value_type": "number",
+      "cardinality": "single",
+      "allowed_values": null,
+      "applies_to": [
+        "garment_variant"
+      ],
+      "contextual": true,
+      "queryable": true,
+      "inheritable": true,
+      "default_missing_state": "not_collected",
+      "status": "active",
+      "version": 1
+    },
+    {
+      "key": "construction.tail.length",
+      "label_vi": "Độ dài tà",
+      "description": null,
+      "value_type": "enum",
+      "cardinality": "single",
+      "allowed_values": [
+        "knee",
+        "mid_calf",
+        "ankle",
+        "near_ground",
+        "varied"
+      ],
+      "applies_to": [
+        "garment",
+        "garment_variant"
+      ],
+      "contextual": true,
+      "queryable": true,
+      "inheritable": true,
+      "default_missing_state": "not_collected",
+      "status": "active",
+      "version": 1
+    },
+    {
+      "key": "construction.layering",
+      "label_vi": "Kết cấu lớp",
+      "description": null,
+      "value_type": "enum",
+      "cardinality": "single",
+      "allowed_values": [
+        "single_layer",
+        "multi_layer",
+        "varied"
+      ],
+      "applies_to": [
+        "garment",
+        "garment_variant"
+      ],
+      "contextual": true,
+      "queryable": true,
+      "inheritable": true,
+      "default_missing_state": "not_collected",
+      "status": "active",
+      "version": 1
+    },
+    {
+      "key": "wearing.default_lower_garment",
+      "label_vi": "Trang phục mặc dưới mặc định",
+      "description": null,
+      "value_type": "entity_ref",
+      "cardinality": "single",
+      "allowed_values": null,
+      "applies_to": [
+        "garment",
+        "garment_variant"
+      ],
+      "contextual": true,
+      "queryable": true,
+      "inheritable": true,
+      "default_missing_state": "not_collected",
+      "status": "active",
+      "version": 1
+    },
+    {
+      "key": "usage.primary_context",
+      "label_vi": "Bối cảnh sử dụng chính",
+      "description": null,
+      "value_type": "entity_ref_list",
+      "cardinality": "multiple",
+      "allowed_values": null,
+      "applies_to": [
+        "garment",
+        "garment_variant"
+      ],
+      "contextual": true,
+      "queryable": true,
+      "inheritable": true,
+      "default_missing_state": "not_collected",
+      "status": "active",
+      "version": 1
+    },
+    {
+      "key": "cultural.legal_scope_note",
+      "label_vi": "Ghi chú phạm vi pháp lý/di sản",
+      "description": null,
+      "value_type": "string",
+      "cardinality": "single",
+      "allowed_values": null,
+      "applies_to": [
+        "garment",
+        "cultural_practice"
+      ],
+      "contextual": true,
+      "queryable": true,
+      "inheritable": false,
+      "default_missing_state": "not_collected",
+      "status": "active",
+      "version": 1
+    }
+  ],
+  "attribute_values": [
+    {
+      "id": "av_family_fit",
+      "entity_id": "garment_ao_dai",
+      "attribute_key": "construction.body.fit",
+      "state": "known",
+      "value": "varied",
+      "candidate_values": [],
+      "qualifiers": {
+        "period_ids": [],
+        "region_ids": [],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "assertion_ids": [
+        "assert_current_variation"
+      ]
+    },
+    {
+      "id": "av_family_collar",
+      "entity_id": "garment_ao_dai",
+      "attribute_key": "construction.collar.type",
+      "state": "known",
+      "value": "varied",
+      "candidate_values": [],
+      "qualifiers": {
+        "period_ids": [],
+        "region_ids": [],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "assertion_ids": [
+        "assert_current_collar_variation"
+      ]
+    },
+    {
+      "id": "av_family_lower",
+      "entity_id": "garment_ao_dai",
+      "attribute_key": "wearing.default_lower_garment",
+      "state": "known",
+      "value": "lower_garment_trousers",
+      "candidate_values": [],
+      "qualifiers": {
+        "period_ids": [],
+        "region_ids": [],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "assertion_ids": [
+        "assert_modern_two_piece"
+      ]
+    },
+    {
+      "id": "av_lemur_fit",
+      "entity_id": "variant_ao_dai_lemur_1930s",
+      "attribute_key": "construction.body.fit",
+      "state": "known",
+      "value": "fitted",
+      "candidate_values": [],
+      "qualifiers": {
+        "period_ids": [
+          "period_1930s"
+        ],
+        "region_ids": [],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "assertion_ids": [
+        "assert_lemur_form"
+      ]
+    },
+    {
+      "id": "av_lemur_waist",
+      "entity_id": "variant_ao_dai_lemur_1930s",
+      "attribute_key": "construction.waist.shaping",
+      "state": "known",
+      "value": "strong",
+      "candidate_values": [],
+      "qualifiers": {
+        "period_ids": [
+          "period_1930s"
+        ],
+        "region_ids": [],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "assertion_ids": [
+        "assert_lemur_form"
+      ]
+    },
+    {
+      "id": "av_lemur_year",
+      "entity_id": "variant_ao_dai_lemur_1930s",
+      "attribute_key": "historical.exact_year",
+      "state": "disputed",
+      "value": null,
+      "candidate_values": [
+        1934,
+        1939
+      ],
+      "qualifiers": {
+        "period_ids": [
+          "period_1930s"
+        ],
+        "region_ids": [],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "assertion_ids": [
+        "assert_cat_tuong_1934",
+        "assert_hou_lemur_1939"
+      ]
+    },
+    {
+      "id": "av_lepho_fit",
+      "entity_id": "variant_ao_dai_le_pho_1930s",
+      "attribute_key": "construction.body.fit",
+      "state": "known",
+      "value": "fitted",
+      "candidate_values": [],
+      "qualifiers": {
+        "period_ids": [
+          "period_1930s"
+        ],
+        "region_ids": [],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "assertion_ids": [
+        "assert_le_pho_form"
+      ]
+    },
+    {
+      "id": "av_lepho_tail",
+      "entity_id": "variant_ao_dai_le_pho_1930s",
+      "attribute_key": "construction.tail.length",
+      "state": "known",
+      "value": "near_ground",
+      "candidate_values": [],
+      "qualifiers": {
+        "period_ids": [
+          "period_1930s"
+        ],
+        "region_ids": [],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "assertion_ids": [
+        "assert_le_pho_form"
+      ]
+    },
+    {
+      "id": "av_raglan_sleeve",
+      "entity_id": "variant_ao_dai_raglan_1958_1960",
+      "attribute_key": "construction.sleeve.assembly",
+      "state": "known",
+      "value": "raglan",
+      "candidate_values": [],
+      "qualifiers": {
+        "period_ids": [
+          "period_1958_1960"
+        ],
+        "region_ids": [],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "assertion_ids": [
+        "assert_raglan_structure"
+      ]
+    },
+    {
+      "id": "av_raglan_fit",
+      "entity_id": "variant_ao_dai_raglan_1958_1960",
+      "attribute_key": "construction.body.fit",
+      "state": "known",
+      "value": "fitted",
+      "candidate_values": [],
+      "qualifiers": {
+        "period_ids": [
+          "period_1958_1960"
+        ],
+        "region_ids": [],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "assertion_ids": [
+        "assert_raglan_structure"
+      ]
+    },
+    {
+      "id": "av_raglan_closure",
+      "entity_id": "variant_ao_dai_raglan_1958_1960",
+      "attribute_key": "construction.closure.system",
+      "state": "known",
+      "value": "snaps",
+      "candidate_values": [],
+      "qualifiers": {
+        "period_ids": [
+          "period_1958_1960"
+        ],
+        "region_ids": [],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "assertion_ids": [
+        "assert_raglan_structure"
+      ]
+    },
+    {
+      "id": "av_raglan_year",
+      "entity_id": "variant_ao_dai_raglan_1958_1960",
+      "attribute_key": "historical.exact_year",
+      "state": "disputed",
+      "value": null,
+      "candidate_values": [
+        1958,
+        1960
+      ],
+      "qualifiers": {
+        "period_ids": [
+          "period_1958_1960"
+        ],
+        "region_ids": [],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "assertion_ids": [
+        "assert_raglan_1958",
+        "assert_raglan_1960"
+      ]
+    },
+    {
+      "id": "av_mini_tail",
+      "entity_id": "variant_ao_dai_miniraglan_1960s_1970s",
+      "attribute_key": "construction.tail.length",
+      "state": "known",
+      "value": "knee",
+      "candidate_values": [],
+      "qualifiers": {
+        "period_ids": [
+          "period_1960s_1970s"
+        ],
+        "region_ids": [],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "assertion_ids": [
+        "assert_miniraglan"
+      ]
+    },
+    {
+      "id": "av_mini_fit",
+      "entity_id": "variant_ao_dai_miniraglan_1960s_1970s",
+      "attribute_key": "construction.body.fit",
+      "state": "known",
+      "value": "relaxed",
+      "candidate_values": [],
+      "qualifiers": {
+        "period_ids": [
+          "period_1960s_1970s"
+        ],
+        "region_ids": [],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "assertion_ids": [
+        "assert_miniraglan"
+      ]
+    },
+    {
+      "id": "av_mini_usage",
+      "entity_id": "variant_ao_dai_miniraglan_1960s_1970s",
+      "attribute_key": "usage.primary_context",
+      "state": "known",
+      "value": [
+        "occasion_school_uniform"
+      ],
+      "candidate_values": [],
+      "qualifiers": {
+        "period_ids": [
+          "period_1960s_1970s"
+        ],
+        "region_ids": [],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "assertion_ids": [
+        "assert_miniraglan"
+      ]
+    },
+    {
+      "id": "av_hippy_tail",
+      "entity_id": "variant_ao_dai_hippy_late1960s",
+      "attribute_key": "construction.tail.length",
+      "state": "known",
+      "value": "knee",
+      "candidate_values": [],
+      "qualifiers": {
+        "period_ids": [
+          "period_1960s_1970s"
+        ],
+        "region_ids": [],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "assertion_ids": [
+        "assert_hippy"
+      ]
+    },
+    {
+      "id": "av_hippy_fit",
+      "entity_id": "variant_ao_dai_hippy_late1960s",
+      "attribute_key": "construction.body.fit",
+      "state": "known",
+      "value": "relaxed",
+      "candidate_values": [],
+      "qualifiers": {
+        "period_ids": [
+          "period_1960s_1970s"
+        ],
+        "region_ids": [],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "assertion_ids": [
+        "assert_hippy"
+      ]
+    },
+    {
+      "id": "av_hippy_waist",
+      "entity_id": "variant_ao_dai_hippy_late1960s",
+      "attribute_key": "construction.waist.shaping",
+      "state": "known",
+      "value": "none",
+      "candidate_values": [],
+      "qualifiers": {
+        "period_ids": [
+          "period_1960s_1970s"
+        ],
+        "region_ids": [],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "assertion_ids": [
+        "assert_hippy"
+      ]
+    },
+    {
+      "id": "av_classic_fit",
+      "entity_id": "variant_ao_dai_modern_classic",
+      "attribute_key": "construction.body.fit",
+      "state": "known",
+      "value": "fitted",
+      "candidate_values": [],
+      "qualifiers": {
+        "period_ids": [],
+        "region_ids": [],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "assertion_ids": [
+        "assert_classic_profile"
+      ]
+    },
+    {
+      "id": "av_classic_sleeve",
+      "entity_id": "variant_ao_dai_modern_classic",
+      "attribute_key": "construction.sleeve.assembly",
+      "state": "known",
+      "value": "raglan",
+      "candidate_values": [],
+      "qualifiers": {
+        "period_ids": [],
+        "region_ids": [],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "assertion_ids": [
+        "assert_classic_profile"
+      ]
+    },
+    {
+      "id": "av_classic_collar",
+      "entity_id": "variant_ao_dai_modern_classic",
+      "attribute_key": "construction.collar.type",
+      "state": "known",
+      "value": "standing_high",
+      "candidate_values": [],
+      "qualifiers": {
+        "period_ids": [],
+        "region_ids": [],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "assertion_ids": [
+        "assert_classic_profile"
+      ]
+    },
+    {
+      "id": "av_classic_closure",
+      "entity_id": "variant_ao_dai_modern_classic",
+      "attribute_key": "construction.closure.system",
+      "state": "known",
+      "value": "snaps",
+      "candidate_values": [],
+      "qualifiers": {
+        "period_ids": [],
+        "region_ids": [],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "assertion_ids": [
+        "assert_classic_profile"
+      ]
+    },
+    {
+      "id": "av_classic_tail_count",
+      "entity_id": "variant_ao_dai_modern_classic",
+      "attribute_key": "construction.tail.count",
+      "state": "known",
+      "value": 2,
+      "candidate_values": [],
+      "qualifiers": {
+        "period_ids": [],
+        "region_ids": [],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "assertion_ids": [
+        "assert_classic_profile"
+      ]
+    },
+    {
+      "id": "av_classic_lower",
+      "entity_id": "variant_ao_dai_modern_classic",
+      "attribute_key": "wearing.default_lower_garment",
+      "state": "known",
+      "value": "lower_garment_trousers",
+      "candidate_values": [],
+      "qualifiers": {
+        "period_ids": [],
+        "region_ids": [],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "assertion_ids": [
+        "assert_classic_profile"
+      ]
+    },
+    {
+      "id": "av_relaxed_fit",
+      "entity_id": "variant_ao_dai_contemporary_relaxed",
+      "attribute_key": "construction.body.fit",
+      "state": "known",
+      "value": "relaxed",
+      "candidate_values": [],
+      "qualifiers": {
+        "period_ids": [
+          "period_2017_2026"
+        ],
+        "region_ids": [],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "assertion_ids": [
+        "assert_relaxed_trend"
+      ]
+    },
+    {
+      "id": "av_relaxed_waist",
+      "entity_id": "variant_ao_dai_contemporary_relaxed",
+      "attribute_key": "construction.waist.shaping",
+      "state": "known",
+      "value": "minimal",
+      "candidate_values": [],
+      "qualifiers": {
+        "period_ids": [
+          "period_2017_2026"
+        ],
+        "region_ids": [],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "assertion_ids": [
+        "assert_relaxed_trend"
+      ]
+    },
+    {
+      "id": "av_relaxed_collar",
+      "entity_id": "variant_ao_dai_contemporary_relaxed",
+      "attribute_key": "construction.collar.type",
+      "state": "known",
+      "value": "varied",
+      "candidate_values": [],
+      "qualifiers": {
+        "period_ids": [
+          "period_2017_2026"
+        ],
+        "region_ids": [],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "assertion_ids": [
+        "assert_current_collar_variation"
+      ]
+    },
+    {
+      "id": "av_multilayer_layers",
+      "entity_id": "variant_ao_dai_contemporary_multilayer",
+      "attribute_key": "construction.layering",
+      "state": "known",
+      "value": "multi_layer",
+      "candidate_values": [],
+      "qualifiers": {
+        "period_ids": [
+          "period_2024_2025"
+        ],
+        "region_ids": [],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "assertion_ids": [
+        "assert_multilayer_trend"
+      ]
+    },
+    {
+      "id": "av_multilayer_count",
+      "entity_id": "variant_ao_dai_contemporary_multilayer",
+      "attribute_key": "construction.tail.count",
+      "state": "unknown",
+      "value": null,
+      "candidate_values": [],
+      "qualifiers": {
+        "period_ids": [
+          "period_2024_2025"
+        ],
+        "region_ids": [],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "assertion_ids": [
+        "assert_multilayer_trend"
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "id": "src_bvhttdl_2024_hue_heritage",
+      "source_type": "official_institution_web",
+      "title": "Đón nhận danh hiệu Di sản văn hóa phi vật thể quốc gia 'Tri thức May và Mặc áo dài Huế'",
+      "institution": "Bộ Văn hóa, Thể thao và Du lịch",
+      "publication_date": "2024-11-24",
+      "url": "https://bvhttdl.gov.vn/Pages/chi-tiet.aspx?url=%2Fdon-nhan-danh-hieu-di-san-van-hoa-phi-vat-the-quoc-gia-tri-thuc-may-va-mac-ao-dai-hue-20241123163635638.htm",
+      "accessed_at": "2026-09-18",
+      "trust_tier": "A_PRIMARY",
+      "review_status": "verified_source",
+      "rights": {
+        "may_store_metadata": true,
+        "may_store_full_text": false,
+        "may_display_publicly": false,
+        "may_use_for_ai_reference": false,
+        "status": "review_required"
+      }
+    },
+    {
+      "id": "src_baochinhphu_2019_hue_history",
+      "source_type": "official_institution_web",
+      "title": "Áo dài trong dòng chảy lịch sử-văn hoá Huế",
+      "institution": "Báo Điện tử Chính phủ",
+      "publication_date": "2019",
+      "url": "https://baochinhphu.vn/ao-dai-trong-dong-chay-lich-su-van-hoa-hue-102267311.htm",
+      "accessed_at": "2026-09-18",
+      "trust_tier": "C_INSTITUTIONAL",
+      "review_status": "verified_source",
+      "rights": {
+        "may_store_metadata": true,
+        "may_store_full_text": false,
+        "may_display_publicly": false,
+        "may_use_for_ai_reference": false,
+        "status": "review_required"
+      }
+    },
+    {
+      "id": "src_svhtt_hcm_2021_ngu_than",
+      "source_type": "official_institution_web",
+      "title": "Lễ trao tặng áo dài ngũ thân truyền thống nhân Ngày Di sản Văn hoá",
+      "institution": "Sở Văn hóa và Thể thao Thành phố Hồ Chí Minh",
+      "publication_date": "2021",
+      "url": "https://svhtt.hochiminhcity.gov.vn/tin-chi-tiet/-/chi-tiet/le-trao-tang-ao-dai-ngu-than-truyen-thong-nhan-ngay-di-san-van-hoa-23-thang-11-23561-1002.html",
+      "accessed_at": "2026-09-18",
+      "trust_tier": "C_INSTITUTIONAL",
+      "review_status": "verified_source",
+      "rights": {
+        "may_store_metadata": true,
+        "may_store_full_text": false,
+        "may_display_publicly": false,
+        "may_use_for_ai_reference": false,
+        "status": "review_required"
+      }
+    },
+    {
+      "id": "src_qdnd_2014_ao_dai",
+      "source_type": "institutional_press",
+      "title": "Áo dài",
+      "institution": "Báo Quân đội nhân dân",
+      "publication_date": "2014-08-02",
+      "url": "https://www.qdnd.vn/van-hoa/doi-song/ao-dai-413627",
+      "accessed_at": "2026-09-18",
+      "trust_tier": "C_INSTITUTIONAL",
+      "review_status": "verified_source",
+      "rights": {
+        "may_store_metadata": true,
+        "may_store_full_text": false,
+        "may_display_publicly": false,
+        "may_use_for_ai_reference": false,
+        "status": "review_required"
+      }
+    },
+    {
+      "id": "src_trinhbach_2020_origin",
+      "source_type": "academic_article",
+      "title": "Nguồn gốc áo dài Việt Nam",
+      "creator": "Trịnh Bách",
+      "institution": "Tạp chí Nghiên cứu và Phát triển, số 7 (161), 2020",
+      "publication_date": "2020",
+      "url": "https://vjol.info.vn/index.php/ncpt-hue/article/download/54470/45091/",
+      "accessed_at": "2026-09-18",
+      "trust_tier": "B_SCHOLARLY",
+      "review_status": "verified_source",
+      "rights": {
+        "may_store_metadata": true,
+        "may_store_full_text": false,
+        "may_display_publicly": false,
+        "may_use_for_ai_reference": false,
+        "status": "review_required"
+      }
+    },
+    {
+      "id": "src_minina_2021_color",
+      "source_type": "academic_article",
+      "title": "Symbolism of Colour of the Vietnamese National Garment Áo Dài: Historical Foundations, Development and Interpretations",
+      "creator": "Yuliia D. Minina",
+      "institution": "The Russian Journal of Vietnamese Studies 5(4)",
+      "publication_date": "2021",
+      "doi": "10.54631/VS.2021.54-106-130",
+      "url": "https://vietnamjournal.ru/2618-9453/article/view/96433",
+      "accessed_at": "2026-09-18",
+      "trust_tier": "B_SCHOLARLY",
+      "review_status": "verified_source",
+      "rights": {
+        "may_store_metadata": true,
+        "may_store_full_text": false,
+        "may_display_publicly": false,
+        "may_use_for_ai_reference": false,
+        "status": "restricted_for_derivative_use",
+        "license": "CC BY-NC-ND 4.0 for article content; derivative-use review required"
+      }
+    },
+    {
+      "id": "src_hou_2026_form",
+      "source_type": "academic_article",
+      "title": "Diện mạo mới của Áo dài nữ: Những xu hướng thiết kế phom dáng và kết cấu của Áo dài hiện nay",
+      "creator": "Võ Thị Ngọc Anh; Trần Thị Thu Hằng",
+      "institution": "Tạp chí Khoa học Trường Đại học Mở Hà Nội",
+      "publication_date": "2026-06",
+      "doi": "10.59266/houjs.2026.1237",
+      "url": "https://www.researchgate.net/publication/407512858_DIEN_MAO_MOI_CUA_AO_DAI_NU_NHUNG_XU_HUONG_THIET_KE_PHOM_DANG_VA_KET_CAU_CUA_AO_DAI_HIEN_NAY",
+      "accessed_at": "2026-09-18",
+      "trust_tier": "B_SCHOLARLY",
+      "review_status": "verified_source",
+      "rights": {
+        "may_store_metadata": true,
+        "may_store_full_text": false,
+        "may_display_publicly": false,
+        "may_use_for_ai_reference": false,
+        "status": "review_required"
+      }
+    },
+    {
+      "id": "src_chinhphu_hcm_2022_story",
+      "source_type": "official_institution_web",
+      "title": "Tới TPHCM nghe chuyện về áo dài - tâm hồn văn hóa người Việt",
+      "institution": "Cổng thông tin Chính phủ tại TP.HCM",
+      "publication_date": "2022",
+      "url": "https://tphcm.baochinhphu.vn/toi-tphcm-nghe-chuyen-ve-ao-dai-tam-hon-van-hoa-nguoi-viet-101220317165416434.htm",
+      "accessed_at": "2026-09-18",
+      "trust_tier": "C_INSTITUTIONAL",
+      "review_status": "verified_source",
+      "rights": {
+        "may_store_metadata": true,
+        "may_store_full_text": false,
+        "may_display_publicly": false,
+        "may_use_for_ai_reference": false,
+        "status": "review_required"
+      }
+    },
+    {
+      "id": "src_vnexpress_2025_hcm_history",
+      "source_type": "press_article",
+      "title": "Áo dài TP HCM thay đổi thế nào qua trăm năm",
+      "institution": "VnExpress",
+      "publication_date": "2025",
+      "url": "https://vnexpress.net/ao-dai-tp-hcm-thay-doi-the-nao-qua-tram-nam-4876661.html",
+      "accessed_at": "2026-09-18",
+      "trust_tier": "D_EXPERT_CURATED",
+      "review_status": "verified_source",
+      "rights": {
+        "may_store_metadata": true,
+        "may_store_full_text": false,
+        "may_display_publicly": false,
+        "may_use_for_ai_reference": false,
+        "status": "review_required"
+      }
+    },
+    {
+      "id": "src_chinhphu_2024_ao_dai_museum",
+      "source_type": "official_institution_web",
+      "title": "Bảo tàng Áo dài TPHCM: Một thập kỷ tôn vinh tà áo dài truyền thống",
+      "institution": "Báo Điện tử Chính phủ",
+      "publication_date": "2024-01-19",
+      "url": "https://tphcm.chinhphu.vn/bao-tang-ao-dai-tphcm-mot-thap-ky-ton-vinh-ta-ao-dai-truyen-thong-101240119154009365.htm",
+      "accessed_at": "2026-09-18",
+      "trust_tier": "C_INSTITUTIONAL",
+      "review_status": "verified_source",
+      "rights": {
+        "may_store_metadata": true,
+        "may_store_full_text": false,
+        "may_display_publicly": false,
+        "may_use_for_ai_reference": false,
+        "status": "review_required"
+      }
+    },
+    {
+      "id": "src_howard_2016_textiles",
+      "source_type": "academic_book",
+      "title": "Textiles and Clothing of Việt Nam: A History",
+      "creator": "Michael C. Howard",
+      "institution": "McFarland",
+      "publication_date": "2016",
+      "url": "https://books.google.com/books/about/Textiles_and_Clothing_of_Vi%E1%BB%87t_Nam.html?id=Cw7MDAAAQBAJ",
+      "accessed_at": "2026-09-18",
+      "trust_tier": "B_SCHOLARLY",
+      "review_status": "source_identified_not_fully_reviewed",
+      "rights": {
+        "may_store_metadata": true,
+        "may_store_full_text": false,
+        "may_display_publicly": false,
+        "may_use_for_ai_reference": false,
+        "status": "review_required"
+      }
+    }
+  ],
+  "assertions": [
+    {
+      "id": "assert_1744_reform",
+      "subject_id": "garment_ao_ngu_than",
+      "predicate": "historical.clothing_reform_context",
+      "value": 1744,
+      "qualifiers": {
+        "period_ids": [
+          "period_18c_nguyen_lords"
+        ],
+        "region_ids": [
+          "region_hue"
+        ],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "statement_vi": "Năm 1744 là một mốc cải cách y phục quan trọng tại Phú Xuân/Đàng Trong trong lịch sử dẫn tới các dạng áo dài về sau.",
+      "evidence": [
+        {
+          "source_id": "src_baochinhphu_2019_hue_history",
+          "locator": "đoạn về năm 1744 và Nguyễn Phúc Khoát"
+        },
+        {
+          "source_id": "src_svhtt_hcm_2021_ngu_than",
+          "locator": "phần lịch sử hình thành áo ngũ thân"
+        }
+      ],
+      "confidence": 0.92,
+      "consensus": "corroborated",
+      "review_status": "under_review",
+      "version": 1
+    },
+    {
+      "id": "assert_ngu_than_predecessor",
+      "subject_id": "garment_ao_ngu_than",
+      "predicate": "historical.relationship",
+      "value": "predecessor_of_ao_dai",
+      "qualifiers": {
+        "period_ids": [
+          "period_18c_nguyen_lords"
+        ],
+        "region_ids": [],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "statement_vi": "Áo ngũ thân được nhiều nguồn hiện đại mô tả là tiền thân quan trọng/trực tiếp của áo dài hiện đại.",
+      "evidence": [
+        {
+          "source_id": "src_hou_2026_form",
+          "locator": "mục 4.1.2 về áo ngũ thân tay chẽn"
+        },
+        {
+          "source_id": "src_svhtt_hcm_2021_ngu_than",
+          "locator": "mô tả lịch sử và cấu trúc áo ngũ thân"
+        }
+      ],
+      "confidence": 0.88,
+      "consensus": "corroborated",
+      "review_status": "under_review",
+      "version": 1
+    },
+    {
+      "id": "assert_cat_tuong_1934",
+      "subject_id": "variant_ao_dai_lemur_1930s",
+      "predicate": "historical.documented_reform_publication",
+      "value": "1934-02-23",
+      "qualifiers": {
+        "period_ids": [
+          "period_1930s"
+        ],
+        "region_ids": [],
+        "place_ids": [
+          "place_hanoi"
+        ],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "statement_vi": "Nguyễn Cát Tường công bố quan niệm cải cách y phục phụ nữ trên Phong Hóa ngày 23/2/1934; đây là mốc tài liệu quan trọng cho Le Mur.",
+      "evidence": [
+        {
+          "source_id": "src_qdnd_2014_ao_dai",
+          "locator": "đoạn dẫn Phong Hóa ngày 23/2/1934"
+        },
+        {
+          "source_id": "src_trinhbach_2020_origin",
+          "locator": "phần bàn về cải cách Cát Tường/Le Mur"
+        }
+      ],
+      "confidence": 0.94,
+      "consensus": "corroborated",
+      "review_status": "under_review",
+      "version": 1
+    },
+    {
+      "id": "assert_hou_lemur_1939",
+      "subject_id": "variant_ao_dai_lemur_1930s",
+      "predicate": "historical.claimed_year",
+      "value": 1939,
+      "qualifiers": {
+        "period_ids": [
+          "period_1930s"
+        ],
+        "region_ids": [],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "statement_vi": "Một nghiên cứu năm 2026 sử dụng mốc 1939 khi mô tả sự xuất hiện của áo dài Lemur.",
+      "evidence": [
+        {
+          "source_id": "src_hou_2026_form",
+          "locator": "mục 4.1.2, đoạn về Lemur"
+        }
+      ],
+      "confidence": 0.6,
+      "consensus": "single_source",
+      "review_status": "under_review",
+      "version": 1
+    },
+    {
+      "id": "assert_lemur_form",
+      "subject_id": "variant_ao_dai_lemur_1930s",
+      "predicate": "construction.form_change",
+      "value": "fitted_and_waist_emphasized",
+      "qualifiers": {
+        "period_ids": [
+          "period_1930s"
+        ],
+        "region_ids": [],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "statement_vi": "Le Mur được mô tả là chuyển mạnh khỏi phom rộng trước đó sang phom ôm hơn và nhấn vùng eo, đồng thời sử dụng nhiều chi tiết chịu ảnh hưởng phương Tây.",
+      "evidence": [
+        {
+          "source_id": "src_hou_2026_form",
+          "locator": "mục 4.1.2 về Lemur"
+        },
+        {
+          "source_id": "src_qdnd_2014_ao_dai",
+          "locator": "phần Cát Tường và cải cách y phục"
+        }
+      ],
+      "confidence": 0.84,
+      "consensus": "corroborated",
+      "review_status": "under_review",
+      "version": 1
+    },
+    {
+      "id": "assert_le_pho_form",
+      "subject_id": "variant_ao_dai_le_pho_1930s",
+      "predicate": "construction.form_change",
+      "value": "fitted_long_tails_traditional_rebalancing",
+      "qualifiers": {
+        "period_ids": [
+          "period_1930s"
+        ],
+        "region_ids": [],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "statement_vi": "Kiểu gắn với Lê Phổ được mô tả là làm gọn Le Mur, đưa trở lại các yếu tố từ trang phục truyền thống và tạo tà dài, phom ôm gọn.",
+      "evidence": [
+        {
+          "source_id": "src_hou_2026_form",
+          "locator": "mục 4.1.2, đoạn về Lê Phổ"
+        }
+      ],
+      "confidence": 0.72,
+      "consensus": "single_source",
+      "review_status": "under_review",
+      "version": 1
+    },
+    {
+      "id": "assert_raglan_1958",
+      "subject_id": "variant_ao_dai_raglan_1958_1960",
+      "predicate": "historical.claimed_year",
+      "value": 1958,
+      "qualifiers": {
+        "period_ids": [
+          "period_1958_1960"
+        ],
+        "region_ids": [],
+        "place_ids": [
+          "place_dakao_saigon"
+        ],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "statement_vi": "Một số nguồn thể chế/báo chí ghi Raglan xuất hiện từ khoảng 1958 và gắn với nhà may Dung Đakao.",
+      "evidence": [
+        {
+          "source_id": "src_chinhphu_hcm_2022_story",
+          "locator": "phần Áo dài Raglan"
+        },
+        {
+          "source_id": "src_vnexpress_2025_hcm_history",
+          "locator": "đoạn về Raglan từ 1958"
+        }
+      ],
+      "confidence": 0.82,
+      "consensus": "corroborated",
+      "review_status": "under_review",
+      "version": 1
+    },
+    {
+      "id": "assert_raglan_1960",
+      "subject_id": "variant_ao_dai_raglan_1958_1960",
+      "predicate": "historical.claimed_year",
+      "value": 1960,
+      "qualifiers": {
+        "period_ids": [
+          "period_1958_1960"
+        ],
+        "region_ids": [],
+        "place_ids": [
+          "place_dakao_saigon"
+        ],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "statement_vi": "Nghiên cứu năm 2026 sử dụng mốc 1960 cho sự xuất hiện của áo dài Raglan.",
+      "evidence": [
+        {
+          "source_id": "src_hou_2026_form",
+          "locator": "mục 4.1.2, đoạn Raglan"
+        }
+      ],
+      "confidence": 0.75,
+      "consensus": "single_source",
+      "review_status": "under_review",
+      "version": 1
+    },
+    {
+      "id": "assert_raglan_structure",
+      "subject_id": "variant_ao_dai_raglan_1958_1960",
+      "predicate": "construction.signature",
+      "value": "raglan_sleeve_fitted_snap_closure",
+      "qualifiers": {
+        "period_ids": [
+          "period_1958_1960"
+        ],
+        "region_ids": [],
+        "place_ids": [
+          "place_dakao_saigon"
+        ],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "statement_vi": "Raglan được mô tả với đường ráp tay chéo từ cổ xuống nách, giảm nhăn vùng nách/vai, phom ôm và hệ cúc bấm ở phần thân bên.",
+      "evidence": [
+        {
+          "source_id": "src_hou_2026_form",
+          "locator": "mục 4.1.2, cấu trúc Raglan"
+        },
+        {
+          "source_id": "src_chinhphu_hcm_2022_story",
+          "locator": "phần mô tả Raglan"
+        }
+      ],
+      "confidence": 0.9,
+      "consensus": "corroborated",
+      "review_status": "under_review",
+      "version": 1
+    },
+    {
+      "id": "assert_miniraglan",
+      "subject_id": "variant_ao_dai_miniraglan_1960s_1970s",
+      "predicate": "construction.signature",
+      "value": "shorter_tail_relaxed_student_variant",
+      "qualifiers": {
+        "period_ids": [
+          "period_1960s_1970s"
+        ],
+        "region_ids": [],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [
+          "occasion_school_uniform"
+        ],
+        "social_context_ids": []
+      },
+      "statement_vi": "Miniraglan trong giai đoạn 1960–1970 được mô tả có tà ngắn hơn và phom thoải mái hơn, gắn với nữ sinh.",
+      "evidence": [
+        {
+          "source_id": "src_hou_2026_form",
+          "locator": "mục 4.1.2, đoạn Miniraglan"
+        }
+      ],
+      "confidence": 0.8,
+      "consensus": "single_source",
+      "review_status": "under_review",
+      "version": 1
+    },
+    {
+      "id": "assert_hippy",
+      "subject_id": "variant_ao_dai_hippy_late1960s",
+      "predicate": "construction.signature",
+      "value": "shorter_relaxed_less_waist_shaping",
+      "qualifiers": {
+        "period_ids": [
+          "period_1960s_1970s"
+        ],
+        "region_ids": [],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "statement_vi": "Kiểu Hippy được mô tả với vạt ngắn hơn, phom thoải mái và giảm/bỏ chiết eo, thường đi với quần rộng.",
+      "evidence": [
+        {
+          "source_id": "src_hou_2026_form",
+          "locator": "mục 4.1.2, đoạn áo dài Hippy"
+        },
+        {
+          "source_id": "src_vnexpress_2025_hcm_history",
+          "locator": "đoạn về áo dài hippy cuối thập niên 1960"
+        }
+      ],
+      "confidence": 0.8,
+      "consensus": "corroborated",
+      "review_status": "under_review",
+      "version": 1
+    },
+    {
+      "id": "assert_classic_profile",
+      "subject_id": "variant_ao_dai_modern_classic",
+      "predicate": "construction.signature",
+      "value": "fitted_high_collar_raglan_two_tails_trousers",
+      "qualifiers": {
+        "period_ids": [],
+        "region_ids": [],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "statement_vi": "Một profile áo dài cổ điển hiện đại quen thuộc được mô tả với thân ôm, cổ đứng, tà trước/tà sau, tay raglan, cúc bấm và quần dài rộng.",
+      "evidence": [
+        {
+          "source_id": "src_hou_2026_form",
+          "locator": "mục 4.1.2, phần kiểu áo dài khoảng 1970 và đặc điểm trước thế kỷ XXI"
+        }
+      ],
+      "confidence": 0.82,
+      "consensus": "single_source",
+      "review_status": "under_review",
+      "version": 1
+    },
+    {
+      "id": "assert_modern_two_piece",
+      "subject_id": "garment_ao_dai",
+      "predicate": "wearing.structure",
+      "value": "long_tunic_over_trousers",
+      "qualifiers": {
+        "period_ids": [],
+        "region_ids": [],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "statement_vi": "Áo dài hiện đại thường được mô tả như áo/tunic dài mặc cùng quần.",
+      "evidence": [
+        {
+          "source_id": "src_minina_2021_color",
+          "locator": "phần introduction và mô tả modernized áo dài"
+        },
+        {
+          "source_id": "src_hou_2026_form",
+          "locator": "phần tổng quan kết cấu"
+        }
+      ],
+      "confidence": 0.9,
+      "consensus": "corroborated",
+      "review_status": "under_review",
+      "version": 1
+    },
+    {
+      "id": "assert_current_variation",
+      "subject_id": "garment_ao_dai",
+      "predicate": "construction.current_variability",
+      "value": "high",
+      "qualifiers": {
+        "period_ids": [
+          "period_2017_2026"
+        ],
+        "region_ids": [],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "statement_vi": "Áo dài đương đại có biên độ biến đổi lớn về phom và kết cấu, nên garment family không nên có một fit cố định.",
+      "evidence": [
+        {
+          "source_id": "src_hou_2026_form",
+          "locator": "mục 4.2 và bảng so sánh xu hướng hiện nay"
+        }
+      ],
+      "confidence": 0.9,
+      "consensus": "single_source",
+      "review_status": "under_review",
+      "version": 1
+    },
+    {
+      "id": "assert_relaxed_trend",
+      "subject_id": "variant_ao_dai_contemporary_relaxed",
+      "predicate": "construction.current_trend",
+      "value": "relaxed_loose_low_dart",
+      "qualifiers": {
+        "period_ids": [
+          "period_2017_2026"
+        ],
+        "region_ids": [],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "statement_vi": "Nghiên cứu 2026 ghi nhận xu hướng phom suông/rộng, ít hoặc không chiết ly tăng từ khoảng 2017.",
+      "evidence": [
+        {
+          "source_id": "src_hou_2026_form",
+          "locator": "mục 4.2.1 về phom suông rộng và không chiết ly"
+        }
+      ],
+      "confidence": 0.88,
+      "consensus": "single_source",
+      "review_status": "under_review",
+      "version": 1
+    },
+    {
+      "id": "assert_current_collar_variation",
+      "subject_id": "garment_ao_dai",
+      "predicate": "construction.collar_variability",
+      "value": "standing_low_round_high_geometric",
+      "qualifiers": {
+        "period_ids": [
+          "period_2017_2026"
+        ],
+        "region_ids": [],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "statement_vi": "Thiết kế hiện nay sử dụng nhiều nhóm cổ: cổ trụ thấp, cổ tròn, cổ đứng cao và các dạng hình học/bất đối xứng.",
+      "evidence": [
+        {
+          "source_id": "src_hou_2026_form",
+          "locator": "mục phân tích cấu trúc cổ áo hiện nay"
+        }
+      ],
+      "confidence": 0.88,
+      "consensus": "single_source",
+      "review_status": "under_review",
+      "version": 1
+    },
+    {
+      "id": "assert_multilayer_trend",
+      "subject_id": "variant_ao_dai_contemporary_multilayer",
+      "predicate": "construction.current_trend",
+      "value": "multiple_tails_and_layers",
+      "qualifiers": {
+        "period_ids": [
+          "period_2024_2025"
+        ],
+        "region_ids": [],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "statement_vi": "Nghiên cứu 2026 ghi nhận xu hướng nhiều tà/nhiều lớp nổi bật trong giai đoạn 2024–2025.",
+      "evidence": [
+        {
+          "source_id": "src_hou_2026_form",
+          "locator": "mục về kết cấu nhiều tà, nhiều lớp 2024–2025"
+        }
+      ],
+      "confidence": 0.86,
+      "consensus": "single_source",
+      "review_status": "under_review",
+      "version": 1
+    },
+    {
+      "id": "assert_white_school_usage",
+      "subject_id": "garment_ao_dai",
+      "predicate": "usage.color_context",
+      "value": "white_school_uniform",
+      "qualifiers": {
+        "period_ids": [],
+        "region_ids": [
+          "region_hue"
+        ],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [
+          "occasion_school_uniform"
+        ],
+        "social_context_ids": []
+      },
+      "statement_vi": "Áo dài trắng được ghi nhận dùng làm đồng phục tại nhiều cơ sở giáo dục nữ trong thế kỷ XX, với ví dụ lịch sử từ trường Đồng Khánh ở Huế.",
+      "evidence": [
+        {
+          "source_id": "src_minina_2021_color",
+          "locator": "phần white color và school uniforms"
+        }
+      ],
+      "confidence": 0.82,
+      "consensus": "single_source",
+      "review_status": "under_review",
+      "version": 1
+    },
+    {
+      "id": "assert_red_wedding_usage",
+      "subject_id": "garment_ao_dai",
+      "predicate": "usage.color_context",
+      "value": "red_wedding",
+      "qualifiers": {
+        "period_ids": [],
+        "region_ids": [],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [
+          "occasion_wedding"
+        ],
+        "social_context_ids": []
+      },
+      "statement_vi": "Áo dài đỏ/hồng được ghi nhận phổ biến trong bối cảnh cưới ở thời hiện đại.",
+      "evidence": [
+        {
+          "source_id": "src_minina_2021_color",
+          "locator": "phần red color và wedding attire"
+        }
+      ],
+      "confidence": 0.84,
+      "consensus": "single_source",
+      "review_status": "under_review",
+      "version": 1
+    },
+    {
+      "id": "assert_white_wedding_usage",
+      "subject_id": "garment_ao_dai",
+      "predicate": "usage.color_context",
+      "value": "white_wedding",
+      "qualifiers": {
+        "period_ids": [],
+        "region_ids": [],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [
+          "occasion_wedding"
+        ],
+        "social_context_ids": []
+      },
+      "statement_vi": "Áo dài trắng cũng được ghi nhận trong bối cảnh cưới hiện đại, cho thấy màu cưới không chỉ có một lựa chọn.",
+      "evidence": [
+        {
+          "source_id": "src_minina_2021_color",
+          "locator": "phần white áo dài và wedding ceremonies"
+        }
+      ],
+      "confidence": 0.8,
+      "consensus": "single_source",
+      "review_status": "under_review",
+      "version": 1
+    },
+    {
+      "id": "assert_service_uniform_usage",
+      "subject_id": "garment_ao_dai",
+      "predicate": "usage.context",
+      "value": "service_uniform",
+      "qualifiers": {
+        "period_ids": [],
+        "region_ids": [],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [
+          "occasion_service_uniform"
+        ],
+        "social_context_ids": []
+      },
+      "statement_vi": "Cuối thế kỷ XX/đầu XXI, áo dài được ghi nhận dùng làm đồng phục trong một số ngành dịch vụ như khách sạn, du lịch và phục vụ.",
+      "evidence": [
+        {
+          "source_id": "src_minina_2021_color",
+          "locator": "phần sphere of use/service sector"
+        }
+      ],
+      "confidence": 0.78,
+      "consensus": "single_source",
+      "review_status": "under_review",
+      "version": 1
+    },
+    {
+      "id": "assert_hue_heritage_2024",
+      "subject_id": "practice_may_mac_ao_dai_hue",
+      "predicate": "legal.heritage_recognition",
+      "value": "national_intangible_cultural_heritage_list",
+      "qualifiers": {
+        "period_ids": [],
+        "region_ids": [
+          "region_hue"
+        ],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "statement_vi": "Ngày 9/8/2024, 'Tri thức may, mặc áo dài Huế' được ghi danh vào Danh mục di sản văn hóa phi vật thể quốc gia.",
+      "evidence": [
+        {
+          "source_id": "src_bvhttdl_2024_hue_heritage",
+          "locator": "phần nêu Quyết định 2320/QĐ-BVHTTDL"
+        }
+      ],
+      "confidence": 0.99,
+      "consensus": "strong_consensus",
+      "review_status": "verified",
+      "version": 1
+    }
+  ],
+  "relation_definitions": [
+    {
+      "key": "style_variant_of",
+      "label_vi": "Biến thể kiểu dáng của",
+      "source_types": [
+        "garment_variant"
+      ],
+      "target_types": [
+        "garment"
+      ],
+      "directional": true,
+      "contextual": true,
+      "inheritable": false,
+      "status": "active",
+      "version": 1
+    },
+    {
+      "key": "documented_predecessor_of",
+      "label_vi": "Tiền thân được nguồn ghi nhận của",
+      "source_types": [
+        "garment"
+      ],
+      "target_types": [
+        "garment"
+      ],
+      "directional": true,
+      "contextual": true,
+      "inheritable": false,
+      "status": "active",
+      "version": 1
+    },
+    {
+      "key": "associated_with_designer",
+      "label_vi": "Gắn với nhà thiết kế/người cải cách",
+      "source_types": [
+        "garment_variant"
+      ],
+      "target_types": [
+        "person",
+        "institution"
+      ],
+      "directional": true,
+      "contextual": true,
+      "inheritable": false,
+      "status": "active",
+      "version": 1
+    },
+    {
+      "key": "influenced_by",
+      "label_vi": "Chịu ảnh hưởng từ",
+      "source_types": [
+        "garment_variant"
+      ],
+      "target_types": [
+        "garment",
+        "garment_variant"
+      ],
+      "directional": true,
+      "contextual": true,
+      "inheritable": false,
+      "status": "active",
+      "version": 1
+    },
+    {
+      "key": "documented_in_place",
+      "label_vi": "Được ghi nhận tại",
+      "source_types": [
+        "garment_variant",
+        "cultural_practice"
+      ],
+      "target_types": [
+        "place",
+        "region"
+      ],
+      "directional": true,
+      "contextual": true,
+      "inheritable": false,
+      "status": "active",
+      "version": 1
+    },
+    {
+      "key": "recognized_heritage_practice_in",
+      "label_vi": "Thực hành di sản được ghi danh tại",
+      "source_types": [
+        "cultural_practice"
+      ],
+      "target_types": [
+        "region"
+      ],
+      "directional": true,
+      "contextual": true,
+      "inheritable": false,
+      "status": "active",
+      "version": 1
+    },
+    {
+      "key": "documented_usage_context",
+      "label_vi": "Bối cảnh sử dụng được ghi nhận",
+      "source_types": [
+        "garment",
+        "garment_variant"
+      ],
+      "target_types": [
+        "occasion"
+      ],
+      "directional": true,
+      "contextual": true,
+      "inheritable": false,
+      "status": "active",
+      "version": 1
+    }
+  ],
+  "relations": [
+    {
+      "id": "rel_ngu_than_predecessor",
+      "subject_id": "garment_ao_ngu_than",
+      "relation_type": "documented_predecessor_of",
+      "object_id": "garment_ao_dai",
+      "state": "known",
+      "qualifiers": {
+        "period_ids": [
+          "period_18c_nguyen_lords"
+        ],
+        "region_ids": [],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "assertion_ids": [
+        "assert_ngu_than_predecessor"
+      ]
+    },
+    {
+      "id": "rel_lemur_variant",
+      "subject_id": "variant_ao_dai_lemur_1930s",
+      "relation_type": "style_variant_of",
+      "object_id": "garment_ao_dai",
+      "state": "known",
+      "qualifiers": {
+        "period_ids": [
+          "period_1930s"
+        ],
+        "region_ids": [],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "assertion_ids": [
+        "assert_lemur_form"
+      ]
+    },
+    {
+      "id": "rel_lemur_cat_tuong",
+      "subject_id": "variant_ao_dai_lemur_1930s",
+      "relation_type": "associated_with_designer",
+      "object_id": "person_nguyen_cat_tuong",
+      "state": "known",
+      "qualifiers": {
+        "period_ids": [
+          "period_1930s"
+        ],
+        "region_ids": [],
+        "place_ids": [
+          "place_hanoi"
+        ],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "assertion_ids": [
+        "assert_cat_tuong_1934"
+      ]
+    },
+    {
+      "id": "rel_lepho_variant",
+      "subject_id": "variant_ao_dai_le_pho_1930s",
+      "relation_type": "style_variant_of",
+      "object_id": "garment_ao_dai",
+      "state": "known",
+      "qualifiers": {
+        "period_ids": [
+          "period_1930s"
+        ],
+        "region_ids": [],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "assertion_ids": [
+        "assert_le_pho_form"
+      ]
+    },
+    {
+      "id": "rel_lepho_person",
+      "subject_id": "variant_ao_dai_le_pho_1930s",
+      "relation_type": "associated_with_designer",
+      "object_id": "person_le_pho",
+      "state": "known",
+      "qualifiers": {
+        "period_ids": [
+          "period_1930s"
+        ],
+        "region_ids": [],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "assertion_ids": [
+        "assert_le_pho_form"
+      ]
+    },
+    {
+      "id": "rel_lepho_lemur",
+      "subject_id": "variant_ao_dai_le_pho_1930s",
+      "relation_type": "influenced_by",
+      "object_id": "variant_ao_dai_lemur_1930s",
+      "state": "known",
+      "qualifiers": {
+        "period_ids": [
+          "period_1930s"
+        ],
+        "region_ids": [],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "assertion_ids": [
+        "assert_le_pho_form"
+      ]
+    },
+    {
+      "id": "rel_lepho_nguthan",
+      "subject_id": "variant_ao_dai_le_pho_1930s",
+      "relation_type": "influenced_by",
+      "object_id": "garment_ao_ngu_than",
+      "state": "known",
+      "qualifiers": {
+        "period_ids": [
+          "period_1930s"
+        ],
+        "region_ids": [],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "assertion_ids": [
+        "assert_le_pho_form"
+      ]
+    },
+    {
+      "id": "rel_raglan_variant",
+      "subject_id": "variant_ao_dai_raglan_1958_1960",
+      "relation_type": "style_variant_of",
+      "object_id": "garment_ao_dai",
+      "state": "known",
+      "qualifiers": {
+        "period_ids": [
+          "period_1958_1960"
+        ],
+        "region_ids": [],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "assertion_ids": [
+        "assert_raglan_structure"
+      ]
+    },
+    {
+      "id": "rel_raglan_dung",
+      "subject_id": "variant_ao_dai_raglan_1958_1960",
+      "relation_type": "associated_with_designer",
+      "object_id": "workshop_dung_dakao",
+      "state": "known",
+      "qualifiers": {
+        "period_ids": [
+          "period_1958_1960"
+        ],
+        "region_ids": [],
+        "place_ids": [
+          "place_dakao_saigon"
+        ],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "assertion_ids": [
+        "assert_raglan_1958",
+        "assert_raglan_1960"
+      ]
+    },
+    {
+      "id": "rel_raglan_place",
+      "subject_id": "variant_ao_dai_raglan_1958_1960",
+      "relation_type": "documented_in_place",
+      "object_id": "place_dakao_saigon",
+      "state": "known",
+      "qualifiers": {
+        "period_ids": [
+          "period_1958_1960"
+        ],
+        "region_ids": [],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "assertion_ids": [
+        "assert_raglan_1958",
+        "assert_raglan_1960"
+      ]
+    },
+    {
+      "id": "rel_mini_variant",
+      "subject_id": "variant_ao_dai_miniraglan_1960s_1970s",
+      "relation_type": "style_variant_of",
+      "object_id": "garment_ao_dai",
+      "state": "known",
+      "qualifiers": {
+        "period_ids": [
+          "period_1960s_1970s"
+        ],
+        "region_ids": [],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "assertion_ids": [
+        "assert_miniraglan"
+      ]
+    },
+    {
+      "id": "rel_hippy_variant",
+      "subject_id": "variant_ao_dai_hippy_late1960s",
+      "relation_type": "style_variant_of",
+      "object_id": "garment_ao_dai",
+      "state": "known",
+      "qualifiers": {
+        "period_ids": [
+          "period_1960s_1970s"
+        ],
+        "region_ids": [],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "assertion_ids": [
+        "assert_hippy"
+      ]
+    },
+    {
+      "id": "rel_classic_variant",
+      "subject_id": "variant_ao_dai_modern_classic",
+      "relation_type": "style_variant_of",
+      "object_id": "garment_ao_dai",
+      "state": "known",
+      "qualifiers": {
+        "period_ids": [],
+        "region_ids": [],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "assertion_ids": [
+        "assert_classic_profile"
+      ]
+    },
+    {
+      "id": "rel_relaxed_variant",
+      "subject_id": "variant_ao_dai_contemporary_relaxed",
+      "relation_type": "style_variant_of",
+      "object_id": "garment_ao_dai",
+      "state": "known",
+      "qualifiers": {
+        "period_ids": [
+          "period_2017_2026"
+        ],
+        "region_ids": [],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "assertion_ids": [
+        "assert_relaxed_trend"
+      ]
+    },
+    {
+      "id": "rel_multilayer_variant",
+      "subject_id": "variant_ao_dai_contemporary_multilayer",
+      "relation_type": "style_variant_of",
+      "object_id": "garment_ao_dai",
+      "state": "known",
+      "qualifiers": {
+        "period_ids": [
+          "period_2024_2025"
+        ],
+        "region_ids": [],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "assertion_ids": [
+        "assert_multilayer_trend"
+      ]
+    },
+    {
+      "id": "rel_hue_practice",
+      "subject_id": "practice_may_mac_ao_dai_hue",
+      "relation_type": "recognized_heritage_practice_in",
+      "object_id": "region_hue",
+      "state": "known",
+      "qualifiers": {
+        "period_ids": [],
+        "region_ids": [
+          "region_hue"
+        ],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "assertion_ids": [
+        "assert_hue_heritage_2024"
+      ]
+    },
+    {
+      "id": "rel_school_usage",
+      "subject_id": "garment_ao_dai",
+      "relation_type": "documented_usage_context",
+      "object_id": "occasion_school_uniform",
+      "state": "known",
+      "qualifiers": {
+        "period_ids": [],
+        "region_ids": [],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "assertion_ids": [
+        "assert_white_school_usage"
+      ]
+    },
+    {
+      "id": "rel_wedding_usage",
+      "subject_id": "garment_ao_dai",
+      "relation_type": "documented_usage_context",
+      "object_id": "occasion_wedding",
+      "state": "known",
+      "qualifiers": {
+        "period_ids": [],
+        "region_ids": [],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "assertion_ids": [
+        "assert_red_wedding_usage",
+        "assert_white_wedding_usage"
+      ]
+    },
+    {
+      "id": "rel_service_usage",
+      "subject_id": "garment_ao_dai",
+      "relation_type": "documented_usage_context",
+      "object_id": "occasion_service_uniform",
+      "state": "known",
+      "qualifiers": {
+        "period_ids": [],
+        "region_ids": [],
+        "place_ids": [],
+        "community_ids": [],
+        "occasion_ids": [],
+        "social_context_ids": []
+      },
+      "assertion_ids": [
+        "assert_service_uniform_usage"
+      ]
+    }
+  ],
+  "rules": [
+    {
+      "id": "rule_historical_variant_required",
+      "category": "HISTORICAL_CONTEXT",
+      "severity": "notice",
+      "version": 1,
+      "status": "draft",
+      "scope": [
+        "garment_ao_dai"
+      ],
+      "when": {
+        "operator": "all",
+        "conditions": [
+          {
+            "field": "context.mode",
+            "operator": "eq",
+            "value": "historical_recreation"
+          },
+          {
+            "field": "context.variant_id",
+            "operator": "missing"
+          }
+        ]
+      },
+      "then": {
+        "status": "notice",
+        "message_vi": "Bạn đang chọn tái hiện lịch sử nhưng chưa chọn biến thể/thời kỳ cụ thể. Áo dài thay đổi đáng kể qua các giai đoạn.",
+        "assertion_ids": [
+          "assert_current_variation"
+        ]
+      }
+    },
+    {
+      "id": "rule_raglan_preserve_sleeve_historical",
+      "category": "STRUCTURAL",
+      "severity": "strong_warning",
+      "version": 1,
+      "status": "draft",
+      "scope": [
+        "variant_ao_dai_raglan_1958_1960"
+      ],
+      "when": {
+        "operator": "all",
+        "conditions": [
+          {
+            "field": "context.mode",
+            "operator": "eq",
+            "value": "historical_recreation"
+          },
+          {
+            "field": "context.variant_id",
+            "operator": "eq",
+            "value": "variant_ao_dai_raglan_1958_1960"
+          },
+          {
+            "field": "style.sleeve_assembly",
+            "operator": "neq",
+            "value": "raglan"
+          }
+        ]
+      },
+      "then": {
+        "status": "warning",
+        "message_vi": "Nếu đang tái hiện biến thể Raglan, kiểu ráp tay raglan là đặc điểm nhận dạng quan trọng. Bạn vẫn có thể giữ lựa chọn hiện tại nếu mục tiêu là remix.",
+        "assertion_ids": [
+          "assert_raglan_structure"
+        ]
+      }
+    },
+    {
+      "id": "rule_nonstanding_collar_is_not_automatically_wrong",
+      "category": "STYLING_HEURISTIC",
+      "severity": "info",
+      "version": 1,
+      "status": "draft",
+      "scope": [
+        "garment_ao_dai"
+      ],
+      "when": {
+        "operator": "all",
+        "conditions": [
+          {
+            "field": "context.mode",
+            "operator": "neq",
+            "value": "historical_recreation"
+          },
+          {
+            "field": "style.collar_type",
+            "operator": "in",
+            "value": [
+              "round",
+              "boat",
+              "standing_low",
+              "geometric",
+              "collarless"
+            ]
+          }
+        ]
+      },
+      "then": {
+        "status": "info",
+        "message_vi": "Áo dài đương đại có nhiều cấu trúc cổ khác nhau; cổ không cao không tự động đồng nghĩa với sai văn hóa.",
+        "assertion_ids": [
+          "assert_current_collar_variation"
+        ]
+      }
+    },
+    {
+      "id": "rule_wedding_color_context_info",
+      "category": "OCCASION",
+      "severity": "info",
+      "version": 1,
+      "status": "draft",
+      "scope": [
+        "garment_ao_dai"
+      ],
+      "when": {
+        "field": "context.occasion_id",
+        "operator": "eq",
+        "value": "occasion_wedding"
+      },
+      "then": {
+        "status": "info",
+        "message_vi": "Nguồn ghi nhận cả đỏ/hồng và trắng trong bối cảnh áo dài cưới hiện đại; đây là thông tin tham khảo, không phải quy định màu bắt buộc.",
+        "assertion_ids": [
+          "assert_red_wedding_usage",
+          "assert_white_wedding_usage"
+        ]
+      }
+    }
+  ],
+  "generation_profiles": [
+    {
+      "id": "gp_ao_dai_modern_classic_v1",
+      "subject_id": "variant_ao_dai_modern_classic",
+      "version": 1,
+      "semantic_grounding_ready": true,
+      "generation_ready": false,
+      "not_ready_reason": "Chưa có reference media được xác nhận quyền AI-reference.",
+      "must_preserve": [
+        {
+          "feature": "garment_identity",
+          "value": "Vietnamese áo dài",
+          "assertion_ids": [
+            "assert_modern_two_piece"
+          ]
+        },
+        {
+          "feature": "construction.sleeve.assembly",
+          "value": "raglan",
+          "assertion_ids": [
+            "assert_classic_profile"
+          ]
+        },
+        {
+          "feature": "construction.tail.count",
+          "value": 2,
+          "assertion_ids": [
+            "assert_classic_profile"
+          ]
+        },
+        {
+          "feature": "wearing.default_lower_garment",
+          "value": "trousers",
+          "assertion_ids": [
+            "assert_classic_profile"
+          ]
+        }
+      ],
+      "user_overridable": [
+        "color",
+        "material",
+        "pattern",
+        "collar_height",
+        "fit_intensity",
+        "trouser_color"
+      ],
+      "forbidden": [
+        {
+          "description_vi": "Không tự thêm logo/chữ hoặc phụ kiện văn hóa không có trong OutfitSpec.",
+          "assertion_ids": []
+        }
+      ],
+      "reference_media_candidate_ids": [
+        "mc_minina_modern_figure"
+      ]
+    },
+    {
+      "id": "gp_ao_dai_raglan_historical_v1",
+      "subject_id": "variant_ao_dai_raglan_1958_1960",
+      "version": 1,
+      "semantic_grounding_ready": true,
+      "generation_ready": false,
+      "not_ready_reason": "Reference historical images chưa được cleared; exact date đang disputed.",
+      "must_preserve": [
+        {
+          "feature": "construction.sleeve.assembly",
+          "value": "raglan",
+          "assertion_ids": [
+            "assert_raglan_structure"
+          ]
+        },
+        {
+          "feature": "construction.body.fit",
+          "value": "fitted",
+          "assertion_ids": [
+            "assert_raglan_structure"
+          ]
+        },
+        {
+          "feature": "construction.closure.system",
+          "value": "snaps",
+          "assertion_ids": [
+            "assert_raglan_structure"
+          ]
+        }
+      ],
+      "user_overridable": [
+        "color",
+        "material",
+        "pattern"
+      ],
+      "forbidden": [
+        {
+          "description_vi": "Không ghi một năm phát minh duy nhất trong caption nếu chưa nêu đây là mốc còn khác nhau giữa nguồn.",
+          "assertion_ids": [
+            "assert_raglan_1958",
+            "assert_raglan_1960"
+          ]
+        }
+      ],
+      "reference_media_candidate_ids": [
+        "mc_raglan_vnexpress_1958",
+        "mc_hou_raglan_figure"
+      ]
+    }
+  ],
+  "media_candidates": [
+    {
+      "id": "mc_raglan_vnexpress_1958",
+      "source_id": "src_vnexpress_2025_hcm_history",
+      "subject_ids": [
+        "variant_ao_dai_raglan_1958_1960"
+      ],
+      "view_type": "historical_context",
+      "source_page_url": "https://vnexpress.net/ao-dai-tp-hcm-thay-doi-the-nao-qua-tram-nam-4876661.html",
+      "description": "Ảnh/tư liệu minh họa Raglan gắn với nhà may Dung Đakao.",
+      "rights_status": "copyright_restricted_or_unknown",
+      "may_display_publicly": false,
+      "may_use_for_ai_reference": false,
+      "action_required": "Xin phép/chọn ảnh sở hữu nội bộ hoặc nguồn có license phù hợp."
+    },
+    {
+      "id": "mc_hou_raglan_figure",
+      "source_id": "src_hou_2026_form",
+      "subject_ids": [
+        "variant_ao_dai_raglan_1958_1960"
+      ],
+      "view_type": "construction_diagram",
+      "source_page_url": "https://www.researchgate.net/publication/407512858_DIEN_MAO_MOI_CUA_AO_DAI_NU_NHUNG_XU_HUONG_THIET_KE_PHOM_DANG_VA_KET_CAU_CUA_AO_DAI_HIEN_NAY",
+      "description": "Hình/minh họa cấu trúc Raglan trong bài nghiên cứu.",
+      "rights_status": "review_required",
+      "may_display_publicly": false,
+      "may_use_for_ai_reference": false,
+      "action_required": "Không đưa vào provider trước khi xác định quyền hình."
+    },
+    {
+      "id": "mc_minina_modern_figure",
+      "source_id": "src_minina_2021_color",
+      "subject_ids": [
+        "garment_ao_dai",
+        "variant_ao_dai_modern_classic"
+      ],
+      "view_type": "full_body",
+      "source_page_url": "https://vietnamjournal.ru/2618-9453/article/view/96433",
+      "description": "Figure về áo dài hiện đại; article CC BY-NC-ND 4.0.",
+      "rights_status": "CC_BY_NC_ND_4_0_article_derivative_review",
+      "may_display_publicly": false,
+      "may_use_for_ai_reference": false,
+      "action_required": "Legal review; ND/NC làm AI-reference không nên mặc định được phép."
+    },
+    {
+      "id": "mc_ao_dai_museum_collection",
+      "source_id": "src_chinhphu_2024_ao_dai_museum",
+      "subject_ids": [
+        "garment_ao_dai"
+      ],
+      "view_type": "museum_collection",
+      "source_page_url": "https://tphcm.chinhphu.vn/bao-tang-ao-dai-tphcm-mot-thap-ky-ton-vinh-ta-ao-dai-truyen-thong-101240119154009365.htm",
+      "description": "Nguồn để liên hệ/khảo sát hiện vật và catalogue Bảo tàng Áo dài.",
+      "rights_status": "institution_permission_required",
+      "may_display_publicly": false,
+      "may_use_for_ai_reference": false,
+      "action_required": "Liên hệ bảo tàng để có ảnh/catalgoue/reference được cấp quyền."
+    }
+  ]
+}

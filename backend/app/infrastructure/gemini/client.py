@@ -59,7 +59,7 @@ class GeminiClient:
             "available_items": items_summary,
         }
 
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.text_model}:generateContent?key={self.api_key}"
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.text_model}:generateContent"
         payload = {
             "contents": [
                 {
@@ -86,7 +86,11 @@ class GeminiClient:
 
             client = get_shared_async_client(timeout=25.0)
             with anyio.fail_after(30):
-                resp = await client.post(url, json=payload)
+                resp = await client.post(
+                    url,
+                    headers={"X-goog-api-key": self.api_key},
+                    json=payload,
+                )
             if resp.status_code == 200:
                 data = resp.json()
                 candidates = data.get("candidates", [])

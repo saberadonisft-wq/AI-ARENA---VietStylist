@@ -116,6 +116,27 @@ def test_known_without_matching_evidence_does_not_prove_compliance():
     assert client.post("/api/v3/outfits/validate", json=spec()).json()["status"] == "not_evaluated"
 
 
+def test_entity_rule_can_read_package_context_and_selection_style():
+    rule({
+        "operator": "all",
+        "conditions": [
+            {"field": "context.mode", "operator": "eq", "value": "historical_recreation"},
+            {"field": "style.front_button_closure", "operator": "eq", "value": True},
+        ],
+    })
+    payload = spec()
+    payload["context"] = {"mode": "historical_recreation"}
+    assert client.post("/api/v3/outfits/validate", json=payload).json()["status"] == "not_evaluated"
+
+    payload["selections"][0]["style"] = {"front_button_closure": True}
+    result = client.post("/api/v3/outfits/validate", json=payload).json()
+    assert result["status"] == "warning"
+    assert result["violations"][0]["rule_id"] == "example_rule"
+
+    payload["selections"][0]["style"]["front_button_closure"] = False
+    assert client.post("/api/v3/outfits/validate", json=payload).json()["status"] == "clear"
+
+
 def test_multiple_values_are_evaluated_as_set_without_overwriting_first():
     rule({"field": "facts.outerwear.construction.snapshot", "operator": "contains", "value": 5})
     Database.execute("UPDATE attribute_definitions SET cardinality='multiple'")

@@ -52,6 +52,16 @@ Reference lookbook khác owner/đã xóa còn nguyên dữ liệu, xuất hiện
 
 Rollback: dừng API/worker/cleanup; giữ một backup riêng của trạng thái vừa lỗi; dùng SQLite backup API để phục hồi file `.bak` đã kiểm tra sang DB đích, không copy riêng main DB đang mở/WAL đang hoạt động. Chạy dry-run/migrate/check bằng bản backend đã vá, rồi readiness/smoke A/B trước mở traffic. Không quay về backend baseline có upload không grant. Object đã xóa cần backup/versioning storage riêng; SQLite backup không khôi phục bytes.
 
+## Dữ liệu thí điểm Áo dài và Áo tứ thân
+
+Hai gói JSON đã được lọc nằm trong package backend; script, prompt và tài liệu hướng dẫn từ ZIP nguồn không được thực thi. Nhập cả hai gói từ thư mục `backend`:
+
+```powershell
+python scripts/import_v3_pilot_packages.py all
+```
+
+Có thể thay `all` bằng `ao-dai` hoặc `ao-tu-than`. Lệnh chạy nguyên tử và idempotent, không ghi đè chỉnh sửa biên tập hiện có. Thực thể, nguồn và khẳng định mới giữ trạng thái `under_review`; quy tắc giữ `draft`. Media candidate chỉ được lưu làm metadata để thẩm định quyền, không được tạo thành `media_assets` hay dùng làm AI reference.
+
 ## Media và cleanup
 
 Ảnh PNG/JPEG/WebP: tối đa 10 MiB và 40 triệu pixel, giải mã/encode lại trước publish. SVG chỉ admin/editor và allowlist hình học tĩnh. MP4 tối đa 50 MiB/10 phút; cần cài `ffprobe`, đặt `FFPROBE_PATH` nếu ngoài PATH. Validator quét frame với timeout 30 giây; thiếu binary trả 503, không tự đánh dấu ready. Không có ffprobe đi kèm wheel. Thiết lập reverse proxy body limit phù hợp; app cũng chặn multipart local quá 50 MiB + 64 KiB framing trước khi parser spool hết body.
@@ -71,7 +81,7 @@ Cleanup xử lý expired/uploading/processing quá lease, rejected, deleting, to
 
 Production dùng DEBUG=false, JWT secret ngẫu nhiên ≥32 ký tự, issuer/audience không rỗng, API/Frontend HTTPS origins, đủ ba R2 credential, public/private bucket khác nhau. Role lấy từ DB, token dev bị từ chối. Không log token/key/presigned URL; error response chỉ có request_id và thông tin an toàn. Rate limit auth/AI lưu trong SQLite dùng chung process; giới hạn concurrent provider là 4/process, timeout tổng 30 giây. Khi chạy nhiều host/DB cần rate limit tập trung, thuộc migration hạ tầng sau M1.
 
-Backend vẫn dùng Gemini model cấu hình hiện có, không đổi sang tên model của agent thực hiện. Mock provider chứng minh error/fallback wiring; không chứng minh chất lượng AI, Google OAuth live, quyền R2 live, CDN/CORS hay khả năng vận hành production. Try-on chưa bật. Xem runbook và số đo trong báo cáo sửa nghiệm thu trước release.
+Backend dùng riêng `GEMINI_MODEL_TEXT` cho tư vấn và `GEMINI_MODEL_IMAGE` cho sinh ảnh. Try-on chỉ hoạt động khi có `GEMINI_API_KEY` và `GEMINI_TRY_ON_ENABLED=True`; kết quả phải là ảnh hợp lệ, được lưu private và đọc kiểm chứng trước khi API báo hoàn tất. Kiểm thử mock chứng minh error/storage wiring nhưng không chứng minh chất lượng model, quota Gemini, Google OAuth live, quyền R2 live, CDN/CORS hay khả năng vận hành production. Xem runbook và số đo trong báo cáo sửa nghiệm thu trước release.
 
 Kiểm tra MP4 với binary thực được cấp sẵn (từ repo root):
 

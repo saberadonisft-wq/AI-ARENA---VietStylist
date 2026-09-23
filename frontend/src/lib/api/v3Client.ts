@@ -19,6 +19,15 @@ export interface OutfitValidationResult {
   outfit: Record<string, any>;
 }
 
+export interface SynthesisResult {
+  status: string;
+  model_id: string;
+  result_media_id: string | null;
+  prompt_used: string;
+  post_validation: Record<string, any>;
+  metadata: Record<string, any>;
+}
+
 export function projectionQuery(context?: Partial<ContextQualifier>, datasetVersion?: string): string {
   const params = new URLSearchParams();
   if (datasetVersion) params.set("dataset_version", datasetVersion);
@@ -75,5 +84,62 @@ export const v3Api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(spec),
     });
+  },
+
+  async uploadPrivateImage(file: File): Promise<string> {
+    const session = await apiFetch<{
+      media_id: string;
+      upload_url: string;
+      method: string;
+      storage_type: "local" | "r2";
+    }>("/api/media/uploads", {
+      method: "POST",
+      body: JSON.stringify({
+        filename: file.name,
+        media_type: "image",
+        mime_type: file.type,
+        size_bytes: file.size,
+        visibility: "private",
+      }),
+    });
+
+    const body = session.storage_type === "local" ? new FormData() : file;
+    const headers = new Headers();
+    if (body instanceof FormData) body.append("file", file);
+    else headers.set("Content-Type", file.type);
+    const uploaded = await fetch(session.upload_url, {
+      method: session.method,
+      headers,
+      body,
+    });
+    if (!uploaded.ok) throw new Error("Không thể tải ảnh người mẫu lên kho media.");
+
+    await apiFetch(`/api/media/${encodeURIComponent(session.media_id)}/complete`, {
+      method: "POST",
+      body: JSON.stringify({}),
+      timeoutMs: 30000,
+    });
+    return session.media_id;
+  },
+
+  async synthesize(outfit: OutfitSpecV2, userImageId: string, modelId: string): Promise<SynthesisResult> {
+    return apiFetch<SynthesisResult>("/api/v3/generation/synthesize", {
+      method: "POST",
+      timeoutMs: 70000,
+      body: JSON.stringify({
+        outfit,
+        user_image_id: userImageId,
+        model_id: modelId,
+        options: {},
+        idempotency_key: `studio_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+      }),
+    });
+  },
+
+  async getMediaAccessUrl(mediaId: string): Promise<string> {
+    const response = await apiFetch<{ access_url: string }>(
+      `/api/media/${encodeURIComponent(mediaId)}/access`,
+    );
+    return response.access_url;
   },
 };
