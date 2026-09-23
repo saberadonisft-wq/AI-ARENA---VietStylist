@@ -156,6 +156,14 @@ class PromptSynthesisResponse(BaseModel):
 class SynthesizeRequest(BaseModel):
     outfit: OutfitSpecV2
     user_image_id: Optional[str] = None
+    model_id: Optional[
+        Literal[
+            "gemini-3.1-flash-image",
+            "gemini-3.1-flash-lite-image",
+            "gemini-3-pro-image",
+            "gemini-2.5-flash-image",
+        ]
+    ] = None
     options: Dict[str, Any] = {}
     idempotency_key: Optional[str] = None
 

@@ -27,7 +27,7 @@ import ColorAnalysisPanel from "@/features/studio/ColorAnalysisPanel";
 import CompareModal from "@/features/studio/CompareModal";
 import ExportModal from "@/features/studio/ExportModal";
 import StarterOutfitModal from "@/features/studio/StarterOutfitModal";
-import AITryOnModal from "@/features/studio/AITryOnModal";
+import GeminiTryOnModal from "@/features/studio/GeminiTryOnModal";
 import {
   Skeleton,
   GarmentItemSkeleton,
@@ -582,6 +582,22 @@ export default function StudioPage() {
               </span>
             </div>
 
+            <label className="block space-y-1">
+              <span className="text-[11px] font-semibold text-stone-500">Nhóm trang phục</span>
+              <select
+                value={selectedGarmentType}
+                onChange={(event) => setSelectedGarmentType(event.target.value)}
+                className="w-full h-9 rounded-lg border border-stone-300 bg-white px-3 text-xs font-medium text-stone-800 focus:outline-none focus:border-heritage-red"
+              >
+                <option value="all">Tất cả nhóm trang phục</option>
+                {garmentTypes.map((garmentType) => (
+                  <option key={garmentType.id} value={garmentType.id}>
+                    {garmentType.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+
             {/* Tabs Slot sắp xếp lưới 3 cột x 2 hàng đều đặn, khóa slot tinh gọn */}
             <div className="grid grid-cols-3 gap-1.5">
               {[
@@ -668,6 +684,11 @@ export default function StudioPage() {
               </div>
             ) : (
               <div className="space-y-2 max-h-[480px] xl:max-h-[560px] overflow-y-auto pr-1 overscroll-contain">
+                {filteredCatalogItems.length === 0 && (
+                  <div className="rounded-lg border border-dashed border-stone-300 p-4 text-center text-xs text-stone-500">
+                    Chưa có trang phục trong nhóm và lớp đang chọn.
+                  </div>
+                )}
                 {filteredCatalogItems.map((item) => {
                   const isEquipped = equippedItems.some((it) => it.itemId === item.id);
                   return (
@@ -710,6 +731,11 @@ export default function StudioPage() {
                         <div className="font-semibold text-[13px] text-stone-900 truncate tracking-tight" title={item.name}>
                           {item.name}
                         </div>
+                        {item.metadata?.pilot_dataset && (
+                          <span className="inline-flex rounded border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-[9px] font-bold uppercase text-amber-800">
+                            Dữ liệu thí điểm
+                          </span>
+                        )}
                         <div className="flex items-center space-x-2 text-xs text-stone-500">
                           <span>Thời {item.era || "Nguyễn"}</span>
                           {item.variants.length > 0 && (
@@ -978,7 +1004,7 @@ export default function StudioPage() {
         outfitTitle={outfitTitle}
       />
 
-      <AITryOnModal
+      <GeminiTryOnModal
         isOpen={isTryOnOpen}
         onClose={() => setIsTryOnOpen(false)}
         snapshot={snapshot}

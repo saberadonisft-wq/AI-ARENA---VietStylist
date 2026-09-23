@@ -105,6 +105,6 @@ def evaluate_supported_condition(condition: dict, ctx: dict) -> bool | None:
             return False if False in values else None if None in values else True
         return True if True in values else None if None in values else False
     field = condition["field"]
-    if field.startswith("facts.") and get_path(ctx, field) is None:
+    if condition["operator"] not in ("exists", "missing") and get_path(ctx, field) is None:
         return None
     return evaluate_condition(condition, ctx)

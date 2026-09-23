@@ -9,6 +9,7 @@ ENTITY_TYPES = [
     "garment", "garment_variant", "garment_component", "accessory",
     "material", "technique", "pattern", "motif",
     "period", "region", "place", "community", "occasion", "social_context",
+    "person", "institution", "cultural_practice", "wearing_ensemble",
 ]
 
 SOURCE_TYPES = [

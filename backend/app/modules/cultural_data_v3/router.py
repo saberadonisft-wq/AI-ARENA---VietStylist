@@ -7,6 +7,7 @@ from __future__ import annotations
 import sqlite3
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
+from app.core.config import settings
 from app.core.database import Database, db_transaction
 from app.core.errors import AppError
 from app.core.security import AuthenticatedUser, get_current_user_optional, require_current_user, require_role
@@ -255,8 +256,59 @@ def generation_prompt(outfit: OutfitSpecV2):
 
 
 @router.post("/generation/synthesize", response_model=SynthesizeResponse)
-def generation_synthesize(req: SynthesizeRequest, user: AuthenticatedUser = Depends(require_current_user)):
-    raise AppError("GENERATION_UNAVAILABLE", "Dịch vụ sinh ảnh chưa được nghiệm thu. Bộ phối của bạn vẫn được giữ nguyên.", 503)
+async def generation_synthesize(req: SynthesizeRequest, user: AuthenticatedUser = Depends(require_current_user)):
+    from app.modules.cultural_data_v3.providers.gemini import GeminiGenerationProvider
+    from app.modules.cultural_data_v3.services.generation import (
+        PostValidationService,
+        PromptBuilder,
+        ProviderRequest,
+        canonical_hash,
+        validate_provider_result,
+    )
+    from app.modules.media.repository import MediaRepository
+    from app.modules.media.service import MediaService
+
+    if not settings.GEMINI_TRY_ON_ENABLED or not settings.GEMINI_API_KEY:
+        raise AppError(
+            "GENERATION_UNAVAILABLE",
+            "Dịch vụ sinh ảnh chưa được cấu hình. Bộ phối của bạn vẫn được giữ nguyên.",
+            503,
+        )
+
+    grounding = build_grounding(req.outfit)
+    prompts = PromptBuilder.build(grounding)
+    idempotency_key = req.idempotency_key or canonical_hash(
+        {
+            "user_id": user.user_id,
+            "grounding_hash": grounding["grounding_hash"],
+            "user_image_id": req.user_image_id,
+            "model_id": req.model_id or settings.GEMINI_MODEL_IMAGE,
+            "options": req.options,
+        }
+    )
+    result = await GeminiGenerationProvider(user.user_id, model_id=req.model_id).generate(
+        ProviderRequest(
+            prompt=prompts["positive_prompt"],
+            negative_prompt=prompts["negative_prompt"],
+            user_image_id=req.user_image_id,
+            reference_media_ids=grounding["reference_media_ids"],
+            options=req.options,
+            idempotency_key=idempotency_key,
+        )
+    )
+    validate_provider_result(
+        result,
+        media_lookup=MediaRepository.get_media_by_id,
+        media_probe=MediaService.probe_image,
+    )
+    return SynthesizeResponse(
+        status=result.status,
+        model_id=result.model_id,
+        result_media_id=result.result_media_id,
+        prompt_used=result.prompt_used,
+        post_validation=PostValidationService.validate_generation(grounding, result),
+        metadata=result.metadata,
+    )
 
 
 @router.post("/outfits/validate", response_model=OutfitValidationResponse)

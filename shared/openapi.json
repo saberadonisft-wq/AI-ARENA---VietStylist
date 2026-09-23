@@ -83,7 +83,7 @@
             }
           },
           "413": {
-            "description": "Content Too Large",
+            "description": "Request Entity Too Large",
             "content": {
               "application/json": {
                 "schema": {
@@ -93,7 +93,7 @@
             }
           },
           "422": {
-            "description": "Unprocessable Content",
+            "description": "Unprocessable Entity",
             "content": {
               "application/json": {
                 "schema": {
@@ -215,7 +215,7 @@
             }
           },
           "413": {
-            "description": "Content Too Large",
+            "description": "Request Entity Too Large",
             "content": {
               "application/json": {
                 "schema": {
@@ -225,7 +225,7 @@
             }
           },
           "422": {
-            "description": "Unprocessable Content",
+            "description": "Unprocessable Entity",
             "content": {
               "application/json": {
                 "schema": {
@@ -351,7 +351,7 @@
             }
           },
           "413": {
-            "description": "Content Too Large",
+            "description": "Request Entity Too Large",
             "content": {
               "application/json": {
                 "schema": {
@@ -361,7 +361,7 @@
             }
           },
           "422": {
-            "description": "Unprocessable Content",
+            "description": "Unprocessable Entity",
             "content": {
               "application/json": {
                 "schema": {
@@ -487,7 +487,7 @@
             }
           },
           "413": {
-            "description": "Content Too Large",
+            "description": "Request Entity Too Large",
             "content": {
               "application/json": {
                 "schema": {
@@ -497,7 +497,7 @@
             }
           },
           "422": {
-            "description": "Unprocessable Content",
+            "description": "Unprocessable Entity",
             "content": {
               "application/json": {
                 "schema": {
@@ -745,7 +745,7 @@
                 }
               }
             },
-            "description": "Content Too Large"
+            "description": "Request Entity Too Large"
           },
           "422": {
             "content": {
@@ -755,7 +755,7 @@
                 }
               }
             },
-            "description": "Unprocessable Content"
+            "description": "Unprocessable Entity"
           },
           "429": {
             "content": {
@@ -888,7 +888,7 @@
                 }
               }
             },
-            "description": "Content Too Large"
+            "description": "Request Entity Too Large"
           },
           "422": {
             "content": {
@@ -898,7 +898,7 @@
                 }
               }
             },
-            "description": "Unprocessable Content"
+            "description": "Unprocessable Entity"
           },
           "429": {
             "content": {
@@ -1017,7 +1017,7 @@
             }
           },
           "413": {
-            "description": "Content Too Large",
+            "description": "Request Entity Too Large",
             "content": {
               "application/json": {
                 "schema": {
@@ -1027,7 +1027,7 @@
             }
           },
           "422": {
-            "description": "Unprocessable Content",
+            "description": "Unprocessable Entity",
             "content": {
               "application/json": {
                 "schema": {
@@ -1153,7 +1153,7 @@
             }
           },
           "413": {
-            "description": "Content Too Large",
+            "description": "Request Entity Too Large",
             "content": {
               "application/json": {
                 "schema": {
@@ -1163,7 +1163,7 @@
             }
           },
           "422": {
-            "description": "Unprocessable Content",
+            "description": "Unprocessable Entity",
             "content": {
               "application/json": {
                 "schema": {
@@ -1352,7 +1352,7 @@
                 }
               }
             },
-            "description": "Content Too Large"
+            "description": "Request Entity Too Large"
           },
           "422": {
             "content": {
@@ -1362,7 +1362,7 @@
                 }
               }
             },
-            "description": "Unprocessable Content"
+            "description": "Unprocessable Entity"
           },
           "429": {
             "content": {
@@ -1513,7 +1513,7 @@
                 }
               }
             },
-            "description": "Content Too Large"
+            "description": "Request Entity Too Large"
           },
           "422": {
             "content": {
@@ -1523,7 +1523,7 @@
                 }
               }
             },
-            "description": "Unprocessable Content"
+            "description": "Unprocessable Entity"
           },
           "429": {
             "content": {
@@ -1656,7 +1656,7 @@
                 }
               }
             },
-            "description": "Content Too Large"
+            "description": "Request Entity Too Large"
           },
           "422": {
             "content": {
@@ -1666,7 +1666,7 @@
                 }
               }
             },
-            "description": "Unprocessable Content"
+            "description": "Unprocessable Entity"
           },
           "429": {
             "content": {
@@ -1818,7 +1818,7 @@
                 }
               }
             },
-            "description": "Content Too Large"
+            "description": "Request Entity Too Large"
           },
           "422": {
             "content": {
@@ -1828,7 +1828,7 @@
                 }
               }
             },
-            "description": "Unprocessable Content"
+            "description": "Unprocessable Entity"
           },
           "429": {
             "content": {
@@ -1947,7 +1947,7 @@
             }
           },
           "413": {
-            "description": "Content Too Large",
+            "description": "Request Entity Too Large",
             "content": {
               "application/json": {
                 "schema": {
@@ -1957,7 +1957,7 @@
             }
           },
           "422": {
-            "description": "Unprocessable Content",
+            "description": "Unprocessable Entity",
             "content": {
               "application/json": {
                 "schema": {
@@ -2089,7 +2089,7 @@
             }
           },
           "413": {
-            "description": "Content Too Large",
+            "description": "Request Entity Too Large",
             "content": {
               "application/json": {
                 "schema": {
@@ -2099,7 +2099,7 @@
             }
           },
           "422": {
-            "description": "Unprocessable Content",
+            "description": "Unprocessable Entity",
             "content": {
               "application/json": {
                 "schema": {
@@ -2231,7 +2231,7 @@
             }
           },
           "413": {
-            "description": "Content Too Large",
+            "description": "Request Entity Too Large",
             "content": {
               "application/json": {
                 "schema": {
@@ -2241,7 +2241,7 @@
             }
           },
           "422": {
-            "description": "Unprocessable Content",
+            "description": "Unprocessable Entity",
             "content": {
               "application/json": {
                 "schema": {
@@ -2424,7 +2424,7 @@
                 }
               }
             },
-            "description": "Content Too Large"
+            "description": "Request Entity Too Large"
           },
           "422": {
             "content": {
@@ -2434,7 +2434,7 @@
                 }
               }
             },
-            "description": "Unprocessable Content"
+            "description": "Unprocessable Entity"
           },
           "429": {
             "content": {
@@ -2589,7 +2589,7 @@
                 }
               }
             },
-            "description": "Content Too Large"
+            "description": "Request Entity Too Large"
           },
           "422": {
             "content": {
@@ -2599,7 +2599,7 @@
                 }
               }
             },
-            "description": "Unprocessable Content"
+            "description": "Unprocessable Entity"
           },
           "429": {
             "content": {
@@ -2754,7 +2754,7 @@
                 }
               }
             },
-            "description": "Content Too Large"
+            "description": "Request Entity Too Large"
           },
           "422": {
             "content": {
@@ -2764,7 +2764,7 @@
                 }
               }
             },
-            "description": "Unprocessable Content"
+            "description": "Unprocessable Entity"
           },
           "429": {
             "content": {
@@ -2913,7 +2913,7 @@
                 }
               }
             },
-            "description": "Content Too Large"
+            "description": "Request Entity Too Large"
           },
           "422": {
             "content": {
@@ -2923,7 +2923,7 @@
                 }
               }
             },
-            "description": "Unprocessable Content"
+            "description": "Unprocessable Entity"
           },
           "429": {
             "content": {
@@ -3076,7 +3076,7 @@
                 }
               }
             },
-            "description": "Content Too Large"
+            "description": "Request Entity Too Large"
           },
           "422": {
             "content": {
@@ -3086,7 +3086,7 @@
                 }
               }
             },
-            "description": "Unprocessable Content"
+            "description": "Unprocessable Entity"
           },
           "429": {
             "content": {
@@ -3240,7 +3240,7 @@
                 }
               }
             },
-            "description": "Content Too Large"
+            "description": "Request Entity Too Large"
           },
           "422": {
             "content": {
@@ -3250,7 +3250,7 @@
                 }
               }
             },
-            "description": "Unprocessable Content"
+            "description": "Unprocessable Entity"
           },
           "429": {
             "content": {
@@ -3412,7 +3412,7 @@
                 }
               }
             },
-            "description": "Content Too Large"
+            "description": "Request Entity Too Large"
           },
           "422": {
             "content": {
@@ -3422,7 +3422,7 @@
                 }
               }
             },
-            "description": "Unprocessable Content"
+            "description": "Unprocessable Entity"
           },
           "429": {
             "content": {
@@ -3572,7 +3572,7 @@
                 }
               }
             },
-            "description": "Content Too Large"
+            "description": "Request Entity Too Large"
           },
           "422": {
             "content": {
@@ -3582,7 +3582,7 @@
                 }
               }
             },
-            "description": "Unprocessable Content"
+            "description": "Unprocessable Entity"
           },
           "429": {
             "content": {
@@ -3707,7 +3707,7 @@
             }
           },
           "413": {
-            "description": "Content Too Large",
+            "description": "Request Entity Too Large",
             "content": {
               "application/json": {
                 "schema": {
@@ -3717,7 +3717,7 @@
             }
           },
           "422": {
-            "description": "Unprocessable Content",
+            "description": "Unprocessable Entity",
             "content": {
               "application/json": {
                 "schema": {
@@ -3873,7 +3873,7 @@
                 }
               }
             },
-            "description": "Content Too Large"
+            "description": "Request Entity Too Large"
           },
           "422": {
             "content": {
@@ -3883,7 +3883,7 @@
                 }
               }
             },
-            "description": "Unprocessable Content"
+            "description": "Unprocessable Entity"
           },
           "429": {
             "content": {
@@ -4036,7 +4036,7 @@
                 }
               }
             },
-            "description": "Content Too Large"
+            "description": "Request Entity Too Large"
           },
           "422": {
             "content": {
@@ -4046,7 +4046,7 @@
                 }
               }
             },
-            "description": "Unprocessable Content"
+            "description": "Unprocessable Entity"
           },
           "429": {
             "content": {
@@ -4200,7 +4200,7 @@
                 }
               }
             },
-            "description": "Content Too Large"
+            "description": "Request Entity Too Large"
           },
           "422": {
             "content": {
@@ -4210,7 +4210,7 @@
                 }
               }
             },
-            "description": "Unprocessable Content"
+            "description": "Unprocessable Entity"
           },
           "429": {
             "content": {
@@ -4372,7 +4372,7 @@
                 }
               }
             },
-            "description": "Content Too Large"
+            "description": "Request Entity Too Large"
           },
           "422": {
             "content": {
@@ -4382,7 +4382,7 @@
                 }
               }
             },
-            "description": "Unprocessable Content"
+            "description": "Unprocessable Entity"
           },
           "429": {
             "content": {
@@ -4532,7 +4532,7 @@
                 }
               }
             },
-            "description": "Content Too Large"
+            "description": "Request Entity Too Large"
           },
           "422": {
             "content": {
@@ -4542,7 +4542,7 @@
                 }
               }
             },
-            "description": "Unprocessable Content"
+            "description": "Unprocessable Entity"
           },
           "429": {
             "content": {
@@ -4706,7 +4706,7 @@
                 }
               }
             },
-            "description": "Content Too Large"
+            "description": "Request Entity Too Large"
           },
           "422": {
             "content": {
@@ -4716,7 +4716,7 @@
                 }
               }
             },
-            "description": "Unprocessable Content"
+            "description": "Unprocessable Entity"
           },
           "429": {
             "content": {
@@ -4868,7 +4868,7 @@
                 }
               }
             },
-            "description": "Content Too Large"
+            "description": "Request Entity Too Large"
           },
           "422": {
             "content": {
@@ -4878,7 +4878,7 @@
                 }
               }
             },
-            "description": "Unprocessable Content"
+            "description": "Unprocessable Entity"
           },
           "429": {
             "content": {
@@ -5011,7 +5011,7 @@
                 }
               }
             },
-            "description": "Content Too Large"
+            "description": "Request Entity Too Large"
           },
           "422": {
             "content": {
@@ -5021,7 +5021,7 @@
                 }
               }
             },
-            "description": "Unprocessable Content"
+            "description": "Unprocessable Entity"
           },
           "429": {
             "content": {
@@ -5175,7 +5175,7 @@
                 }
               }
             },
-            "description": "Content Too Large"
+            "description": "Request Entity Too Large"
           },
           "422": {
             "content": {
@@ -5185,7 +5185,7 @@
                 }
               }
             },
-            "description": "Unprocessable Content"
+            "description": "Unprocessable Entity"
           },
           "429": {
             "content": {
@@ -5348,7 +5348,7 @@
                 }
               }
             },
-            "description": "Content Too Large"
+            "description": "Request Entity Too Large"
           },
           "422": {
             "content": {
@@ -5358,7 +5358,7 @@
                 }
               }
             },
-            "description": "Unprocessable Content"
+            "description": "Unprocessable Entity"
           },
           "429": {
             "content": {
@@ -5511,7 +5511,7 @@
                 }
               }
             },
-            "description": "Content Too Large"
+            "description": "Request Entity Too Large"
           },
           "422": {
             "content": {
@@ -5521,7 +5521,7 @@
                 }
               }
             },
-            "description": "Unprocessable Content"
+            "description": "Unprocessable Entity"
           },
           "429": {
             "content": {
@@ -5672,7 +5672,7 @@
                 }
               }
             },
-            "description": "Content Too Large"
+            "description": "Request Entity Too Large"
           },
           "422": {
             "content": {
@@ -5682,7 +5682,7 @@
                 }
               }
             },
-            "description": "Unprocessable Content"
+            "description": "Unprocessable Entity"
           },
           "429": {
             "content": {
@@ -5837,7 +5837,7 @@
                 }
               }
             },
-            "description": "Content Too Large"
+            "description": "Request Entity Too Large"
           },
           "422": {
             "content": {
@@ -5847,7 +5847,7 @@
                 }
               }
             },
-            "description": "Unprocessable Content"
+            "description": "Unprocessable Entity"
           },
           "429": {
             "content": {
@@ -6001,7 +6001,7 @@
                 }
               }
             },
-            "description": "Content Too Large"
+            "description": "Request Entity Too Large"
           },
           "422": {
             "content": {
@@ -6011,7 +6011,7 @@
                 }
               }
             },
-            "description": "Unprocessable Content"
+            "description": "Unprocessable Entity"
           },
           "429": {
             "content": {
@@ -6156,7 +6156,7 @@
                 }
               }
             },
-            "description": "Content Too Large"
+            "description": "Request Entity Too Large"
           },
           "422": {
             "content": {
@@ -6166,7 +6166,7 @@
                 }
               }
             },
-            "description": "Unprocessable Content"
+            "description": "Unprocessable Entity"
           },
           "429": {
             "content": {
@@ -6319,7 +6319,7 @@
                 }
               }
             },
-            "description": "Content Too Large"
+            "description": "Request Entity Too Large"
           },
           "422": {
             "content": {
@@ -6329,7 +6329,7 @@
                 }
               }
             },
-            "description": "Unprocessable Content"
+            "description": "Unprocessable Entity"
           },
           "429": {
             "content": {
@@ -6482,7 +6482,7 @@
                 }
               }
             },
-            "description": "Content Too Large"
+            "description": "Request Entity Too Large"
           },
           "422": {
             "content": {
@@ -6492,7 +6492,7 @@
                 }
               }
             },
-            "description": "Unprocessable Content"
+            "description": "Unprocessable Entity"
           },
           "429": {
             "content": {
@@ -6645,7 +6645,7 @@
                 }
               }
             },
-            "description": "Content Too Large"
+            "description": "Request Entity Too Large"
           },
           "422": {
             "content": {
@@ -6655,7 +6655,7 @@
                 }
               }
             },
-            "description": "Unprocessable Content"
+            "description": "Unprocessable Entity"
           },
           "429": {
             "content": {
@@ -6808,7 +6808,7 @@
                 }
               }
             },
-            "description": "Content Too Large"
+            "description": "Request Entity Too Large"
           },
           "422": {
             "content": {
@@ -6818,7 +6818,7 @@
                 }
               }
             },
-            "description": "Unprocessable Content"
+            "description": "Unprocessable Entity"
           },
           "429": {
             "content": {
@@ -6971,7 +6971,7 @@
                 }
               }
             },
-            "description": "Content Too Large"
+            "description": "Request Entity Too Large"
           },
           "422": {
             "content": {
@@ -6981,7 +6981,7 @@
                 }
               }
             },
-            "description": "Unprocessable Content"
+            "description": "Unprocessable Entity"
           },
           "429": {
             "content": {
@@ -7105,7 +7105,7 @@
             }
           },
           "413": {
-            "description": "Content Too Large",
+            "description": "Request Entity Too Large",
             "content": {
               "application/json": {
                 "schema": {
@@ -7115,7 +7115,7 @@
             }
           },
           "422": {
-            "description": "Unprocessable Content",
+            "description": "Unprocessable Entity",
             "content": {
               "application/json": {
                 "schema": {
@@ -7246,7 +7246,7 @@
             }
           },
           "413": {
-            "description": "Content Too Large",
+            "description": "Request Entity Too Large",
             "content": {
               "application/json": {
                 "schema": {
@@ -7256,7 +7256,7 @@
             }
           },
           "422": {
-            "description": "Unprocessable Content",
+            "description": "Unprocessable Entity",
             "content": {
               "application/json": {
                 "schema": {
@@ -7387,7 +7387,7 @@
             }
           },
           "413": {
-            "description": "Content Too Large",
+            "description": "Request Entity Too Large",
             "content": {
               "application/json": {
                 "schema": {
@@ -7397,7 +7397,7 @@
             }
           },
           "422": {
-            "description": "Unprocessable Content",
+            "description": "Unprocessable Entity",
             "content": {
               "application/json": {
                 "schema": {
@@ -7548,7 +7548,7 @@
                 }
               }
             },
-            "description": "Content Too Large"
+            "description": "Request Entity Too Large"
           },
           "422": {
             "content": {
@@ -7558,7 +7558,7 @@
                 }
               }
             },
-            "description": "Unprocessable Content"
+            "description": "Unprocessable Entity"
           },
           "429": {
             "content": {
@@ -7712,7 +7712,7 @@
                 }
               }
             },
-            "description": "Content Too Large"
+            "description": "Request Entity Too Large"
           },
           "422": {
             "content": {
@@ -7722,7 +7722,7 @@
                 }
               }
             },
-            "description": "Unprocessable Content"
+            "description": "Unprocessable Entity"
           },
           "429": {
             "content": {
@@ -7882,7 +7882,7 @@
                 }
               }
             },
-            "description": "Content Too Large"
+            "description": "Request Entity Too Large"
           },
           "422": {
             "content": {
@@ -7892,7 +7892,7 @@
                 }
               }
             },
-            "description": "Unprocessable Content"
+            "description": "Unprocessable Entity"
           },
           "429": {
             "content": {
@@ -8045,7 +8045,7 @@
                 }
               }
             },
-            "description": "Content Too Large"
+            "description": "Request Entity Too Large"
           },
           "422": {
             "content": {
@@ -8055,7 +8055,7 @@
                 }
               }
             },
-            "description": "Unprocessable Content"
+            "description": "Unprocessable Entity"
           },
           "429": {
             "content": {
@@ -8206,7 +8206,7 @@
                 }
               }
             },
-            "description": "Content Too Large"
+            "description": "Request Entity Too Large"
           },
           "422": {
             "content": {
@@ -8216,7 +8216,7 @@
                 }
               }
             },
-            "description": "Unprocessable Content"
+            "description": "Unprocessable Entity"
           },
           "429": {
             "content": {
@@ -8371,7 +8371,7 @@
                 }
               }
             },
-            "description": "Content Too Large"
+            "description": "Request Entity Too Large"
           },
           "422": {
             "content": {
@@ -8381,7 +8381,7 @@
                 }
               }
             },
-            "description": "Unprocessable Content"
+            "description": "Unprocessable Entity"
           },
           "429": {
             "content": {
@@ -8600,7 +8600,7 @@
                 }
               }
             },
-            "description": "Content Too Large"
+            "description": "Request Entity Too Large"
           },
           "422": {
             "content": {
@@ -8610,7 +8610,7 @@
                 }
               }
             },
-            "description": "Unprocessable Content"
+            "description": "Unprocessable Entity"
           },
           "429": {
             "content": {
@@ -8763,7 +8763,7 @@
                 }
               }
             },
-            "description": "Content Too Large"
+            "description": "Request Entity Too Large"
           },
           "422": {
             "content": {
@@ -8773,7 +8773,7 @@
                 }
               }
             },
-            "description": "Unprocessable Content"
+            "description": "Unprocessable Entity"
           },
           "429": {
             "content": {
@@ -8960,7 +8960,7 @@
                 }
               }
             },
-            "description": "Content Too Large"
+            "description": "Request Entity Too Large"
           },
           "422": {
             "content": {
@@ -8970,7 +8970,7 @@
                 }
               }
             },
-            "description": "Unprocessable Content"
+            "description": "Unprocessable Entity"
           },
           "429": {
             "content": {
@@ -9123,7 +9123,7 @@
                 }
               }
             },
-            "description": "Content Too Large"
+            "description": "Request Entity Too Large"
           },
           "422": {
             "content": {
@@ -9133,7 +9133,7 @@
                 }
               }
             },
-            "description": "Unprocessable Content"
+            "description": "Unprocessable Entity"
           },
           "429": {
             "content": {
@@ -9296,7 +9296,7 @@
                 }
               }
             },
-            "description": "Content Too Large"
+            "description": "Request Entity Too Large"
           },
           "422": {
             "content": {
@@ -9306,7 +9306,7 @@
                 }
               }
             },
-            "description": "Unprocessable Content"
+            "description": "Unprocessable Entity"
           },
           "429": {
             "content": {
@@ -9609,7 +9609,7 @@
                 }
               }
             },
-            "description": "Content Too Large"
+            "description": "Request Entity Too Large"
           },
           "422": {
             "content": {
@@ -9619,7 +9619,7 @@
                 }
               }
             },
-            "description": "Unprocessable Content"
+            "description": "Unprocessable Entity"
           },
           "429": {
             "content": {
@@ -9922,7 +9922,7 @@
                 }
               }
             },
-            "description": "Content Too Large"
+            "description": "Request Entity Too Large"
           },
           "422": {
             "content": {
@@ -9932,7 +9932,7 @@
                 }
               }
             },
-            "description": "Unprocessable Content"
+            "description": "Unprocessable Entity"
           },
           "429": {
             "content": {
@@ -10235,7 +10235,7 @@
                 }
               }
             },
-            "description": "Content Too Large"
+            "description": "Request Entity Too Large"
           },
           "422": {
             "content": {
@@ -10245,7 +10245,7 @@
                 }
               }
             },
-            "description": "Unprocessable Content"
+            "description": "Unprocessable Entity"
           },
           "429": {
             "content": {
@@ -10399,7 +10399,7 @@
                 }
               }
             },
-            "description": "Content Too Large"
+            "description": "Request Entity Too Large"
           },
           "422": {
             "content": {
@@ -10409,7 +10409,7 @@
                 }
               }
             },
-            "description": "Unprocessable Content"
+            "description": "Unprocessable Entity"
           },
           "429": {
             "content": {
@@ -10563,7 +10563,7 @@
                 }
               }
             },
-            "description": "Content Too Large"
+            "description": "Request Entity Too Large"
           },
           "422": {
             "content": {
@@ -10573,7 +10573,7 @@
                 }
               }
             },
-            "description": "Unprocessable Content"
+            "description": "Unprocessable Entity"
           },
           "429": {
             "content": {
@@ -10727,7 +10727,7 @@
                 }
               }
             },
-            "description": "Content Too Large"
+            "description": "Request Entity Too Large"
           },
           "422": {
             "content": {
@@ -10737,7 +10737,7 @@
                 }
               }
             },
-            "description": "Unprocessable Content"
+            "description": "Unprocessable Entity"
           },
           "429": {
             "content": {
@@ -10891,7 +10891,7 @@
                 }
               }
             },
-            "description": "Content Too Large"
+            "description": "Request Entity Too Large"
           },
           "422": {
             "content": {
@@ -10901,7 +10901,7 @@
                 }
               }
             },
-            "description": "Unprocessable Content"
+            "description": "Unprocessable Entity"
           },
           "429": {
             "content": {
@@ -11054,7 +11054,7 @@
                 }
               }
             },
-            "description": "Content Too Large"
+            "description": "Request Entity Too Large"
           },
           "422": {
             "content": {
@@ -11064,7 +11064,7 @@
                 }
               }
             },
-            "description": "Unprocessable Content"
+            "description": "Unprocessable Entity"
           },
           "429": {
             "content": {
@@ -15573,6 +15573,23 @@
               }
             ],
             "title": "User Image Id"
+          },
+          "model_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "gemini-3.1-flash-image",
+                  "gemini-3.1-flash-lite-image",
+                  "gemini-3-pro-image",
+                  "gemini-2.5-flash-image"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Id"
           },
           "options": {
             "type": "object",

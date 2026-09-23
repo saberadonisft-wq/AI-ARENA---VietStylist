@@ -3,12 +3,75 @@ from __future__ import annotations
 
 import json
 import sys
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 backend_dir = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(backend_dir))
 
 from app.core.database import get_db_connection, init_database
+from app.modules.media.validation import validate_svg
+
+
+def _local_name(value: str) -> str:
+    return value.rsplit("}", 1)[-1]
+
+
+def normalize_legacy_svg(svg_content: str | None) -> str | None:
+    """Convert trusted legacy SVG fragments into standalone, safe V3 assets."""
+    if not svg_content:
+        return None
+
+    try:
+        root = ET.fromstring(svg_content)
+    except ET.ParseError as exc:
+        raise ValueError("Legacy SVG is not valid XML") from exc
+
+    gradients: dict[str, str] = {}
+    for element in root.iter():
+        if _local_name(element.tag) not in {"linearGradient", "radialGradient"}:
+            continue
+        gradient_id = element.attrib.get("id")
+        color = next(
+            (
+                child.attrib.get("stop-color")
+                for child in element
+                if _local_name(child.tag) == "stop" and child.attrib.get("stop-color")
+            ),
+            None,
+        )
+        if gradient_id and color:
+            gradients[gradient_id] = color
+
+    if _local_name(root.tag) != "svg":
+        wrapper = ET.Element("svg", {"viewBox": "0 0 800 1200"})
+        wrapper.append(root)
+        root = wrapper
+
+    for parent in list(root.iter()):
+        for child in list(parent):
+            if _local_name(child.tag) == "defs":
+                parent.remove(child)
+
+    for element in root.iter():
+        element.tag = _local_name(element.tag)
+        cleaned = {}
+        for raw_key, raw_value in element.attrib.items():
+            key = _local_name(raw_key)
+            if key == "id":
+                continue
+            value = raw_value
+            if value.startswith("url(#") and value.endswith(")"):
+                value = gradients.get(value[5:-1], "#000000")
+            cleaned[key] = value
+        element.attrib.clear()
+        element.attrib.update(cleaned)
+
+    root.set("xmlns", "http://www.w3.org/2000/svg")
+    if "viewBox" not in root.attrib:
+        root.set("viewBox", "0 0 800 1200")
+    normalized = ET.tostring(root, encoding="utf-8")
+    return validate_svg(normalized)[0].decode("utf-8")
 
 
 def run_legacy_migration() -> dict[str, int]:
@@ -104,7 +167,7 @@ def run_legacy_migration() -> dict[str, int]:
                     transform = {key: layer[key] for key in ("anchor_x", "anchor_y", "scale_x", "scale_y", "slot", "layer_type")}
                     transform["color_mask_rule"] = json.loads(layer["color_mask_rule"] or "{}")
                     conn.execute("""INSERT INTO render_profiles_v3(id,renderable_item_id,variant_id,avatar_id,pose,z_index,svg_content,media_asset_id,transform_json)
-                        VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO NOTHING""", (f"render_profile_{layer['id']}", renderable_id, variant_ids.get(layer["variant_id"]), layer["avatar_id"], "front_01", layer["z_index"], layer["svg_content"], layer["media_asset_id"], json.dumps(transform)))
+                        VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO NOTHING""", (f"render_profile_{layer['id']}", renderable_id, variant_ids.get(layer["variant_id"]), layer["avatar_id"], "front_01", layer["z_index"], normalize_legacy_svg(layer["svg_content"]), layer["media_asset_id"], json.dumps(transform)))
                     results["profiles"] += 1
 
             # 3. Map heritage_sources -> cultural_sources_v3

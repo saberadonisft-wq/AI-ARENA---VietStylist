@@ -6,6 +6,8 @@ from typing import Any, Dict, List
 from app.modules.cultural_data_v3.services.resolver import EffectiveEntityResolver
 from app.modules.cultural_data_v3.services.evidence import evidence_for_facts, constraint_evidence_issue
 from app.modules.cultural_data_v3.services.composer import public_rules, renderables_for
+from app.modules.cultural_data_v3.services.publication import PublicationPolicy
+from app.modules.cultural_data_v3.repository import decode_record
 
 
 class EducationProjectionBuilder:
@@ -71,9 +73,59 @@ class GenerationProfileBuilder:
         data = self.resolver.resolve(entity_id, context)
         must_preserve: List[Dict[str, Any]] = []
         may_vary: List[str] = []
+        forbidden: List[Any] = []
         evidence = evidence_for_facts([*data["attributes"], *data["relations"]], reader=self.resolver.reader)
         citations = {c["assertion_id"]: c for c in evidence}
         unresolved = [a for a in data["attributes"] if a["state"] != "known"]
+
+        stored_profile_row = self.resolver.reader.fetch_one(
+            "SELECT * FROM generation_profiles_v3 WHERE canonical_entity_id=? "
+            "ORDER BY version DESC,id LIMIT 1",
+            (entity_id,),
+        )
+        stored_profile = decode_record(stored_profile_row) if stored_profile_row else None
+        if stored_profile:
+            profile_facts = [
+                {
+                    "state": "known",
+                    "attribute_key": constraint.get("feature"),
+                    "value": constraint.get("value"),
+                    "assertion_ids": constraint.get("assertion_ids", []),
+                }
+                for constraint in stored_profile.get("must_preserve", [])
+                if isinstance(constraint, dict)
+            ]
+            profile_evidence = evidence_for_facts(profile_facts, reader=self.resolver.reader)
+            evidence = [
+                *evidence,
+                *[item for item in profile_evidence if item["assertion_id"] not in citations],
+            ]
+            citations = {c["assertion_id"]: c for c in evidence}
+            policy = PublicationPolicy(self.resolver.reader)
+            for constraint in stored_profile.get("must_preserve", []):
+                assertion_ids = constraint.get("assertion_ids", [])
+                if not assertion_ids or any(
+                    not policy.assertion_is_public(assertion_id)
+                    or assertion_id not in citations
+                    for assertion_id in assertion_ids
+                ):
+                    unresolved.append(
+                        {
+                            **constraint,
+                            "state": "not_evaluated",
+                            "generation_status": "not_evaluated",
+                            "reason": "unavailable_profile_evidence",
+                        }
+                    )
+                    continue
+                must_preserve.append({**constraint, "subject_id": entity_id})
+            may_vary.extend(stored_profile.get("may_vary", []))
+            forbidden.extend(
+                item.get("description_vi", item)
+                if isinstance(item, dict)
+                else item
+                for item in stored_profile.get("forbidden", [])
+            )
 
         for attr in data["attributes"]:
             state = attr.get("state")
@@ -92,6 +144,8 @@ class GenerationProfileBuilder:
                 if issue:
                     unresolved.append({**attr, "generation_status": "not_evaluated", "reason": issue})
                     continue
+                if any(item.get("feature") == key for item in must_preserve):
+                    continue
                 must_preserve.append({
                     "feature": key,
                     "value": value,
@@ -107,8 +161,8 @@ class GenerationProfileBuilder:
             "projection_version": "generation-profile-1",
             "subject_id": entity_id,
             "must_preserve": must_preserve,
-            "may_vary": may_vary,
-            "forbidden": [],
+            "may_vary": sorted(set(may_vary)),
+            "forbidden": forbidden,
             "reference_media_ids": [],
             "context": data["context"],
             "unresolved": unresolved,

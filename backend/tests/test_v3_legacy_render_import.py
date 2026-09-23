@@ -1,7 +1,9 @@
 """Legacy render import preserves editorial decisions and actual geometry."""
 import json
+import xml.etree.ElementTree as ET
 import pytest
 from app.core.database import Database
+from app.modules.media.validation import validate_svg
 from app.modules.cultural_data_v3.domain.models import Entity
 from app.modules.cultural_data_v3.repository import CulturalDataV3Repository as Repo
 from scripts.migrate_legacy_to_v3 import run_legacy_migration
@@ -19,7 +21,13 @@ def test_import_uses_curated_mapping_and_copies_variants_and_profiles():
     assert (json.loads(metadata) if isinstance(metadata, str) else metadata)["legacy_item_id"] == item["id"]
     for layer in Database.fetch_all("SELECT * FROM asset_layers WHERE item_id=?", (item["id"],)):
         profile = Database.fetch_one("SELECT * FROM render_profiles_v3 WHERE id=?", (f"render_profile_{layer['id']}",))
-        assert profile["svg_content"] == layer["svg_content"]
+        validate_svg(profile["svg_content"].encode("utf-8"))
+        legacy_root = ET.fromstring(layer["svg_content"])
+        profile_root = ET.fromstring(profile["svg_content"])
+        shape_tags = {"path", "rect", "circle", "ellipse", "line", "polyline", "polygon"}
+        legacy_shapes = [node for node in legacy_root.iter() if node.tag.rsplit("}", 1)[-1] in shape_tags]
+        profile_shapes = [node for node in profile_root.iter() if node.tag.rsplit("}", 1)[-1] in shape_tags]
+        assert len(profile_shapes) == len(legacy_shapes)
         assert profile["avatar_id"] == layer["avatar_id"]
         assert profile["variant_id"] == (f"render_variant_{layer['variant_id']}" if layer["variant_id"] else None)
         transform = profile["transform_json"]
@@ -27,6 +35,9 @@ def test_import_uses_curated_mapping_and_copies_variants_and_profiles():
             transform = json.loads(transform)
         assert transform["anchor_x"] == layer["anchor_x"]
         assert transform["scale_y"] == layer["scale_y"]
+
+    for profile in Database.fetch_all("SELECT svg_content FROM render_profiles_v3 WHERE svg_content IS NOT NULL"):
+        validate_svg(profile["svg_content"].encode("utf-8"))
 
 
 def test_repeat_import_preserves_edits_and_does_not_publish_or_reactivate():

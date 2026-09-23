@@ -17,7 +17,7 @@ VietStylist là nền tảng web hỗ trợ khám phá, phối và lưu trữ c�
 - Lưu media trên Cloudflare R2 hoặc thư mục local trong môi trường phát triển.
 
 > [!NOTE]
-> Tính năng AI Virtual Try-On hiện chưa nối với dịch vụ sinh ảnh và chủ động trả về HTTP `503`. Studio phối đồ 2D và xuất ảnh vẫn hoạt động bình thường.
+> Tính năng AI Virtual Try-On đã có adapter Gemini và mặc định tắt. Khi chưa có khóa, model ảnh hoặc cờ bật hợp lệ, API chủ động trả về HTTP `503`; Studio phối đồ 2D và xuất ảnh vẫn hoạt động bình thường.
 
 ## Công nghệ sử dụng
 
@@ -154,6 +154,8 @@ Task Backend ưu tiên `.venv` ở thư mục gốc (nếu không có sẽ dùng
 | `GOOGLE_CLIENT_ID` | Xác minh Google ID token ở backend | Chỉ khi dùng Google Sign-In |
 | `GEMINI_API_KEY` | Bật gợi ý phối đồ qua Gemini | Không |
 | `GEMINI_MODEL_TEXT` | Model Gemini dùng cho gợi ý văn bản | Không |
+| `GEMINI_MODEL_IMAGE` | Model Gemini có khả năng trả về ảnh | Chỉ khi dùng AI Virtual Try-On |
+| `GEMINI_TRY_ON_ENABLED` | Bật endpoint sinh ảnh sau khi đã cấu hình và kiểm tra model | Không |
 | `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` | Bật lưu trữ Cloudflare R2 | Không |
 | `R2_BUCKET_PUBLIC`, `R2_BUCKET_PRIVATE`, `R2_PUBLIC_DOMAIN` | Tên bucket và public domain của R2 | Không |
 | `LOCAL_MEDIA_DIR` | Thư mục media fallback | Không |
