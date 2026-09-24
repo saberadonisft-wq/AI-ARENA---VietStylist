@@ -7,12 +7,14 @@ from app.modules.admin.schemas import (
     CreateRuleAdminRequest,
     CreateArticleAdminRequest,
 )
+from app.modules.admin.recolor_guard import validate_new_item_metadata
 
 
 class AdminService:
     @staticmethod
     def create_item(req: CreateItemAdminRequest) -> Dict[str, Any]:
-        meta_json = json.dumps(req.metadata, ensure_ascii=False)
+        metadata = validate_new_item_metadata(req.metadata)
+        meta_json = json.dumps(metadata, ensure_ascii=False)
         Database.execute("""
             INSERT INTO items (id, garment_type_id, slot, name, gender, description, era, is_published, metadata)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)

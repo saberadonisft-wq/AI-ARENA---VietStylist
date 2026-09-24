@@ -1,9 +1,39 @@
+import json
+import json
 from typing import List, Optional, Dict, Any
 from app.modules.catalog.repository import CatalogRepository
+from app.modules.catalog.studio_images import _RECOLOR_VERSION
 from app.core.errors import AppError
 
 
 class CatalogService:
+    @staticmethod
+    def _add_color_change_capability(item: Dict[str, Any], layers: List[Dict[str, Any]]) -> None:
+        metadata = item.get("metadata") or {}
+        if isinstance(metadata, str):
+            try:
+                metadata = json.loads(metadata)
+            except json.JSONDecodeError:
+                metadata = {}
+        if not isinstance(metadata, dict):
+            metadata = {}
+        item["metadata"] = metadata
+        has_public_photo = isinstance(metadata.get("catalog_media_id"), str)
+        svg_token_available = any("VAR_COLOR_PRIMARY" in (layer.get("svg_content") or "") for layer in layers)
+        photo_approved = metadata.get("studio_recolor_approved") is True
+        item["color_change_supported"] = photo_approved if has_public_photo else svg_token_available
+        item["color_change_reason"] = None if item["color_change_supported"] else (
+            "Ảnh chưa được duyệt kiểm tra giữ họa tiết." if has_public_photo
+            else "Lớp ảnh chưa đánh dấu vùng màu có thể đổi an toàn."
+        )
+        item["color_algorithm_version"] = (
+            _RECOLOR_VERSION if has_public_photo and photo_approved
+            else "svg-primary-token-v1" if not has_public_photo and svg_token_available
+            else None
+        )
+        image_version = metadata.get("catalog_image_version")
+        item["image_version"] = image_version if isinstance(image_version, str) else None
+
     @staticmethod
     def list_garment_types() -> List[Dict[str, Any]]:
         return CatalogRepository.get_garment_types()
@@ -54,6 +84,7 @@ class CatalogService:
             variants = variants_by_item.get(item_id, [])
             layers = layers_by_item.get(item_id, [])
             item_dict = dict(item)
+            CatalogService._add_color_change_capability(item_dict, layers)
             item_dict["variants"] = variants
             item_dict["default_layer"] = layers[0] if layers else None
             result.append(item_dict)
@@ -77,6 +108,7 @@ class CatalogService:
         item_dict["default_layer"] = (
             item_dict["asset_layers"][0] if item_dict["asset_layers"] else None
         )
+        CatalogService._add_color_change_capability(item_dict, item_dict["asset_layers"])
         return item_dict
 
     @staticmethod

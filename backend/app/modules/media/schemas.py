@@ -1,4 +1,4 @@
-from typing import Optional, Literal
+from typing import List, Optional, Literal
 from pydantic import BaseModel, Field
 
 
@@ -43,3 +43,10 @@ class MediaAssetResponse(BaseModel):
 class AccessUrlResponse(BaseModel):
     access_url: str
     expires_in: int
+
+
+class AIMediaResponse(BaseModel):
+    media_id: str
+    purposes: List[Literal["person", "outfit", "result"]]
+    status: str
+    created_at: str

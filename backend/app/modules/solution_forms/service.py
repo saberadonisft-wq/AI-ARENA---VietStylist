@@ -1,6 +1,6 @@
 import json
 import uuid
-import sqlite3
+from app.core.database import INTEGRITY_ERRORS
 from typing import Optional, Dict, Any
 from app.modules.solution_forms.schemas import (
     SolutionFormResponse,
@@ -34,7 +34,7 @@ class SolutionFormService:
                     cultural_safeguards=default_safe,
                     lookbook_references_json="[]",
                 )
-            except sqlite3.IntegrityError:
+            except INTEGRITY_ERRORS:
                 # Tránh race condition khi 2 request cùng tạo form lần đầu
                 pass
 

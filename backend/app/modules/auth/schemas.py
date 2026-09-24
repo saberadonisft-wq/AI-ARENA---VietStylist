@@ -6,7 +6,7 @@ class RegisterRequest(BaseModel):
     email: str = Field(..., description="Email đăng ký của người dùng")
     password: str = Field(..., min_length=6, description="Mật khẩu (tối thiểu 6 ký tự)")
     display_name: str = Field(..., min_length=2, description="Tên hiển thị")
-    role: Literal["user", "stylist"] = "user"
+    role: Literal["user"] = "user"
 
     @field_validator("email", "display_name", mode="before")
     @classmethod

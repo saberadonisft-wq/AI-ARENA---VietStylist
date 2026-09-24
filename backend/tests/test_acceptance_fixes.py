@@ -352,7 +352,7 @@ def test_malformed_provider_output_falls_back(raw, monkeypatch):
         return raw
 
     monkeypatch.setattr(gemini_client, "get_styling_recommendations", provider)
-    response = client.post("/api/recommendations/ai", json={"prompt": "Test"})
+    response = client.post("/api/recommendations/ai", headers=HEADERS(), json={"prompt": "Test"})
     assert response.status_code == 200, response.text
     assert response.json()["source"] == "cultural_rule_engine"
     assert response.json()["outfits"]
@@ -361,6 +361,7 @@ def test_malformed_provider_output_falls_back(raw, monkeypatch):
 def test_invalid_locked_variant_rejected():
     response = client.post(
         "/api/recommendations/ai",
+        headers=HEADERS(),
         json={
             "prompt": "Test",
             "locked_items": [
@@ -613,9 +614,10 @@ def test_production_lifespan_does_not_migrate(monkeypatch, tmp_path):
     path = tmp_path / "no-auto-migrate.db"
     monkeypatch.setattr(database, "SQLITE_DB_PATH", str(path))
     monkeypatch.setattr(settings, "ENVIRONMENT", "production")
-    with TestClient(create_app()) as production:
-        assert production.get("/health").status_code == 200
-        assert not path.exists()
+    with pytest.raises(RuntimeError, match="SQLite is for tests only"):
+        with TestClient(create_app()):
+            pass
+    assert not path.exists()
 
 
 @pytest.mark.asyncio

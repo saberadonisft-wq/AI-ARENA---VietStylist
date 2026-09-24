@@ -1,6 +1,7 @@
 from typing import Optional, List, Dict, Any
 from app.core.database import Database, get_db_connection, row_to_dict
 from contextlib import closing
+from datetime import datetime, timedelta, timezone
 
 
 class TryOnRepository:
@@ -34,7 +35,7 @@ class TryOnRepository:
                 conn.execute("BEGIN IMMEDIATE")
                 row = conn.execute("""
                     SELECT id FROM ai_jobs
-                    WHERE status = 'queued' OR (status = 'running' AND lease_until < CURRENT_TIMESTAMP)
+                    WHERE task_type <> 'v3_generation' AND (status = 'queued' OR (status = 'running' AND lease_until < CURRENT_TIMESTAMP))
                     ORDER BY created_at ASC LIMIT 1
                 """).fetchone()
                 if not row:
@@ -42,9 +43,9 @@ class TryOnRepository:
                 job_id = row["id"]
                 conn.execute("""
                     UPDATE ai_jobs SET status = 'running',
-                    lease_until = datetime('now', '+' || ? || ' seconds'), updated_at = CURRENT_TIMESTAMP
+                    lease_until = ?, updated_at = CURRENT_TIMESTAMP
                     WHERE id = ?
-                """, (worker_lease_seconds, job_id))
+                """, ((datetime.now(timezone.utc) + timedelta(seconds=worker_lease_seconds)).strftime("%Y-%m-%d %H:%M:%S"), job_id))
                 return row_to_dict(conn.execute("SELECT * FROM ai_jobs WHERE id = ?", (job_id,)).fetchone())
 
     @staticmethod

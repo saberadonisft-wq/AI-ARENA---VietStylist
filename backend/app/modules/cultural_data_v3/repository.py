@@ -132,7 +132,7 @@ class CulturalDataV3Repository:
     @staticmethod
     def add_attribute_definition(definition: AttributeDefinition) -> None:
         Database.execute(
-            "INSERT OR IGNORE INTO attribute_definitions (key, label_vi, description, value_type, cardinality, allowed_values_json, applies_to_json, contextual, queryable, inheritable, default_missing_state, status, version) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO attribute_definitions (key, label_vi, description, value_type, cardinality, allowed_values_json, applies_to_json, contextual, queryable, inheritable, default_missing_state, status, version) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT DO NOTHING",
             (
                 definition.key,
                 definition.label_vi,
@@ -213,7 +213,7 @@ class CulturalDataV3Repository:
     @staticmethod
     def add_relation_definition(definition: RelationDefinition) -> None:
         Database.execute(
-            "INSERT OR IGNORE INTO relation_definitions (key, label_vi, source_types_json, target_types_json, directional, inverse_relation_key, contextual, inheritable, status, version) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO relation_definitions (key, label_vi, source_types_json, target_types_json, directional, inverse_relation_key, contextual, inheritable, status, version) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT DO NOTHING",
             (
                 definition.key,
                 definition.label_vi,
@@ -283,7 +283,7 @@ class CulturalDataV3Repository:
         legacy_table: str, legacy_id: str, entity_id: str, mapping_kind: str
     ) -> None:
         Database.execute(
-            "INSERT OR IGNORE INTO legacy_entity_mappings_v3 (legacy_table, legacy_id, entity_id, mapping_kind) VALUES (?, ?, ?, ?)",
+            "INSERT INTO legacy_entity_mappings_v3 (legacy_table, legacy_id, entity_id, mapping_kind) VALUES (?, ?, ?, ?) ON CONFLICT DO NOTHING",
             (legacy_table, legacy_id, entity_id, mapping_kind),
         )
 

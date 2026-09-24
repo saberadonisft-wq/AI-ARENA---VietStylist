@@ -2,7 +2,7 @@ import os
 import uuid
 import secrets
 import hashlib
-import sqlite3
+from app.core.database import INTEGRITY_ERRORS
 from typing import List
 from datetime import datetime, timezone
 import httpx
@@ -87,7 +87,7 @@ class AuthService:
                     "INSERT INTO user_roles (id, user_id, role) VALUES (?, ?, ?)",
                     (f"ur_{uuid.uuid4().hex[:12]}", account_id, role),
                 )
-        except sqlite3.IntegrityError:
+        except INTEGRITY_ERRORS:
             if Database.fetch_one("SELECT id FROM accounts WHERE email = ?", (email,)):
                 raise AppError(
                     code="EMAIL_EXISTS",

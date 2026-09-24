@@ -204,6 +204,7 @@ def test_r03_production_config_fails_closed_on_weak_secret():
     with pytest.raises(ValueError, match="Production requires a strong JWT secret"):
         Settings(
             ENVIRONMENT="production",
+            DATABASE_URL="postgresql://test:test@localhost/test",
             DEBUG=False,
             SUPABASE_JWT_SECRET="your-supabase-jwt-secret-for-local-dev-vietphucremix2026",
             JWT_SIGNING_SECRET="",

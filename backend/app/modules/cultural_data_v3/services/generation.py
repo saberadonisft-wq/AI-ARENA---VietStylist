@@ -15,6 +15,7 @@ class ProviderRequest:
     prompt: str
     negative_prompt: str = ""
     user_image_id: Optional[str] = None
+    outfit_image_id: Optional[str] = None
     reference_media_ids: List[str] = field(default_factory=list)
     options: Dict[str, Any] = field(default_factory=dict)
     idempotency_key: str = ""
@@ -105,6 +106,29 @@ class PromptBuilder:
     }
 
     NEGATIVE_CONSTRAINTS = ["distorted garment geometry"]
+
+    @classmethod
+    def build_try_on(cls, grounding: Dict[str, Any], *, has_person_image: bool) -> str:
+        base = cls.build(grounding)["positive_prompt"]
+        reference = (
+            "Image 1 is the outfit board and is the authoritative visual reference for "
+            "the garments, colors, layers and accessories. Recreate the clothing on a "
+            "person; do not reproduce the board's white background, captions or layout."
+        )
+        if has_person_image:
+            wearer = (
+                "Image 2 is the person to dress. Preserve this person's identity, face, "
+                "skin tone, body proportions and pose. Replace only clothing as needed "
+                "for natural fit and occlusion. Do not invent a different wearer."
+            )
+        else:
+            wearer = (
+                "No person photo is supplied. Choose one adult wearer whose gender "
+                "presentation and appearance suit the referenced garments and cultural "
+                "context. Use a natural pose and realistic proportions; do not infer a "
+                "specific real person's identity."
+            )
+        return f"{base} {reference} {wearer}"
 
     @classmethod
     def build(cls, grounding: Dict[str, Any]) -> Dict[str, str]:

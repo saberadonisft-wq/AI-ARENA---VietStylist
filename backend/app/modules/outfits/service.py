@@ -1,4 +1,5 @@
 import json
+import hashlib
 import uuid
 from typing import List, Optional, Dict, Any
 from app.modules.outfits.schemas import (
@@ -14,6 +15,7 @@ from app.modules.outfits.schemas import (
 from app.modules.outfits.repository import OutfitRepository
 from app.modules.catalog.repository import CatalogRepository
 from app.core.errors import AppError
+from app.core.database import is_unique_violation
 
 
 class OutfitService:
@@ -40,8 +42,7 @@ class OutfitService:
         return result
 
     @staticmethod
-    def create_outfit(user_id: str, req: CreateOutfitRequest) -> OutfitResponse:
-        outfit_id = str(uuid.uuid4())
+    def create_outfit(user_id: str, req: CreateOutfitRequest, idempotency_key: Optional[str] = None) -> OutfitResponse:
         version_id = str(uuid.uuid4())
 
         occasion_id = req.occasion_id or req.snapshot.occasionId
@@ -50,16 +51,50 @@ class OutfitService:
         normalized = req.snapshot.model_copy(update={"occasionId": occasion_id, "styleMode": style_mode})
         snapshot_str = normalized.model_dump_json()
 
-        OutfitRepository.create_outfit_atomic(
-            outfit_id=outfit_id,
-            owner_id=user_id,
-            title=req.title,
-            occasion_id=occasion_id,
-            style_mode=style_mode,
-            version_id=version_id,
-            snapshot_json=snapshot_str,
-            preview_image_url=req.preview_image_url,
-        )
+        if idempotency_key:
+            canonical_request = json.dumps(
+                {"title": req.title, "occasion_id": occasion_id, "style_mode": style_mode,
+                 "snapshot": normalized.model_dump(mode="json"), "preview_image_url": req.preview_image_url},
+                sort_keys=True, separators=(",", ":"), ensure_ascii=False,
+            )
+            request_hash = hashlib.sha256(canonical_request.encode("utf-8")).hexdigest()
+            scoped_key = "outfit-create:" + hashlib.sha256(f"{user_id}\0{idempotency_key}".encode()).hexdigest()
+            job_id = str(uuid.uuid5(uuid.NAMESPACE_URL, scoped_key))
+            outfit_id = str(uuid.uuid5(uuid.NAMESPACE_URL, scoped_key + ":outfit"))
+            OutfitRepository.reserve_create_receipt(job_id, user_id, scoped_key, request_hash, canonical_request)
+            receipt = OutfitRepository.get_create_receipt(scoped_key)
+            if not receipt or receipt["owner_id"] != user_id:
+                raise AppError("SAVE_RETRY_UNAVAILABLE", "Chưa xác nhận được trạng thái lưu. Hãy thử lại.", 503)
+            if receipt["input_hash"] != request_hash:
+                raise AppError("IDEMPOTENCY_CONFLICT", "Mã lưu đã được dùng cho bản phối khác. Hãy lưu lại để tạo một mã mới.", 409)
+
+            existing_outfit = OutfitRepository.get_outfit_by_id_and_owner(outfit_id, user_id)
+            if existing_outfit:
+                OutfitRepository.finish_create_receipt(scoped_key, outfit_id)
+                return OutfitService.get_outfit(outfit_id, user_id)
+        else:
+            outfit_id = str(uuid.uuid4())
+
+        try:
+            OutfitRepository.create_outfit_atomic(
+                outfit_id=outfit_id,
+                owner_id=user_id,
+                title=req.title,
+                occasion_id=occasion_id,
+                style_mode=style_mode,
+                version_id=version_id,
+                snapshot_json=snapshot_str,
+                preview_image_url=req.preview_image_url,
+            )
+        except Exception as exc:
+            # A concurrent retry can win the deterministic outfit ID after the
+            # receipt was reserved. Reuse its saved result; surface other errors.
+            existing_outfit = OutfitRepository.get_outfit_by_id_and_owner(outfit_id, user_id)
+            if not idempotency_key or not is_unique_violation(exc) or not existing_outfit:
+                raise
+
+        if idempotency_key:
+            OutfitRepository.finish_create_receipt(scoped_key, outfit_id)
 
         return OutfitService.get_outfit(outfit_id, user_id)
 

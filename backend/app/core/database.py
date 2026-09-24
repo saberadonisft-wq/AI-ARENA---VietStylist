@@ -7,6 +7,13 @@ from contextlib import contextmanager
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 from app.core.config import settings
+import psycopg
+
+INTEGRITY_ERRORS = (sqlite3.IntegrityError, psycopg.IntegrityError)
+
+
+def is_unique_violation(error):
+    return getattr(error, "sqlstate", None) == "23505" or getattr(error, "sqlite_errorcode", None) in (sqlite3.SQLITE_CONSTRAINT_PRIMARYKEY, sqlite3.SQLITE_CONSTRAINT_UNIQUE)
 
 # Path to database file if using SQLite
 if settings.DATABASE_URL.startswith("sqlite:///"):
@@ -41,6 +48,16 @@ def get_db_connection():
     """
     Context manager cung cấp kết nối SQLite và đảm bảo LUÔN đóng kết nối (close) sau khi dùng xong (O01).
     """
+    if settings.is_postgres():
+        from app.core.postgres import Connection, get_pool
+        with get_pool().connection() as raw:
+            conn = Connection(raw)
+            try:
+                yield conn
+            finally:
+                # Never return an idle-in-transaction connection to the pool.
+                conn.rollback()
+        return
     conn = _create_raw_connection()
     try:
         yield conn
@@ -517,11 +534,34 @@ def split_sql_statements(sql: str) -> List[str]:
     return statements
 
 
-from app.core.migrations import run_migrations, verify_schema
+from app.core.migrations import run_migrations, verify_schema as verify_sqlite_schema
+
+
+def verify_schema(conn):
+    if getattr(conn, "dialect", None) == "postgresql":
+        from app.core.postgres_migrations import verify_postgres_schema
+        return verify_postgres_schema(conn.raw)
+    return verify_sqlite_schema(conn)
+
+
+def table_columns(table, conn=None):
+    if not re.fullmatch(r"[a-z][a-z0-9_]*", table):
+        raise ValueError("Invalid table name")
+    if settings.is_postgres() and not isinstance(conn, sqlite3.Connection):
+        return [r["column_name"] for r in Database.fetch_all(
+            "SELECT column_name FROM information_schema.columns WHERE table_schema=? AND table_name=? ORDER BY ordinal_position",
+            (settings.DATABASE_SCHEMA, table), conn)]
+    return [r["name"] for r in Database.fetch_all(f"PRAGMA table_info({table})", conn=conn)]
 
 
 def init_database(seed=True):
     """Development/test initialization. Production runs migrate.py explicitly."""
+    if settings.is_postgres():
+        # Startup and seed helpers must never mutate a remote database.
+        with get_db_connection() as conn:
+            if not verify_schema(conn):
+                raise RuntimeError("PostgreSQL schema is missing or incompatible; run scripts/migrate.py explicitly.")
+        return
     os.makedirs(os.path.dirname(SQLITE_DB_PATH), exist_ok=True)
     with get_db_connection() as conn:
         run_migrations(conn)

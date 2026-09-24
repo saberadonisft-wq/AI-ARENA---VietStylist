@@ -4,11 +4,11 @@ All endpoints are under /api/v3 and coexist with V1 endpoints.
 """
 from __future__ import annotations
 
-import sqlite3
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
+from starlette.concurrency import run_in_threadpool
 from app.core.config import settings
-from app.core.database import Database, db_transaction
+from app.core.database import Database, db_transaction, INTEGRITY_ERRORS, is_unique_violation
 from app.core.errors import AppError
 from app.core.security import AuthenticatedUser, get_current_user_optional, require_current_user, require_role
 
@@ -27,6 +27,8 @@ from app.modules.cultural_data_v3.schemas import (
     PromptSynthesisResponse,
     SynthesizeRequest,
     SynthesizeResponse,
+    GenerationAvailabilityResponse,
+    GenerationJobResponse,
     DatasetCreateRequest,
     DatasetMetadataResponse,
     LegacyMappingBundleResponse,
@@ -162,7 +164,7 @@ def list_entities(
     with dataset_resolver(dataset_version) as (selected_resolver, _):
         rows = selected_resolver.reader.fetch_all(
             "SELECT * FROM entity_registry WHERE status='published' "
-            "AND (? IS NULL OR entity_type=?) ORDER BY id LIMIT ? OFFSET ?",
+            "AND (CAST(? AS TEXT) IS NULL OR entity_type=?) ORDER BY id LIMIT ? OFFSET ?",
             (entity_type, entity_type, limit, offset),
         )
         return [entity_response(row) for row in rows]
@@ -182,8 +184,8 @@ def create_entity(req: EntityCreateRequest, user: AuthenticatedUser = Depends(re
     )
     try:
         repo.add_entity(entity)
-    except sqlite3.IntegrityError as e:
-        if e.sqlite_errorcode not in (sqlite3.SQLITE_CONSTRAINT_PRIMARYKEY, sqlite3.SQLITE_CONSTRAINT_UNIQUE):
+    except INTEGRITY_ERRORS as e:
+        if not is_unique_violation(e):
             raise
         raise AppError("ENTITY_EXISTS", "Định danh entity đã tồn tại.", 409) from None
     return EntityResponse(
@@ -255,8 +257,31 @@ def generation_prompt(outfit: OutfitSpecV2):
     return PromptBuilder.build(build_grounding(outfit))
 
 
+@router.get("/generation/status", response_model=GenerationAvailabilityResponse)
+def generation_status():
+    return {"enabled": bool(settings.GEMINI_TRY_ON_ENABLED and settings.GEMINI_API_KEY)}
+
+
 @router.post("/generation/synthesize", response_model=SynthesizeResponse)
 async def generation_synthesize(req: SynthesizeRequest, user: AuthenticatedUser = Depends(require_current_user)):
+    from app.modules.cultural_data_v3.services.generation_jobs import submit, wait_for_job
+    job = await submit(req, user, _generate_image, require_provider=True)
+    return await wait_for_job(job.job_id, user.user_id)
+
+
+@router.post("/generation/jobs", response_model=GenerationJobResponse, status_code=202)
+async def create_generation_job(req: SynthesizeRequest, user: AuthenticatedUser = Depends(require_current_user)):
+    from app.modules.cultural_data_v3.services.generation_jobs import submit
+    return await submit(req, user, _generate_image, require_provider=True)
+
+
+@router.get("/generation/jobs/{job_id}", response_model=GenerationJobResponse)
+async def get_generation_job(job_id: str, user: AuthenticatedUser = Depends(require_current_user)):
+    from app.modules.cultural_data_v3.services.generation_jobs import get_job
+    return await run_in_threadpool(get_job, job_id, user.user_id)
+
+
+async def _generate_image(req: SynthesizeRequest, user: AuthenticatedUser):
     from app.modules.cultural_data_v3.providers.gemini import GeminiGenerationProvider
     from app.modules.cultural_data_v3.services.generation import (
         PostValidationService,
@@ -274,29 +299,59 @@ async def generation_synthesize(req: SynthesizeRequest, user: AuthenticatedUser 
             "Dịch vụ sinh ảnh chưa được cấu hình. Bộ phối của bạn vẫn được giữ nguyên.",
             503,
         )
+    if not req.outfit_image_id:
+        raise AppError("OUTFIT_IMAGE_REQUIRED", "Cần ảnh bản phối để thử đồ.", 422)
 
-    grounding = build_grounding(req.outfit)
+    from app.modules.catalog.repository import CatalogRepository
+    from app.modules.cultural_data_v3.services.generation import GroundingBuilder
+
+    if not req.outfit.selections and not req.legacy_item_ids:
+        raise AppError("OUTFIT_EMPTY", "Bộ phối chưa có trang phục.", 422)
+    if len(req.legacy_item_ids) != len(set(req.legacy_item_ids)):
+        raise AppError("DUPLICATE_OUTFIT_ITEMS", "Bộ phối có trang phục trùng.", 422)
+    published_items = []
+    for item_id in req.legacy_item_ids:
+        item = await run_in_threadpool(CatalogRepository.get_item_by_id, item_id)
+        if not item:
+            raise AppError("ITEM_NOT_FOUND", "Trang phục chưa được xuất bản hoặc không còn tồn tại.", 404)
+        published_items.append(item)
+
+    grounding = (
+        await run_in_threadpool(build_grounding, req.outfit)
+        if req.outfit.selections
+        else GroundingBuilder().build(
+            req.outfit.model_dump(), [],
+            dataset={"dataset_version": req.outfit.dataset_version, "ruleset_version": req.outfit.ruleset_version, "reproducible": False},
+        )
+    )
     prompts = PromptBuilder.build(grounding)
+    try_on_prompt = PromptBuilder.build_try_on(grounding, has_person_image=bool(req.user_image_id))
+    if published_items:
+        garment_list = "; ".join(f"{item['slot']}: {item['name']}" for item in published_items)
+        try_on_prompt += f" Selected published catalog garments: {garment_list}. Follow the outfit board for exact appearance and colors."
     idempotency_key = req.idempotency_key or canonical_hash(
         {
             "user_id": user.user_id,
             "grounding_hash": grounding["grounding_hash"],
             "user_image_id": req.user_image_id,
+            "outfit_image_id": req.outfit_image_id,
+            "legacy_item_ids": req.legacy_item_ids,
             "model_id": req.model_id or settings.GEMINI_MODEL_IMAGE,
             "options": req.options,
         }
     )
     result = await GeminiGenerationProvider(user.user_id, model_id=req.model_id).generate(
         ProviderRequest(
-            prompt=prompts["positive_prompt"],
+            prompt=try_on_prompt,
             negative_prompt=prompts["negative_prompt"],
             user_image_id=req.user_image_id,
+            outfit_image_id=req.outfit_image_id,
             reference_media_ids=grounding["reference_media_ids"],
             options=req.options,
             idempotency_key=idempotency_key,
         )
     )
-    validate_provider_result(
+    await run_in_threadpool(validate_provider_result,
         result,
         media_lookup=MediaRepository.get_media_by_id,
         media_probe=MediaService.probe_image,

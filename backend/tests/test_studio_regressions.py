@@ -105,6 +105,7 @@ def test_cultural_check_uses_equipped_garment_not_filter():
 def test_recommendation_preserves_locked_variant():
     response = client.post(
         "/api/recommendations/ai",
+        headers={"Authorization": auth_header("dev-user-test-1")},
         json={
             "prompt": "Giữ màu áo",
             "locked_items": [

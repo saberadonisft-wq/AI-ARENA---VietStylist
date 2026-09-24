@@ -147,9 +147,10 @@ def get_current_user_optional(
 
     from app.core.database import Database
 
+    role_aggregate = "STRING_AGG(r.role, ',')" if settings.is_postgres() else "GROUP_CONCAT(r.role)"
     account = Database.fetch_one(
-        """
-        SELECT a.is_active, a.email, GROUP_CONCAT(r.role) AS current_roles
+        f"""
+        SELECT a.is_active, a.email, {role_aggregate} AS current_roles
         FROM accounts a LEFT JOIN user_roles r ON r.user_id=a.id
         WHERE a.id=? GROUP BY a.id
     """,

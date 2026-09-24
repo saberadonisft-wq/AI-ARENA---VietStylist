@@ -11,7 +11,7 @@ class LockedItemInput(BaseModel):
 class ContextRecommendationRequest(BaseModel):
     occasion_id: str
     city_key: Optional[str] = "hanoi"
-    gender: Optional[str] = "unisex"
+    gender: Optional[str] = None
     style_mode: str = "traditional"  # traditional, remix
     locked_items: List[LockedItemInput] = Field(default_factory=list, max_length=16)
 
@@ -19,7 +19,7 @@ class ContextRecommendationRequest(BaseModel):
 class AIRecommendationRequest(BaseModel):
     prompt: str = Field(min_length=1, max_length=4000)
     occasion_id: Optional[str] = None
-    gender: Optional[str] = "unisex"
+    gender: Optional[str] = None
     style_mode: str = "traditional"
     locked_items: List[LockedItemInput] = Field(default_factory=list, max_length=16)
 
@@ -43,3 +43,4 @@ class RecommendationResponse(BaseModel):
     source: str  # gemini or cultural_rule_engine
     model: str
     outfits: List[RecommendedOutfitOutput]
+    notice: Optional[str] = None

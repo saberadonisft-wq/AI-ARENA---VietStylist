@@ -15,6 +15,9 @@ dependencies = [
     "python-multipart>=0.0.20",
     "aiofiles>=24.1.0",
     "pillow>=11.0.0",
+    "rembg[cpu]>=2.0.84,<3.0.0",
+    "psycopg[binary]>=3.3.4,<4.0",
+    "psycopg-pool>=3.3.3,<4.0",
 ]
 
 [project.optional-dependencies]
@@ -35,7 +38,7 @@ testpaths = ["tests"]
 asyncio_mode = "auto"
 
 [tool.setuptools.package-data]
-"app.data" = ["*.sql"]
+"app.data" = ["*.sql", "postgres_schema.json"]
 "app.modules.cultural_data_v3" = ["fixtures/*.json", "fixtures/pilot_packages/*.json"]
 
 [tool.setuptools.packages.find]

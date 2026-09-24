@@ -46,6 +46,10 @@ class RecommendationService:
 
         await run_in_threadpool(RecommendationService.validate_locked, locked_data)
 
+        items = await run_in_threadpool(RecommendationService._provider_items, items, locked_data)
+        if not items:
+            return RecommendationService._empty_result()
+
         raw_result = await gemini_client.get_styling_recommendations(
             prompt=prompt,
             occasion_id=req.occasion_id,
@@ -79,6 +83,10 @@ class RecommendationService:
 
         await run_in_threadpool(RecommendationService.validate_locked, locked_data)
 
+        items = await run_in_threadpool(RecommendationService._provider_items, items, locked_data)
+        if not items:
+            return RecommendationService._empty_result()
+
         raw_result = await gemini_client.get_styling_recommendations(
             prompt=f"{req.prompt} Phong cách: {req.style_mode}.",
             occasion_id=req.occasion_id,
@@ -94,6 +102,32 @@ class RecommendationService:
         )
 
     @staticmethod
+    def _empty_result() -> RecommendationResponse:
+        return RecommendationResponse(
+            source="cultural_rule_engine", model="rule-based-fallback-v1", outfits=[],
+            notice="Chưa có trang phục đang xuất bản phù hợp với bộ lọc. Hãy đổi yêu cầu hoặc thêm trang phục vào danh mục.",
+        )
+
+    @staticmethod
+    def _provider_items(items, locked_items):
+        # Locked garments may be outside the occasion filter but still belong in
+        # the provider's allowed IDs. Only publishable garments pass validation.
+        by_id = {item["id"]: dict(item) for item in items}
+        for locked in locked_items:
+            if locked["item_id"] not in by_id:
+                item = CatalogRepository.get_item_by_id(locked["item_id"])
+                if item:
+                    by_id[item["id"]] = dict(item)
+        for item in by_id.values():
+            item["variants"] = []
+        for variant in CatalogRepository.get_variants_by_item_ids(list(by_id)):
+            by_id[variant["item_id"]]["variants"].append({
+                "id": variant["id"], "color_name": variant["color_name"],
+                "hex_color": variant["hex_color"],
+            })
+        return list(by_id.values())
+
+    @staticmethod
     def _format_recommendation_result(
         raw: Dict[str, Any], available_items=None, locked_items=None
     ) -> RecommendationResponse:
@@ -101,7 +135,8 @@ class RecommendationService:
             raw_outfits = parse_recommendations(raw.get("recommendations", []))
         except (ValueError, TypeError, AttributeError):
             raw_outfits = []
-            raw = {}
+            notice = raw.get("notice") if isinstance(raw, dict) else None
+            raw = {"notice": notice or "Gemini trả kết quả chưa hợp lệ. Đây là gợi ý dự phòng từ danh mục."}
         RecommendationService.validate_locked(locked_items or [])
         formatted_outfits: List[RecommendedOutfitOutput] = []
 
@@ -143,7 +178,7 @@ class RecommendationService:
                         not in {v["id"] for v in variants_by_item.get(item_id, [])}
                     ):
                         return RecommendationService._format_recommendation_result(
-                            {}, available_items, locked_items
+                            {"notice": "Gemini chọn món hoặc màu không có trong danh mục. Đây là gợi ý dự phòng."}, available_items, locked_items
                         )
 
         for o in raw_outfits:
@@ -205,13 +240,14 @@ class RecommendationService:
 
         if not formatted_outfits and raw.get("source") == "gemini":
             return RecommendationService._format_recommendation_result(
-                {}, available_items, locked_items
+                {"notice": "Gemini chưa chọn được trang phục hợp lệ. Đây là gợi ý dự phòng."}, available_items, locked_items
             )
 
         return RecommendationResponse(
             source=raw.get("source", "cultural_rule_engine"),
             model=raw.get("model", "vietstylist-stylist-v1"),
             outfits=formatted_outfits,
+            notice=raw.get("notice"),
         )
 
     @staticmethod

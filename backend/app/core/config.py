@@ -7,7 +7,7 @@ import os
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=".env", env_file_encoding="utf-8", extra="ignore"
+        env_file=".env", env_file_encoding="utf-8", extra="ignore", hide_input_in_errors=True
     )
 
     PROJECT_NAME: str = "Việt phục Remix API"
@@ -46,6 +46,9 @@ class Settings(BaseSettings):
 
     # Database
     DATABASE_URL: str = "sqlite:///./viet_phuc_remix.db"
+    SUPABASE_DATABASE_URL: str = ""
+    DATABASE_SCHEMA: str = "vietstylist"
+    DATABASE_POOL_SIZE: int = 8
     SUPABASE_URL: str = ""
     SUPABASE_ANON_KEY: str = ""
     SUPABASE_SERVICE_ROLE_KEY: str = ""
@@ -81,7 +84,7 @@ class Settings(BaseSettings):
 
     # Gemini
     GEMINI_API_KEY: str = ""
-    GEMINI_MODEL_TEXT: str = "gemini-2.5-flash"
+    GEMINI_MODEL_TEXT: str = "gemini-3.6-flash"
     GEMINI_MODEL_IMAGE: str = "gemini-2.5-flash-image"
     GEMINI_TRY_ON_ENABLED: bool = False
 
@@ -92,9 +95,38 @@ class Settings(BaseSettings):
     @field_validator("DATABASE_URL")
     @classmethod
     def validate_database_url(cls, v: str) -> str:
-        if not v.startswith("sqlite:///"):
-            raise ValueError("Only sqlite:/// is supported for M1.")
+        if not v.startswith(("sqlite:///", "postgresql://", "postgres://")):
+            raise ValueError("Use a sqlite:/// test URL or a PostgreSQL connection URI.")
         return v
+
+    @field_validator("SUPABASE_DATABASE_URL")
+    @classmethod
+    def validate_supabase_database_url(cls, v: str) -> str:
+        if v and not v.startswith(("postgresql://", "postgres://")):
+            raise ValueError("SUPABASE_DATABASE_URL must be a PostgreSQL connection URI.")
+        return v
+
+    @field_validator("DATABASE_SCHEMA")
+    @classmethod
+    def validate_schema_name(cls, v: str) -> str:
+        import re
+        if not re.fullmatch(r"[a-z][a-z0-9_]{0,62}", v) or v in ("public", "auth", "storage", "information_schema") or v.startswith("pg_"):
+            raise ValueError("Use a dedicated private application schema.")
+        return v
+
+    @field_validator("DATABASE_POOL_SIZE")
+    @classmethod
+    def validate_pool_size(cls, v: int) -> int:
+        if not 1 <= v <= 32:
+            raise ValueError("DATABASE_POOL_SIZE must be between 1 and 32.")
+        return v
+
+    def database_url(self) -> str:
+        # Tests always select their explicit disposable DATABASE_URL.
+        return self.DATABASE_URL if self.ENVIRONMENT == "test" else (self.SUPABASE_DATABASE_URL or self.DATABASE_URL)
+
+    def is_postgres(self) -> bool:
+        return self.database_url().startswith(("postgresql://", "postgres://"))
 
     def get_jwt_secret(self) -> str:
         secret = self.JWT_SIGNING_SECRET or self.SUPABASE_JWT_SECRET
@@ -109,6 +141,8 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_production_settings(self):
+        if self.ENVIRONMENT in ("staging", "production") and not self.is_postgres():
+            raise ValueError("Staging/production require PostgreSQL; SQLite is only for local tests.")
         if not self.JWT_ISSUER or not self.JWT_AUDIENCE:
             raise ValueError("JWT issuer and audience are required")
         from urllib.parse import urlsplit
@@ -147,6 +181,18 @@ class Settings(BaseSettings):
                 or not self.API_PUBLIC_ORIGIN.startswith("https://")
             ):
                 raise ValueError("Public origins must use HTTPS in production")
+            for value in (self.FRONTEND_PUBLIC_ORIGIN, self.API_PUBLIC_ORIGIN):
+                if urlsplit(value).hostname in ("localhost", "127.0.0.1", "::1"):
+                    raise ValueError("Public origins cannot point to localhost in production")
+            cors_origins = self.CORS_ORIGINS if isinstance(self.CORS_ORIGINS, list) else [self.CORS_ORIGINS]
+            if self.FRONTEND_PUBLIC_ORIGIN.rstrip("/") not in cors_origins or any(
+                origin == "*" or not origin.startswith("https://") for origin in cors_origins
+            ):
+                raise ValueError("Production CORS origins must include the HTTPS frontend origin")
+            if not all((self.R2_ACCOUNT_ID, self.R2_ACCESS_KEY_ID, self.R2_SECRET_ACCESS_KEY)):
+                raise ValueError("Production requires Cloudflare R2 credentials")
+            if not self.R2_PUBLIC_DOMAIN:
+                raise ValueError("Production requires an R2 public media domain")
             if self.R2_PUBLIC_DOMAIN and not self.R2_PUBLIC_DOMAIN.startswith(
                 "https://"
             ):
