@@ -74,7 +74,7 @@ export default function ExportModal({
           <div className="flex items-center space-x-2">
             <Sparkles className="w-4 h-4 text-heritage-gold" />
             <h3 className="font-serif text-base font-bold text-stone-900">
-              Xuất Bản Phối Ảnh 2D (F03)
+              Xuất ảnh bản phối
             </h3>
           </div>
           <button onClick={onClose} className="text-stone-400 hover:text-stone-700">

@@ -6,24 +6,30 @@ import { ShieldCheck, AlertTriangle, AlertCircle, ChevronDown, ChevronUp, BookOp
 
 interface CulturalCheckBadgeProps {
   checkData: CulturalCheckResponse | null;
+  status: "loading" | "ready" | "empty" | "error";
+  error?: string | null;
+  onRetry?: () => void;
   onApplyFix?: (suggestedFix: any) => void;
 }
 
-export default function CulturalCheckBadge({ checkData, onApplyFix }: CulturalCheckBadgeProps) {
+export default function CulturalCheckBadge({ checkData, status, error, onRetry, onApplyFix }: CulturalCheckBadgeProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
-  if (!checkData) return null;
+  if (status === "loading") return <div role="status" className="rounded-xl border border-stone-200 bg-white px-3.5 py-3 text-xs text-stone-600">Đang kiểm tra các quy tắc có dữ liệu…</div>;
+  if (status === "error") return <div className="rounded-xl border border-amber-200 bg-amber-50 p-3.5 text-xs text-amber-900"><p role="alert">Không kiểm tra được quy tắc: {error || "máy chủ chưa phản hồi"}. Chưa có kết luận cho bản phối này.</p><button type="button" onClick={onRetry} className="mt-2 rounded border border-amber-300 bg-white px-2.5 py-1 font-semibold">Thử lại</button></div>;
+  if (status === "empty" || !checkData) return <div role="status" className="rounded-xl border border-stone-200 bg-white px-3.5 py-3 text-xs text-stone-600">Chưa đủ dữ liệu trang phục để kiểm tra.</div>;
 
-  const isSound = checkData.is_culturally_sound && checkData.warning_count === 0 && checkData.info_count === 0;
   const hasStrict = checkData.strict_count > 0;
   const hasWarning = checkData.warning_count > 0;
 
   return (
     <div className="rounded-xl border transition-all overflow-hidden shadow-sm">
       {/* Thanh tiêu đề Banner */}
-      <div
+      <button
+        type="button"
+        aria-expanded={isExpanded}
         onClick={() => setIsExpanded(!isExpanded)}
-        className={`flex items-center justify-between px-3.5 py-2 cursor-pointer transition-colors ${
+        className={`w-full flex items-center justify-between px-3.5 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-heritage-red ${
           hasStrict
             ? "bg-red-50 border-red-200 text-red-900 hover:bg-red-100/80"
             : hasWarning
@@ -42,12 +48,12 @@ export default function CulturalCheckBadge({ checkData, onApplyFix }: CulturalCh
 
           <div className="text-xs font-semibold">
             {hasStrict
-              ? `Phát hiện ${checkData.strict_count} vi phạm quy thức cổ truyền (F10)`
+              ? `Có ${checkData.strict_count} cảnh báo mức nghiêm trọng`
               : hasWarning
               ? `Có ${checkData.warning_count} lưu ý về quy chuẩn lễ nghi cổ phục`
               : checkData.info_count > 0
               ? `Có ${checkData.info_count} gợi ý về quy thức trang phục`
-              : "Chưa phát hiện vi phạm trong các quy tắc đang kiểm tra"}
+              : "Chưa phát hiện cảnh báo trong các quy tắc đang kiểm tra"}
           </div>
         </div>
 
@@ -55,14 +61,14 @@ export default function CulturalCheckBadge({ checkData, onApplyFix }: CulturalCh
           <span>{isExpanded ? "Thu gọn" : "Xem chi tiết"}</span>
           {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
         </div>
-      </div>
+      </button>
 
       {/* Nội dung chi tiết các cảnh báo & Trích dẫn nguồn */}
       {isExpanded && (
         <div className="p-3.5 bg-white space-y-3 text-xs divide-y divide-stone-100">
           {checkData.warnings.length === 0 ? (
             <p className="text-stone-600 leading-relaxed">
-              Trang phục của bạn tuân thủ đúng nguyên tắc <strong>Hữu nhậm</strong> (cài khuy nách phải), giữ lớp viền cổ áo thanh nhã và đầy đủ lễ nghi theo thư tịch cổ triều Nguyễn.
+              Chưa phát hiện cảnh báo trong bộ quy tắc đã chạy. Đây không phải kết luận thẩm định về lịch sử hoặc văn hóa.
             </p>
           ) : (
             checkData.warnings.map((w) => (

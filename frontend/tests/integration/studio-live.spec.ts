@@ -16,7 +16,7 @@ test("real login, two-tab conflict, lookbook creation and revocable anonymous sh
     expect(response.ok()).toBeTruthy();
     expect(Array.isArray((await response.json()).mappings)).toBe(true);
     await expect(page.getByTestId("studio-composer")).toBeVisible();
-    await expect(page.getByTestId("studio-composer").getByText(/chưa có ánh xạ đầy đủ/)).toBeVisible();
+    await expect(page.getByTestId("studio-composer").getByText("Chọn trang phục để tra cứu và kiểm tra văn hóa.")).toBeVisible();
     await page.getByTestId("studio-composer").getByRole("button", { name: "Chọn bối cảnh và bộ dữ liệu riêng" }).click();
     await expect(page.getByLabel("Bộ dữ liệu", { exact: true })).toHaveValue("dev");
   }
@@ -36,7 +36,10 @@ test("real login, two-tab conflict, lookbook creation and revocable anonymous sh
   const saved = await request.get(`http://127.0.0.1:4100/api/outfits/${draft.outfitId}`, { headers });
   expect(saved.ok()).toBeTruthy();
   const persisted = await saved.json();
-  expect(sameDocument({ title: persisted.title, snapshot: persisted.current_snapshot }, draft)).toBe(true);
+  const persistedDocument = { title: persisted.title, snapshot: persisted.current_snapshot };
+  expect(sameDocument(persistedDocument, draft),
+    `Local snapshot: ${JSON.stringify(draft.snapshot)}\nAPI snapshot: ${JSON.stringify(persisted.current_snapshot)}`,
+  ).toBe(true);
   if (mappingResponse) expect(persisted.current_snapshot.culturalSettings).toMatchObject({ dataset_version: "dev", context: { period_ids: [], region_ids: [] } });
 
   const loaded = page.waitForResponse(response => response.url().endsWith(`/api/outfits/${draft.outfitId}`) && response.request().method() === "GET");
@@ -47,11 +50,12 @@ test("real login, two-tab conflict, lookbook creation and revocable anonymous sh
   const otherTab = await context.newPage();
   await otherTab.goto(`/studio?loadOutfit=${encodeURIComponent(draft.outfitId)}`);
   await expect(otherTab.locator("input").first()).toHaveValue("Nháp khách trước đăng nhập");
+  await page.locator("input").first().fill("Nội dung của tab cũ");
+  await expect(otherTab.locator("input").first()).toHaveValue("Nội dung của tab cũ");
   await otherTab.locator("input").first().fill("Tab khác đã lưu");
   const competing = otherTab.waitForResponse(response => response.url().endsWith(`/api/outfits/${draft.outfitId}`) && response.request().method() === "PUT");
   await otherTab.getByRole("button", { name: "Lưu bộ phối", exact: true }).click();
   expect((await competing).ok()).toBeTruthy();
-  await page.locator("input").first().fill("Nội dung của tab cũ");
   await page.getByRole("button", { name: "Lưu bộ phối", exact: true }).click();
   await expect(page.getByRole("alert", { name: "Lưu bộ phối" })).toContainText("Bản nháp của bạn vẫn được giữ");
   await expect(page.locator("input").first()).toHaveValue("Nội dung của tab cũ");
@@ -71,7 +75,7 @@ test("real login, two-tab conflict, lookbook creation and revocable anonymous sh
   await otherTab.goto(`/lookbook/${lookbook.id}`);
   await expect(otherTab.getByRole("heading", { name: "Lookbook nghiệm thu", exact: true })).toBeVisible();
   const shared = otherTab.waitForResponse(response => response.url().endsWith(`/api/lookbooks/${lookbook.id}/share`));
-  await otherTab.getByRole("button", { name: "Tạo link chia sẻ (F09)" }).click();
+  await otherTab.getByRole("button", { name: "Tạo liên kết chia sẻ Lookbook" }).click();
   const shareResponse = await shared;
   expect(shareResponse.ok()).toBeTruthy();
   const share = await shareResponse.json();
@@ -80,7 +84,7 @@ test("real login, two-tab conflict, lookbook creation and revocable anonymous sh
   try {
     const guest = await anonymous.newPage();
     await guest.goto(`http://127.0.0.1:3100/lookbook/${lookbook.id}`);
-    await expect(guest.getByRole("heading", { name: "Không tìm thấy Lookbook" })).toBeVisible();
+    await expect(guest.getByRole("heading", { name: "Đăng nhập để xem Lookbook của bạn" })).toBeVisible();
     await guest.goto(share.share_url);
     await expect(guest.getByRole("heading", { name: "Lookbook nghiệm thu", exact: true })).toBeVisible();
     await expect(guest.getByRole("heading", { name: "Tab khác đã lưu", exact: true })).toBeVisible();

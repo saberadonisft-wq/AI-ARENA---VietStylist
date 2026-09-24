@@ -7,6 +7,8 @@ export interface StudioDraft extends StudioDocument {
   revision?: number;
   ownerId?: string;
   savedDocument?: StudioDocument;
+  createIdempotencyKey?: string;
+  createDocument?: StudioDocument;
 }
 export interface StudioHistory {
   past: StudioDocument[];
@@ -26,19 +28,12 @@ export function sameDocument(left: StudioDocument, right: StudioDocument): boole
   return JSON.stringify(canonical({ title: left.title, snapshot: left.snapshot })) === JSON.stringify(canonical({ title: right.title, snapshot: right.snapshot }));
 }
 export const INITIAL_DOCUMENT: StudioDocument = {
-  title: "Bản phối Kỷ yếu Cổ phong",
+  title: "Bản phối mới",
   snapshot: {
     schemaVersion: 1, avatarId: "avatar_nam_chuan", poseId: "front_01",
-    occasionId: "ky_yeu", styleMode: "traditional", overlapDirection: "right_over_left",
+    styleMode: "traditional", overlapDirection: "right_over_left",
     lockedSlots: [], backgroundTheme: "white", aspectRatio: "9:16",
-    items: [
-      { slot: "outerwear", itemId: "item_ngu_than_nam_xanh", variantId: "var_ngu_than_nam_xanh_cham", assetVersion: 1, colorHex: "#1A365D" },
-      { slot: "undergarment", itemId: "item_ao_lot_trang", variantId: "var_ao_lot_trang", assetVersion: 1, colorHex: "#FFFFFF" },
-      { slot: "bottom", itemId: "item_quan_trang_lua", variantId: "var_quan_trang", assetVersion: 1, colorHex: "#FFFFFF" },
-      { slot: "headwear", itemId: "item_khan_van_den", variantId: "var_khan_van_den", assetVersion: 1, colorHex: "#171923" },
-      { slot: "accessory_front", itemId: "item_quat_xep_giay_do", variantId: "var_quat_xep", assetVersion: 1, colorHex: "#9C4221" },
-      { slot: "footwear", itemId: "item_guoc_moc_quai_nhung", variantId: "var_guoc_moc", assetVersion: 1, colorHex: "#4A5568" },
-    ],
+    items: [],
   },
 };
 
@@ -94,10 +89,18 @@ export function parseDraft(raw: string | null): StudioDraft | null {
     snapshot.lockedSlots = Array.isArray(snap.lockedSlots) ? snap.lockedSlots.filter((s: unknown) => typeof s === "string") : [];
     snapshot.backgroundTheme = snap.backgroundTheme === "dopaper" ? "dopaper" : "white";
     snapshot.aspectRatio = snap.aspectRatio === "1:1" ? "1:1" : "9:16";
+    const legacyCreateKey = typeof data.pendingSaveKey === "string" && /^[A-Za-z0-9._:-]{8,128}$/.test(data.pendingSaveKey)
+      ? data.pendingSaveKey
+      : undefined;
+    const createRecord = data.createDocument || (legacyCreateKey ? data.pendingSavePayload : undefined);
     return { title: typeof data.title === "string" ? data.title : INITIAL_DOCUMENT.title, snapshot,
       outfitId: typeof data.outfitId === "string" ? data.outfitId : undefined,
       revision: Number.isInteger(data.revision) && data.revision > 0 ? data.revision : undefined,
       ownerId: typeof data.ownerId === "string" ? data.ownerId : undefined,
-      savedDocument: data.savedDocument ? parseDraft(JSON.stringify({ title: data.savedDocument.title, snapshot: data.savedDocument.snapshot })) || undefined : undefined };
+      savedDocument: data.savedDocument ? parseDraft(JSON.stringify({ title: data.savedDocument.title, snapshot: data.savedDocument.snapshot })) || undefined : undefined,
+      createIdempotencyKey: typeof data.createIdempotencyKey === "string" && /^[A-Za-z0-9._:-]{8,128}$/.test(data.createIdempotencyKey)
+        ? data.createIdempotencyKey
+        : legacyCreateKey,
+      createDocument: createRecord ? parseDraft(JSON.stringify({ title: createRecord.title, snapshot: createRecord.snapshot })) || undefined : undefined };
   } catch { return null; }
 }

@@ -9,7 +9,7 @@ import { StarterOutfitCardSkeleton } from "@/components/ui/Skeleton";
 interface StarterOutfitModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSelectStarter: (outfit: StarterOutfit) => void;
+  onSelectStarter: (outfit: StarterOutfit) => boolean | void;
 }
 
 export default function StarterOutfitModal({
@@ -19,16 +19,20 @@ export default function StarterOutfitModal({
 }: StarterOutfitModalProps) {
   const [starters, setStarters] = useState<StarterOutfit[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [retry, setRetry] = useState(0);
 
   useEffect(() => {
     if (!isOpen) return;
+    let active = true;
     setIsLoading(true);
-    api
-      .getStarterOutfits()
-      .then((data) => setStarters(data))
-      .catch((err) => console.error("Lỗi lấy starter outfits:", err))
-      .finally(() => setIsLoading(false));
-  }, [isOpen]);
+    setError(null);
+    api.getStarterOutfits()
+      .then(data => { if (active) setStarters(data); })
+      .catch(err => { if (active) setError(err?.message || "Không tải được danh sách mẫu phối."); })
+      .finally(() => { if (active) setIsLoading(false); });
+    return () => { active = false; };
+  }, [isOpen, retry]);
 
   if (!isOpen) return null;
 
@@ -40,10 +44,10 @@ export default function StarterOutfitModal({
           <div className="flex items-center space-x-2">
             <Sparkles className="w-5 h-5 text-heritage-red" />
             <h3 className="font-serif text-base font-bold text-stone-900">
-              Chọn Bộ Phối Mở Đầu (F01)
+              Chọn mẫu phối mở đầu
             </h3>
           </div>
-          <button onClick={onClose} className="text-stone-400 hover:text-stone-700">
+          <button type="button" aria-label="Đóng mẫu phối mở đầu" onClick={onClose} className="rounded-lg p-1.5 text-stone-400 hover:bg-stone-100 hover:text-stone-700">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -51,7 +55,7 @@ export default function StarterOutfitModal({
         {/* Body */}
         <div className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
           <p className="text-xs text-stone-600 leading-relaxed">
-            Các mẫu phối mở đầu được các chuyên gia di sản văn hóa chuẩn hóa phom dáng và sự hài hòa màu sắc, giúp bạn bắt đầu phối đồ ngay mà không phải chọn từ đầu.
+            Chọn một mẫu để đưa các món có sẵn trong mẫu vào bản phối. Bản nháp hiện tại sẽ được giữ trong mục khôi phục trên thiết bị.
           </p>
 
           {isLoading ? (
@@ -60,25 +64,28 @@ export default function StarterOutfitModal({
                 <StarterOutfitCardSkeleton key={i} />
               ))}
             </div>
+          ) : error ? (
+            <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-5 text-sm text-rose-900">
+              <p>Không tải được mẫu phối: {error}</p>
+              <button type="button" onClick={() => setRetry(value => value + 1)} className="mt-3 rounded-lg border border-rose-300 bg-white px-3 py-1.5 text-xs font-semibold">Thử tải lại</button>
+            </div>
+          ) : starters.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-stone-300 bg-stone-50 p-6 text-center text-sm text-stone-600">Hiện chưa có mẫu phối mở đầu. Bạn có thể thêm trang phục từ thư viện.</div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
               {starters.map((outfit) => (
-                <div
+                <button
+                  type="button"
                   key={outfit.id}
-                  onClick={() => {
-                    onSelectStarter(outfit);
-                    onClose();
-                  }}
-                  className="group p-4 rounded-xl border border-stone-200 hover:border-heritage-red bg-[#FAF8F5] hover:bg-white cursor-pointer transition-all shadow-sm hover:shadow-md flex flex-col justify-between"
+                  onClick={() => { if (onSelectStarter(outfit) !== false) onClose(); }}
+                  className="group p-4 text-left rounded-xl border border-stone-200 hover:border-heritage-red bg-[#FAF8F5] hover:bg-white transition-all shadow-sm hover:shadow-md flex flex-col justify-between focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-heritage-red"
                 >
                   <div className="space-y-2">
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between gap-2">
                       <span className="font-serif font-bold text-sm text-stone-900 group-hover:text-heritage-red transition-colors">
                         {outfit.title}
                       </span>
-                      <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-stone-200 text-stone-700">
-                        {outfit.occasion_id}
-                      </span>
+                      <span className="shrink-0 text-[10px] font-medium text-stone-500">{outfit.items.length} món</span>
                     </div>
                     <p className="text-xs text-stone-600 line-clamp-2 leading-relaxed">
                       {outfit.description}
@@ -86,12 +93,12 @@ export default function StarterOutfitModal({
                   </div>
 
                   <div className="mt-3 pt-2 border-t border-stone-200/60 flex items-center justify-between text-[11px] text-stone-500 font-medium">
-                    <span>{outfit.items.length} món đồ chuẩn bị sẵn</span>
+                    <span>Mẫu phối có sẵn</span>
                     <span className="text-heritage-red group-hover:translate-x-0.5 transition-transform font-semibold">
                       Chọn dùng →
                     </span>
                   </div>
-                </div>
+                </button>
               ))}
             </div>
           )}

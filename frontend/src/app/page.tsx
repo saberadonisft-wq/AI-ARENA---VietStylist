@@ -428,7 +428,7 @@ function GarmentStoryCard({
           {/* Nút Bấm Khám Phá Trực Tiếp Trong Studio 2D */}
           <div className="pt-2 flex flex-wrap gap-4 items-center">
             <Link
-              href="/studio"
+              href="/thu-vien"
               prefetch={true}
               className="relative group inline-flex items-center space-x-2.5 px-7 py-3.5 rounded-xl bg-heritage-red hover:bg-heritage-red-dark text-white font-bold text-sm shadow-md shadow-heritage-red/25 hover:shadow-heritage-red/40 transition-all duration-300 transform hover:scale-105 active:scale-95 overflow-hidden ring-2 ring-amber-400/30"
             >
@@ -436,7 +436,7 @@ function GarmentStoryCard({
                 <div className="w-1/2 h-full bg-gradient-to-r from-transparent via-white/25 to-transparent animate-beam-sweep" />
               </div>
               <Sparkles className="w-4 h-4 text-amber-300 group-hover:rotate-12 transition-transform duration-300" />
-              <span>Phối Mẫu {garment.shortName} Tại Studio 2D</span>
+              <span>Chọn trang phục trong thư viện</span>
               <ArrowRight className="w-4 h-4 text-white transform group-hover:translate-x-1.5 transition-transform duration-300" />
             </Link>
 

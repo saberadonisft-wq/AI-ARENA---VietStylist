@@ -167,7 +167,7 @@ export default function ThuVienPage() {
                     </Link>
 
                     <Link
-                      href="/"
+                      href={`/studio?itemId=${encodeURIComponent(item.id)}`}
                       className="px-3 py-1 bg-stone-100 hover:bg-heritage-red hover:text-white rounded-lg text-xs font-medium text-stone-800 transition-colors"
                     >
                       Phối đồ ngay

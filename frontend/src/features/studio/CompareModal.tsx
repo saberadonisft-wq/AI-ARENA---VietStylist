@@ -45,7 +45,7 @@ export default function CompareModal({
           <div className="flex items-center space-x-2">
             <ArrowRightLeft className="w-5 h-5 text-heritage-indigo" />
             <h3 className="font-serif text-lg font-bold text-stone-900">
-              So sánh Hai Phương án Phối Đồ (F08)
+              So sánh hai phương án phối đồ
             </h3>
           </div>
           <button onClick={onClose} className="text-stone-400 hover:text-stone-700">
