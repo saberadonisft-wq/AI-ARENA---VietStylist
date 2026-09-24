@@ -22,11 +22,11 @@ export default function Footer() {
             <div className="flex items-center space-x-4 pt-2 text-xs text-stone-500">
               <span className="flex items-center space-x-1">
                 <Shield className="w-3.5 h-3.5 text-heritage-red" />
-                <span>Thẩm định quy tắc Hữu nhậm</span>
+                <span>Hỗ trợ kiểm tra quy tắc Hữu nhậm</span>
               </span>
               <span className="flex items-center space-x-1">
                 <BookOpen className="w-3.5 h-3.5 text-heritage-indigo" />
-                <span>Trích dẫn thư tịch cổ chính xác</span>
+                <span>Tư liệu có nguồn tham khảo</span>
               </span>
             </div>
           </div>
@@ -66,11 +66,6 @@ export default function Footer() {
               <li>
                 <Link href="/thu-vien" className="hover:text-heritage-red transition-colors">
                   Thư viện Áo ngũ thân & Áo tấc
-                </Link>
-              </li>
-              <li>
-                <Link href="/giai-phap" className="hover:text-heritage-red transition-colors">
-                  Biểu mẫu Trình bày Giải pháp F12
                 </Link>
               </li>
               <li>

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { SolutionForm, Lookbook } from "@/lib/types/api";
 import { api } from "@/lib/api/client";
@@ -18,10 +18,16 @@ import {
 } from "lucide-react";
 
 export default function GiaiPhapPage() {
-  const { user, isLoggedIn } = useAuth();
+  const { user, isLoggedIn, isReady } = useAuth();
+  const currentOwnerId = useRef(user?.id);
+  currentOwnerId.current = user?.id;
+  const loadRequestId = useRef(0);
   const [form, setForm] = useState<SolutionForm | null>(null);
+  const [formOwnerId, setFormOwnerId] = useState<string | null>(null);
   const [lookbooks, setLookbooks] = useState<Lookbook[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [lookbookLoadError, setLookbookLoadError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -35,33 +41,55 @@ export default function GiaiPhapPage() {
   const [culturalSafeguards, setCulturalSafeguards] = useState("");
   const [selectedLookbooks, setSelectedLookbooks] = useState<Array<{ lookbook_id: string; lookbook_title: string }>>([]);
 
-  const fetchFormData = () => {
+  const fetchFormData = async () => {
+    const ownerId = user?.id;
+    const requestId = ++loadRequestId.current;
     setIsLoading(true);
-    Promise.all([
-      api.getSolutionForm(),
-      api.listLookbooks().catch(() => []),
-    ])
-      .then(([formData, lbData]) => {
-        setForm(formData);
-        setLookbooks(lbData);
-
-        setTeamName(formData.team_name);
-        setProductName(formData.product_name);
-        setTargetAudience(formData.target_audience || "");
-        setProblemStatement(formData.problem_statement || "");
-        setProposedSolution(formData.proposed_solution || "");
-        setCulturalSafeguards(formData.cultural_safeguards || "");
-        setSelectedLookbooks(formData.lookbook_references || []);
-      })
-      .catch((err) => {
-        console.error("Lỗi lấy form giải pháp:", err);
-      })
-      .finally(() => setIsLoading(false));
+    setLoadError(null);
+    setLookbookLoadError(null);
+    try {
+      const formData = await api.getSolutionForm();
+      if (currentOwnerId.current !== ownerId || requestId !== loadRequestId.current) return;
+      setForm(formData);
+      setFormOwnerId(ownerId || null);
+      setTeamName(formData.team_name);
+      setProductName(formData.product_name);
+      setTargetAudience(formData.target_audience || "");
+      setProblemStatement(formData.problem_statement || "");
+      setProposedSolution(formData.proposed_solution || "");
+      setCulturalSafeguards(formData.cultural_safeguards || "");
+      setSelectedLookbooks(formData.lookbook_references || []);
+      try {
+        const lbData = await api.listLookbooks();
+        if (currentOwnerId.current === ownerId && requestId === loadRequestId.current) setLookbooks(lbData);
+      } catch (error: any) {
+        if (currentOwnerId.current === ownerId && requestId === loadRequestId.current) {
+          setLookbooks([]);
+          setLookbookLoadError(error?.message || "Không tải được danh sách Lookbook.");
+        }
+      }
+    } catch (error: any) {
+      if (currentOwnerId.current !== ownerId || requestId !== loadRequestId.current) return;
+      console.error("Lỗi lấy form giải pháp:", error);
+      setLoadError(error?.message || "Không tải được biểu mẫu.");
+    } finally {
+      if (currentOwnerId.current === ownerId && requestId === loadRequestId.current) setIsLoading(false);
+    }
   };
 
   useEffect(() => {
-    fetchFormData();
-  }, []);
+    if (isLoggedIn && user?.id) {
+      setForm(null);
+      setFormOwnerId(null);
+      void fetchFormData();
+    } else {
+      loadRequestId.current++;
+      setForm(null);
+      setFormOwnerId(null);
+      setLookbooks([]);
+      setIsLoading(false);
+    }
+  }, [isLoggedIn, user?.id]);
 
   const handleSave = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -69,6 +97,7 @@ export default function GiaiPhapPage() {
 
     setIsSaving(true);
     setErrorMessage(null);
+    const ownerId = user?.id;
     try {
       const updated = await api.updateSolutionForm({
         team_name: teamName,
@@ -82,17 +111,19 @@ export default function GiaiPhapPage() {
         status: "draft",
       });
 
+      if (currentOwnerId.current !== ownerId) return;
       setForm(updated);
-      setSaveStatus("Đã lưu nháp tự động!");
+      setSaveStatus("Đã lưu bản nháp.");
       setTimeout(() => setSaveStatus(null), 3000);
     } catch (err: any) {
+      if (currentOwnerId.current !== ownerId) return;
       if (err.statusCode === 409) {
         setErrorMessage("Xung đột phiên bản: Form đã bị sửa ở một tab khác. Vui lòng tải lại trang.");
       } else {
         setErrorMessage(err.message || "Lỗi khi lưu form");
       }
     } finally {
-      setIsSaving(false);
+      if (currentOwnerId.current === ownerId) setIsSaving(false);
     }
   };
 
@@ -100,8 +131,20 @@ export default function GiaiPhapPage() {
     window.print();
   };
 
-  if (isLoading) {
+  if (!isReady) {
+    return <div role="status" className="py-24 text-center text-sm text-stone-600">Đang kiểm tra phiên đăng nhập…</div>;
+  }
+
+  if (!isLoggedIn) {
+    return <main className="mx-auto max-w-xl px-4 py-20 text-center"><h1 className="font-serif text-2xl font-bold text-stone-900">Khu vực nội bộ</h1><p className="mt-3 text-sm text-stone-600">Đăng nhập để mở biểu mẫu trình bày giải pháp.</p><Link href="/tai-khoan" className="mt-5 inline-flex rounded-lg bg-heritage-red px-4 py-2 text-sm font-semibold text-white">Mở trang tài khoản</Link></main>;
+  }
+
+  if (isLoading || formOwnerId !== user?.id) {
     return <div className="py-24 text-center text-xs text-stone-500">Đang tải form giải pháp...</div>;
+  }
+
+  if (loadError || !form) {
+    return <main className="mx-auto max-w-xl px-4 py-20 text-center"><div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-5 text-sm text-rose-800">{loadError || "Chưa tải được biểu mẫu."}</div><button type="button" onClick={fetchFormData} className="mt-4 rounded-lg border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-stone-700">Thử tải lại</button></main>;
   }
 
   return (
@@ -134,7 +177,7 @@ export default function GiaiPhapPage() {
         <div className="space-y-1">
           <div className="flex items-center space-x-2 text-heritage-red text-xs font-bold uppercase tracking-widest">
             <FileSpreadsheet className="w-4 h-4" />
-            <span>Biểu mẫu Đội thi F12 (Solution Form)</span>
+            <span>Biểu mẫu nội bộ</span>
           </div>
           <h1 className="font-serif text-3xl font-bold text-stone-900 tracking-tight">
             Trình Bày Giải Pháp Sản Phẩm
@@ -170,6 +213,8 @@ export default function GiaiPhapPage() {
           <span>{saveStatus} (Phiên bản revision: {form?.revision})</span>
         </div>
       )}
+
+      {lookbookLoadError && <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">{lookbookLoadError} Phần biểu mẫu vẫn dùng được; danh sách Lookbook hiện chưa đầy đủ.</div>}
 
       {errorMessage && (
         <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl flex items-center space-x-2 no-print">

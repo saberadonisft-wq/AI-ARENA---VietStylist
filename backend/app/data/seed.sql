@@ -16,7 +16,10 @@ INSERT INTO occasions (id, name, description, formality_level, season, criteria,
 ('tet', 'Lễ Tết Cổ truyền', 'Sum họp gia đình, du xuân chúc Tết, sắc màu tươi tắn may mắn, ấm cúng và tôn nghiêm.', 'ceremonial', 'spring', '{"preferred_colors": ["#C53030", "#D69E2E", "#276749", "#9B2C2C"], "tags": ["du xuân", "chúc tết", "may mắn"]}', 'Sparkles'),
 ('le_hoi_truong', 'Lễ hội Văn hóa Trường', 'Ngày hội truyền thống, festival học sinh - sinh viên, khuyến khích sáng tạo remix năng động.', 'casual', 'all', '{"preferred_colors": ["#2B6CB0", "#319795", "#ED8936"], "tags": ["sáng tạo", "remix", "năng động"]}', 'PartyPopper'),
 ('dao_pho', 'Dạo phố & Check-in', 'Dạo chơi phố cổ, check-in bảo tàng di tích, nhẹ nhàng, thoải mái, phong cách thanh lịch.', 'casual', 'all', '{"preferred_colors": ["#4A5568", "#718096", "#CBD5E0"], "tags": ["thoải mái", "dạo phố", "check-in"]}', 'Camera'),
-('cuoi_hoi', 'Lễ cưới & Đính hôn', 'Nghi lễ cưới hỏi trang trọng truyền thống, chuộng màu đỏ thắm, vàng hoàng yến, ngọc bích.', 'ceremonial', 'all', '{"preferred_colors": ["#9B2C2C", "#C53030", "#ECC94B"], "tags": ["trang trọng", "lễ nghi", "cưới hỏi"]}', 'Heart')
+('cuoi_hoi', 'Lễ cưới & Đính hôn', 'Nghi lễ cưới hỏi trang trọng truyền thống, chuộng màu đỏ thắm, vàng hoàng yến, ngọc bích.', 'ceremonial', 'all', '{"preferred_colors": ["#9B2C2C", "#C53030", "#ECC94B"], "tags": ["trang trọng", "lễ nghi", "cưới hỏi"]}', 'Heart'),
+('tot_nghiep', 'Lễ tốt nghiệp', 'Dự lễ tốt nghiệp, nhận bằng và chụp ảnh cùng gia đình; ưu tiên bản phối gọn gàng, trang trọng và dễ di chuyển.', 'formal', 'all', '{"tags": ["tốt nghiệp", "nhận bằng", "trang trọng"]}', 'GraduationCap'),
+('bieu_dien', 'Biểu diễn nghệ thuật', 'Biểu diễn sân khấu, văn nghệ hoặc trình diễn trang phục; lựa chọn theo chủ đề và yêu cầu vận động của tiết mục.', 'formal', 'all', '{"tags": ["sân khấu", "văn nghệ", "trình diễn"]}', 'Music'),
+('tham_quan_di_san', 'Tham quan di sản', 'Tham quan bảo tàng, di tích và không gian văn hóa; ưu tiên sự thoải mái và tuân thủ quy định tại điểm đến.', 'casual', 'all', '{"tags": ["bảo tàng", "di tích", "tham quan"]}', 'Landmark')
 ON CONFLICT (id) DO NOTHING;
 
 -- 3. Heritage Sources

@@ -1,5 +1,13 @@
 import { test, expect, Page } from "@playwright/test";
+import { readFileSync } from "node:fs";
 import { DRAFT_KEY, INITIAL_DOCUMENT, mergeUnlockedItems, parseDraft, sameDocument, studioReducer } from "../src/features/studio/state";
+import { buildManualTryOnPrompt } from "../src/features/studio/tryOnPrompt";
+
+const TEST_GARMENT = { slot: "outerwear", itemId: "item-test-outerwear", variantId: "variant-test-outerwear", assetVersion: 1, colorHex: "#8B1E24" };
+const TEST_DOCUMENT = { ...structuredClone(INITIAL_DOCUMENT), snapshot: { ...structuredClone(INITIAL_DOCUMENT.snapshot), items: [TEST_GARMENT] } };
+const STALE_DOCUMENT = { ...structuredClone(INITIAL_DOCUMENT), snapshot: { ...structuredClone(INITIAL_DOCUMENT.snapshot), items: [
+  "outerwear", "undergarment", "bottom", "headwear", "accessory_front", "footwear",
+].map(slot => ({ slot, itemId: `removed-${slot}`, variantId: `removed-variant-${slot}`, assetVersion: 1, colorHex: "#123456" })) } };
 
 test("history restores the first edit and discards redo after a new edit", () => {
   const initial = { past: [], present: structuredClone(INITIAL_DOCUMENT), future: [] };
@@ -13,31 +21,43 @@ test("history restores the first edit and discards redo after a new edit", () =>
 
 test("draft validation accepts empty outfits and preserves locked placement", () => {
   const document = structuredClone(INITIAL_DOCUMENT);
-  document.snapshot.items[0].transform = { dx: 30, dy: 10, scale: 1.2, rotation: 20 };
+  const item = { slot: "outerwear", itemId: "item-test", variantId: "variant-test", assetVersion: 1, colorHex: "#123456", transform: { dx: 30, dy: 10, scale: 1.2, rotation: 20 } };
+  document.snapshot.items = [item];
   expect(parseDraft(JSON.stringify(document))).toEqual(document);
-  const serverDocument = structuredClone(document);
-  serverDocument.snapshot.items[1].transform = null as any;
-  expect(sameDocument(document, serverDocument)).toBe(true);
+  const documentWithoutPlacement = structuredClone(document);
+  delete documentWithoutPlacement.snapshot.items[0].transform;
+  const serverDocument = structuredClone(documentWithoutPlacement);
+  serverDocument.snapshot.items[0].transform = null as any;
+  expect(sameDocument(documentWithoutPlacement, serverDocument)).toBe(true);
   expect(parseDraft(JSON.stringify({ ...document, snapshot: { ...document.snapshot, items: [] } }))?.snapshot.items).toEqual([]);
   expect(parseDraft('{"snapshot":{"items":[null]}}')).toBeNull();
-  const result = mergeUnlockedItems(document.snapshot.items, [{ ...document.snapshot.items[0], colorHex: "#ffffff" }], ["outerwear"]);
-  expect(result[0]).toEqual(document.snapshot.items[0]);
+  const result = mergeUnlockedItems(document.snapshot.items, [{ ...item, colorHex: "#ffffff" }], ["outerwear"]);
+  expect(result[0]).toEqual(item);
 });
 
-async function mockApi(page: Page) {
+async function mockApi(page: Page, imageMetadata: { real_image_url?: string; flatlay_image_url?: string; catalog_media_id?: string } = { real_image_url: "/fixture.png" }) {
   const saves: Array<{ method: string; body: any }> = [];
   let saved: any;
-  await page.route("**/fixture.svg", route => route.fulfill({ contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="300" height="400"><rect width="300" height="400" fill="#b01020"/></svg>' }));
+  const garmentPng = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAI0lEQVR4nGPcIKDAQApgIkk1w6gG4gATkergYFQDMYDkUAIA4P4BAJPv6JMAAAAASUVORK5CYII=", "base64");
+  await page.route("**/fixture*.png", route => {
+    const path = new URL(route.request().url()).pathname;
+    return ["/fixture.png", "/fixture-flatlay.png"].includes(path)
+      ? route.fulfill({ contentType: "image/png", body: garmentPng })
+      : route.fulfill({ status: 404, body: "Image does not exist" });
+  });
   await page.route("http://127.0.0.1:4100/**", async route => {
     const request = route.request();
     const path = new URL(request.url()).pathname;
     const send = (data: unknown, status = 200) => route.fulfill({ status, contentType: "application/json", body: JSON.stringify(data) });
+    if (path.endsWith("/studio-image")) return route.fulfill({ status: 200, contentType: "image/png", body: garmentPng, headers: { "Access-Control-Allow-Origin": "*" } });
+    if (path === "/api/v3/generation/status") return send({ enabled: true });
+    if (path === "/api/v3/legacy-mappings") return send({ dataset_version: "dev", ruleset_version: "dev", reproducible: false, mappings: [] });
     if (path === "/api/catalog/garment-types") return send([{ id: "ngu_than", name: "Ngũ thân", slot_schema: [] }]);
-    if (path === "/api/catalog/occasions") return send([{ id: "ky_yeu", name: "Kỷ yếu" }, { id: "tet", name: "Tết" }]);
+    if (path === "/api/catalog/occasions") return send([{ id: "ky_yeu", name: "Kỷ yếu", season: "all" }, { id: "tet", name: "Tết", season: "spring", description: "Sum họp gia đình và du xuân." }]);
     if (path === "/api/catalog/avatars") return send([{ id: "avatar_nam_chuan", name: "Nam", dimensions: { width: 800, height: 1200 } }]);
-    if (path === "/api/catalog/items") return send(INITIAL_DOCUMENT.snapshot.items.map((item, index) => ({
+    if (path === "/api/catalog/items") return send([TEST_GARMENT].map((item, index) => ({
       id: item.itemId, slot: item.slot, name: `Trang phục ${index}`, gender: "unisex", garment_type_id: "ngu_than", is_published: true,
-      metadata: index === 0 ? { real_image_url: "/fixture.svg" } : {},
+      metadata: index === 0 ? imageMetadata : {},
       variants: [{ id: item.variantId, item_id: item.itemId, color_name: "Màu gốc", hex_color: item.colorHex, is_default: true }],
       default_layer: { id: `layer-${index}`, item_id: item.itemId, slot: item.slot, z_index: index, layer_type: "svg", svg_content: `<circle cx="50" cy="${50 + index * 30}" r="10" fill="${item.colorHex}"/>` },
     })));
@@ -62,15 +82,71 @@ async function readDraft(page: Page) {
   return page.evaluate(key => JSON.parse(localStorage.getItem(key) || "null"), DRAFT_KEY);
 }
 
+async function seedDraft(page: Page, document = TEST_DOCUMENT, ownerId?: string) {
+  await page.addInitScript(({ key, value, owner }) => {
+    localStorage.setItem(owner ? `${key}:${owner}` : key, JSON.stringify({ ...value, ownerId: owner }));
+  }, { key: DRAFT_KEY, value: document, owner: ownerId });
+}
+
+test("mobile Studio keeps the outfit board above its panels and opens properties after choosing a garment", async ({ page }) => {
+  await mockApi(page);
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.goto("/studio");
+
+  const tabs = page.getByRole("tablist", { name: "Bảng Studio trên điện thoại" });
+  const catalogTab = tabs.getByRole("tab", { name: "Chọn trang phục" });
+  const propertiesTab = tabs.getByRole("tab", { name: "Món đang chọn" });
+  await expect(tabs).toBeVisible();
+  await expect(catalogTab).toHaveAttribute("aria-selected", "true");
+  const board = page.getByText("Bảng Phối Đồ Flat-lay (OOTD)", { exact: true });
+  const catalogHeading = page.getByText("Phân loại trang phục", { exact: true });
+  await expect(board).toBeVisible();
+  expect((await board.boundingBox())!.y).toBeLessThan((await catalogHeading.boundingBox())!.y);
+
+  await page.getByText("Trang phục 0", { exact: true }).click();
+  await expect(propertiesTab).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByText("Biến thể Màu sắc & Chất liệu (1)")).toBeVisible();
+  await expect(board).toBeVisible();
+  await expect(catalogHeading).toBeHidden();
+  await catalogTab.click();
+  await expect(catalogHeading).toBeVisible();
+});
+
+test("occasion selection survives reload, is saved with the outfit, and can be cleared", async ({ page }) => {
+  const saves = await mockApi(page);
+  await loginForGeneration(page);
+  await page.goto("/studio");
+  const occasion = page.getByRole("button", { name: "Tết", exact: true });
+  await occasion.click();
+  await expect(occasion).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByText("Sum họp gia đình và du xuân.")).toBeVisible();
+  await expect(occasion).toContainText("Mùa xuân");
+  await page.reload();
+  await expect(occasion).toHaveAttribute("aria-pressed", "true");
+  await page.getByRole("button", { name: "Lưu bộ phối", exact: true }).click();
+  await expect.poll(() => saves.length).toBe(1);
+  expect(saves[0].body).toMatchObject({ occasion_id: "tet", snapshot: { occasionId: "tet" } });
+  await page.getByRole("button", { name: "Bỏ chọn hoàn cảnh" }).click();
+  await expect(occasion).toHaveAttribute("aria-pressed", "false");
+  await page.getByTitle("Hoàn tác (Ctrl+Z)").click();
+  await expect(occasion).toHaveAttribute("aria-pressed", "true");
+  await page.getByTitle("Làm lại (Ctrl+Y)").click();
+  await page.getByRole("button", { name: "Lưu bộ phối", exact: true }).click();
+  await expect.poll(() => saves.length).toBe(2);
+  expect(saves[1].body.occasion_id).toBeUndefined();
+  expect(saves[1].body.snapshot.occasionId).toBeUndefined();
+});
+
 test("refresh preserves draft, first change can undo, and saving updates one outfit", async ({ page }) => {
   const saves = await mockApi(page);
+  await loginForGeneration(page);
   await page.goto("/studio");
   const title = page.locator('input').first();
   await title.fill("Nháp cần giữ");
   await expect.poll(async () => (await readDraft(page))?.title).toBe("Nháp cần giữ");
   await page.reload();
   await expect.poll(async () => (await readDraft(page))?.title).toBe("Nháp cần giữ");
-  await page.getByRole("button", { name: /Khôi phục/ }).click();
+  await page.getByRole("button", { name: "Tiếp tục bản nháp", exact: true }).click();
   await expect(title).toHaveValue("Nháp cần giữ");
   await page.getByRole("button", { name: "Remix Đương đại" }).click();
   await page.getByTitle("Hoàn tác (Ctrl+Z)").click();
@@ -87,15 +163,18 @@ test("refresh preserves draft, first change can undo, and saving updates one out
   await title.fill("Chưa lưu lên máy chủ");
   await expect.poll(async () => (await readDraft(page))?.title).toBe("Chưa lưu lên máy chủ");
   await page.reload();
-  await page.getByRole("button", { name: /Khôi phục/ }).click();
+  await page.getByRole("button", { name: "Tiếp tục bản nháp", exact: true }).click();
   await expect(title).toHaveValue("Chưa lưu lên máy chủ");
 });
 
 test("canvas drag persists, undo restores it, and export includes garment image", async ({ page }) => {
   await mockApi(page);
+  await loginForGeneration(page);
+  await seedDraft(page, TEST_DOCUMENT, "generation-user");
   await page.goto("/studio");
   const image = page.locator('#content-outerwear image');
   await expect(image).toBeVisible();
+  await expect(image).toHaveAttribute("href", "/fixture.png");
   await image.scrollIntoViewIfNeeded();
   const box = await image.boundingBox();
   if (!box) throw new Error("Missing garment bounds");
@@ -109,7 +188,7 @@ test("canvas drag persists, undo restores it, and export includes garment image"
   await expect.poll(async () => (await readDraft(page))?.snapshot.items.find((item: any) => item.slot === "outerwear")?.transform).toBeUndefined();
   await page.getByTitle("Làm lại (Ctrl+Y)").click();
   await expect.poll(async () => (await readDraft(page))?.snapshot.items.find((item: any) => item.slot === "outerwear")?.transform).toEqual(moved);
-  await page.getByRole("button", { name: "Xuất ảnh (F03)" }).click();
+  await page.getByRole("button", { name: "Xuất ảnh" }).click();
   await page.getByRole("button", { name: "Vuông (Instagram / Post)" }).click();
   const exported = page.getByAltText("Bản phối xuất");
   await expect(exported).toBeVisible();
@@ -124,19 +203,484 @@ test("canvas drag persists, undo restores it, and export includes garment image"
   expect(info.width).toBe(1400); expect(info.height).toBe(1400); expect(info.colored).toBeGreaterThan(1000);
 });
 
-test("unavailable try-on displays an error without fake success", async ({ page }) => {
-  await mockApi(page);
+for (const realImage of ["/fixture.png", undefined]) {
+  test(`canvas uses explicit flatlay image with ${realImage ? "an original image" : "no original image"}`, async ({ page }) => {
+    await mockApi(page, { real_image_url: realImage, flatlay_image_url: "/fixture-flatlay.png" });
+    await seedDraft(page);
+    const imageResponse = page.waitForResponse(response => new URL(response.url()).pathname === "/fixture-flatlay.png");
+    await page.goto("/studio");
+    await expect(page.locator('#content-outerwear image')).toHaveAttribute("href", "/fixture-flatlay.png");
+    expect((await imageResponse).status()).toBe(200);
+  });
+}
+
+async function loginForGeneration(page: Page) {
+  await page.addInitScript(() => {
+    localStorage.setItem("viet_stylist_auth_token", "test-generation-token");
+    localStorage.setItem("viet_stylist_user", JSON.stringify({ id: "generation-user", email: "generation@example.invalid", displayName: "Generation", roles: ["user"] }));
+  });
+  await page.route("**/api/auth/me", route => route.fulfill({ json: { id: "generation-user", email: "generation@example.invalid", display_name: "Generation", roles: ["user"] } }));
+}
+
+test("guest can keep a device draft but must sign in to save, export or use AI", async ({ page }) => {
+  const saves = await mockApi(page);
+  await seedDraft(page);
   await page.goto("/studio");
-  await page.getByRole("button", { name: "Thử đồ AI (F05)" }).click();
-  await page.getByRole("button", { name: "Tạo ảnh Thử đồ AI" }).click();
-  await expect(page.locator("p[role=alert]")).toHaveText("Thử đồ AI chưa sẵn sàng.");
-  await page.waitForTimeout(3200);
-  await expect(page.getByText("Đã hoàn thành", { exact: true })).toHaveCount(0);
-  await expect(page.getByAltText("Kết quả", { exact: true })).toHaveCount(0);
+  const title = page.locator("input").first();
+  await title.fill("Nháp khách trên thiết bị");
+  await expect.poll(async () => (await readDraft(page))?.title).toBe("Nháp khách trên thiết bị");
+
+  await page.getByRole("button", { name: "Lưu bộ phối", exact: true }).click();
+  const authDialog = page.getByRole("dialog", { name: "Đăng nhập hoặc tạo tài khoản" });
+  await expect(authDialog).toBeVisible();
+  await expect.poll(async () => (await readDraft(page))?.title).toBe("Nháp khách trên thiết bị");
+  expect(saves).toHaveLength(0);
+  await authDialog.getByRole("button", { name: "Đóng cửa sổ đăng nhập" }).click();
+
+  await page.getByRole("button", { name: "Xuất ảnh" }).click();
+  await expect(authDialog).toBeVisible();
+  await authDialog.getByRole("button", { name: "Đóng cửa sổ đăng nhập" }).click();
+
+  await page.getByRole("button", { name: "Thử đồ AI" }).click();
+  await expect(authDialog).toBeVisible();
+  expect(saves).toHaveLength(0);
+  await expect.poll(async () => (await readDraft(page))?.title).toBe("Nháp khách trên thiết bị");
+});
+
+async function seedConflictingGuestAndAccountDrafts(page: Page, accountId: string) {
+  await page.addInitScript(({ key, accountId, deviceDocument, accountDocument }) => {
+    localStorage.setItem(key, JSON.stringify(deviceDocument));
+    localStorage.setItem(`${key}:${accountId}`, JSON.stringify({ ...accountDocument, ownerId: accountId }));
+  }, {
+    key: DRAFT_KEY,
+    accountId,
+    deviceDocument: { ...TEST_DOCUMENT, title: "Nháp trên thiết bị" },
+    accountDocument: { ...TEST_DOCUMENT, title: "Nháp của tài khoản" },
+  });
+}
+
+async function signInFromPendingStudioAction(page: Page, accountId: string) {
+  const account = { id: accountId, email: "draft-choice@example.invalid", display_name: "Draft Choice", roles: ["user"] };
+  await page.route("**/api/auth/login", route => route.fulfill({ json: { access_token: "draft-choice-token", token_type: "bearer", user: account } }));
+  await page.route("**/api/auth/me", route => route.fulfill({ json: account }));
+  await page.getByRole("button", { name: "Lưu bộ phối", exact: true }).click();
+  const authDialog = page.getByRole("dialog", { name: "Đăng nhập hoặc tạo tài khoản" });
+  await authDialog.getByLabel("Địa chỉ Email").fill(account.email);
+  await authDialog.getByRole("textbox", { name: "Mật khẩu" }).fill("a-valid-test-password");
+  await authDialog.getByRole("button", { name: "Đăng nhập vào VietStylist" }).click();
+  await expect(authDialog).toBeHidden();
+  await expect(page.getByRole("dialog", { name: "Chọn bản phối cần tiếp tục" })).toBeVisible();
+}
+
+test("pending save waits for a choice when both guest and account drafts exist", async ({ page }) => {
+  const saves = await mockApi(page);
+  const accountId = "draft-choice-device";
+  await page.setViewportSize({ width: 320, height: 640 });
+  await seedConflictingGuestAndAccountDrafts(page, accountId);
+  await page.goto("/studio");
+  await signInFromPendingStudioAction(page, accountId);
+
+  const choice = page.getByRole("dialog", { name: "Chọn bản phối cần tiếp tục" });
+  await expect(choice).toContainText("Nháp trên thiết bị");
+  await expect(choice).toContainText("Nháp của tài khoản");
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  expect(saves).toHaveLength(0);
+  await choice.getByRole("button", { name: "Tiếp tục nháp trên thiết bị" }).click();
+
+  await expect.poll(() => saves.map(save => save.body.title)).toEqual(["Nháp trên thiết bị"]);
+  expect((await readDraft(page)).ownerId).toBe(accountId);
+  const preservedAccountDraft = await page.evaluate(({ key, accountId }) => {
+    const recoveryKey = Object.keys(localStorage).find(candidate => candidate.startsWith(`${key}:${accountId}:account-choice:`));
+    return recoveryKey ? JSON.parse(localStorage.getItem(recoveryKey) || "null") : null;
+  }, { key: DRAFT_KEY, accountId });
+  expect(preservedAccountDraft.title).toBe("Nháp của tài khoản");
+  await page.getByRole("button", { name: "Khôi phục Nháp của tài khoản" }).click();
+  await expect(page.locator("input").first()).toHaveValue("Nháp của tài khoản");
+});
+
+test("pending save can continue with the account draft and keeps the guest draft recoverable", async ({ page }) => {
+  const saves = await mockApi(page);
+  const accountId = "draft-choice-account";
+  await seedConflictingGuestAndAccountDrafts(page, accountId);
+  await page.goto("/studio");
+  await signInFromPendingStudioAction(page, accountId);
+
+  const choice = page.getByRole("dialog", { name: "Chọn bản phối cần tiếp tục" });
+  await choice.getByRole("button", { name: "Tiếp tục nháp của tài khoản" }).click();
+
+  await expect.poll(() => saves.map(save => save.body.title)).toEqual(["Nháp của tài khoản"]);
+  const preservedDeviceDraft = await page.evaluate(({ key, accountId }) => {
+    const recoveryKey = Object.keys(localStorage).find(candidate => candidate.startsWith(`${key}:${accountId}:account-choice:`));
+    return recoveryKey ? JSON.parse(localStorage.getItem(recoveryKey) || "null") : null;
+  }, { key: DRAFT_KEY, accountId });
+  expect(preservedDeviceDraft.title).toBe("Nháp trên thiết bị");
+});
+
+test("published stylist image uses transparent Studio endpoint and can zoom beyond old limit", async ({ page }) => {
+  await mockApi(page, { real_image_url: "/fixture.png", catalog_media_id: "public-media" });
+  await loginForGeneration(page);
+  await seedDraft(page, TEST_DOCUMENT, "generation-user");
+  await page.goto("/studio");
+  const image = page.locator("#content-outerwear image");
+  await expect(image).toHaveAttribute("href", /\/api\/catalog\/items\/.*\/studio-image$/);
+  await image.click();
+  for (let index = 0; index < 5; index++) await page.getByRole("button", { name: "Phóng to trang phục" }).click();
+  await expect.poll(async () => (await readDraft(page))?.snapshot.items.find((item: any) => item.slot === "outerwear")?.transform?.scale).toBeGreaterThan(2.5);
+  await page.getByRole("button", { name: "Xuất ảnh" }).click();
+  await page.getByRole("button", { name: "Vuông (Instagram / Post)" }).click();
+  await expect(page.getByAltText("Bản phối xuất")).toBeVisible();
+});
+
+test("Studio can retry a failed garment image without losing the outfit", async ({ page }) => {
+  await mockApi(page, { real_image_url: "/fixture.png", catalog_media_id: "public-media" });
+  await seedDraft(page);
+  let requests = 0;
+  const garmentPng = readFileSync("public/images/heritage/thumb_nguyen_ao_tac.png");
+  await page.route("**/api/catalog/items/*/studio-image*", route => {
+    requests += 1;
+    return new URL(route.request().url()).searchParams.has("retry")
+      ? route.fulfill({ status: 200, contentType: "image/png", body: garmentPng, headers: { "Access-Control-Allow-Origin": "*" } })
+      : route.fulfill({ status: 503, body: "Unavailable" });
+  });
+  await page.goto("/studio");
+  await expect(page.getByRole("button", { name: "Thử lại ảnh" })).toBeVisible();
+  await page.getByRole("button", { name: "Thử lại ảnh" }).click();
+  await expect.poll(() => requests).toBeGreaterThan(1);
+  await expect(page.getByRole("button", { name: "Thử lại ảnh" })).toHaveCount(0);
+  await expect(page.locator("#content-outerwear image")).toHaveAttribute("href", /studio-image\?retry=1$/);
+  await expect.poll(async () => (await readDraft(page))?.snapshot.items.length).toBeGreaterThan(0);
+});
+
+test("manual try-on gives an exportable board and a prompt without a person photo", async ({ page }) => {
+  await mockApi(page);
+  await loginForGeneration(page);
+  await seedDraft(page, TEST_DOCUMENT, "generation-user");
+  await page.goto("/studio");
+  await page.getByRole("button", { name: "Thử đồ AI" }).click();
+  const dialog = page.getByRole("dialog", { name: "Thử đồ bằng Gemini" });
+  await expect(dialog.getByRole("button", { name: "Tạo ảnh thử đồ" })).toBeEnabled();
+  await expect(dialog.getByLabel("Prompt thử đồ thủ công")).toContainText("No person photo is supplied");
+  const downloadPromise = page.waitForEvent("download");
+  await dialog.getByRole("button", { name: "Tải ảnh bản phối" }).click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toBe("vietstylist-ban-phoi.png");
+  await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+  await dialog.getByRole("button", { name: "Sao chép prompt" }).click();
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toContain("Attach the exported outfit board as Image 1");
+});
+
+test("disabled Gemini leaves manual export available without uploading", async ({ page }) => {
+  await mockApi(page);
+  await loginForGeneration(page);
+  await seedDraft(page, TEST_DOCUMENT, "generation-user");
+  let uploads = 0;
+  await page.route("http://127.0.0.1:4100/api/v3/generation/status", route => route.fulfill({ contentType: "application/json", body: JSON.stringify({ enabled: false }) }));
+  await page.route("http://127.0.0.1:4100/api/media/uploads", route => { uploads++; return route.fulfill({ status: 500 }); });
+  await page.goto("/studio");
+  await page.getByRole("button", { name: "Thử đồ AI" }).click();
+  const dialog = page.getByRole("dialog", { name: "Thử đồ bằng Gemini" });
+  await expect(dialog.getByText(/Gemini chưa được bật/)).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "Tạo ảnh thử đồ" })).toBeDisabled();
+  await expect(dialog.getByRole("button", { name: "Tải ảnh bản phối" })).toBeEnabled();
+  expect(uploads).toBe(0);
+});
+
+test("manual prompt changes when a person photo is selected", () => {
+  const snapshot = INITIAL_DOCUMENT.snapshot;
+  const withoutPerson = buildManualTryOnPrompt("Bộ phối", snapshot, [], false);
+  const withPerson = buildManualTryOnPrompt("Bộ phối", snapshot, [], true);
+  expect(withoutPerson).toContain("Choose one adult wearer");
+  expect(withPerson).toContain("Preserve their identity");
+  expect(withPerson).not.toContain("Choose one adult wearer");
+});
+
+test("stale outfit items stay in the draft and block Gemini before upload", async ({ page }) => {
+  await mockApi(page);
+  await loginForGeneration(page);
+  await seedDraft(page, STALE_DOCUMENT, "generation-user");
+  await page.route("http://127.0.0.1:4100/api/catalog/items*", route => route.fulfill({
+    contentType: "application/json", body: JSON.stringify([{
+      id: "current-outerwear", slot: "outerwear", name: "Áo ngoài hiện có", is_published: true,
+      gender: "unisex", metadata: {}, variants: [{ id: "current-variant", hex_color: "#123456", is_default: true }],
+    }]),
+  }));
+  let uploads = 0;
+  await page.route("http://127.0.0.1:4100/api/media/uploads", route => {
+    uploads += 1;
+    return route.fulfill({ status: 500 });
+  });
+  await page.goto("/studio");
+  await page.getByRole("button", { name: "Thử đồ AI" }).click();
+  const dialog = page.getByRole("dialog", { name: "Thử đồ bằng Gemini" });
+  await expect(dialog.getByText("6 món trong bản phối không còn trong danh mục đã xuất bản.", { exact: false })).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "Tạo ảnh thử đồ" })).toBeDisabled();
+  await expect(dialog.getByRole("button", { name: "Tải ảnh bản phối" })).toBeDisabled();
+  expect(uploads).toBe(0);
+  await dialog.getByRole("button", { name: "Đóng và chọn món thay thế" }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(page.getByRole("alert").getByText(/Một số món trong bản phối không còn được xuất bản/)).toBeVisible();
+  await expect.poll(async () => (await readDraft(page))?.snapshot.items.map((item: any) => item.itemId)).toEqual(STALE_DOCUMENT.snapshot.items.map((item: any) => item.itemId));
+});
+
+test("Gemini result is visible without a person photo", async ({ page }) => {
+  await mockApi(page);
+  await loginForGeneration(page);
+  await seedDraft(page, TEST_DOCUMENT, "generation-user");
+  await page.route("**/test-upload/result-board", route => route.fulfill({ status: 200, body: "ok" }));
+  await page.route("http://127.0.0.1:4100/api/media/**", route => {
+    const path = new URL(route.request().url()).pathname;
+    if (path === "/api/media/uploads") {
+      return route.fulfill({ contentType: "application/json", body: JSON.stringify({
+        media_id: "result-board", upload_url: "http://127.0.0.1:3100/test-upload/result-board", method: "PUT", storage_type: "r2",
+      }) });
+    }
+    if (path === "/api/media/generated-image/access") {
+      return route.fulfill({ contentType: "application/json", body: JSON.stringify({ access_url: "/fixture.png" }) });
+    }
+    return route.fulfill({ contentType: "application/json", body: "{}" });
+  });
+  await page.route("http://127.0.0.1:4100/api/v3/generation/jobs", route => route.fulfill({
+    status: 202, json: { job_id: "job-1", status: "completed", result: { status: "completed", result_media_id: "generated-image" }, error: null },
+  }));
+
+  await page.goto("/studio");
+  await page.getByRole("button", { name: "Thử đồ AI" }).click();
+  const dialog = page.getByRole("dialog", { name: "Thử đồ bằng Gemini" });
+  await dialog.getByRole("button", { name: "Tạo ảnh thử đồ" }).click();
+  await expect(dialog.getByRole("status")).toContainText("Ảnh đã tạo và tải thành công. Ảnh kết quả được lưu trong Tài khoản → Ảnh AI.");
+  await expect(dialog.getByRole("img", { name: "Kết quả thử đồ Gemini" })).toBeVisible();
+});
+
+for (const withPerson of [false, true]) {
+  test(`try-on uploads the outfit board ${withPerson ? "and the person" : "without requiring a person"}`, async ({ page }) => {
+    await mockApi(page);
+    await loginForGeneration(page);
+    await seedDraft(page, TEST_DOCUMENT, "generation-user");
+    const uploads: Array<{ filename: string; bytes: Buffer }> = [];
+    let synthesis: any;
+    let nextId = 0;
+    await page.route("**/test-upload/*", route => {
+      uploads.push({ filename: route.request().url(), bytes: route.request().postDataBuffer() || Buffer.alloc(0) });
+      return route.fulfill({ status: 200, body: "ok" });
+    });
+    await page.route("http://127.0.0.1:4100/api/v3/legacy-mappings*", route => route.fulfill({ contentType: "application/json", body: JSON.stringify({
+      dataset_version: "dev", ruleset_version: "dev", reproducible: false,
+      mappings: withPerson ? [{ legacy_table: "items", legacy_id: TEST_GARMENT.itemId,
+        canonical_entity_id: "garment_ngu_than", renderable_item_id: "renderable-1",
+        render_variants: { [TEST_GARMENT.variantId]: "variant-1" } }] : [],
+    }) }));
+    await page.route("http://127.0.0.1:4100/api/media/**", route => {
+      if (route.request().method() === "POST" && new URL(route.request().url()).pathname === "/api/media/uploads") {
+        const id = `media-${++nextId}`;
+        return route.fulfill({ contentType: "application/json", body: JSON.stringify({ media_id: id, upload_url: `http://127.0.0.1:3100/test-upload/${id}`, method: "PUT", storage_type: "r2" }) });
+      }
+      return route.fulfill({ contentType: "application/json", body: "{}" });
+    });
+    await page.route("http://127.0.0.1:4100/api/v3/generation/jobs", route => {
+      synthesis = route.request().postDataJSON();
+      const error = withPerson
+        ? { code: "GENERATION_BUSY", message: "Gemini đang quá tải." }
+        : { code: "GENERATION_RATE_LIMITED", message: "Gemini đã chạm hạn mức. Kiểm tra quota của API key." };
+      return route.fulfill({ status: 202, json: { job_id: "failed-job", status: "failed", result: null, error } });
+    });
+    await page.goto("/studio");
+    await page.getByRole("button", { name: "Thử đồ AI" }).click();
+    const dialog = page.getByRole("dialog", { name: "Thử đồ bằng Gemini" });
+    if (withPerson) {
+      await dialog.locator("div.overflow-y-auto").evaluate(element => { element.scrollTop = element.scrollHeight; });
+      const chooserPromise = page.waitForEvent("filechooser");
+      await dialog.getByText("Tùy chọn: tải ảnh nhân vật").click();
+      await (await chooserPromise).setFiles("public/images/heritage/thumb_nguyen_ao_tac.jpg");
+      await expect(dialog.getByText("thumb_nguyen_ao_tac.jpg")).toBeVisible();
+      const preview = dialog.getByRole("img", { name: "Ảnh người mẫu đã chọn" });
+      await expect(preview).toBeInViewport();
+      await expect(preview).toHaveJSProperty("complete", true);
+      expect(await preview.evaluate(image => (image as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
+      await dialog.getByRole("button", { name: "Bỏ ảnh nhân vật để AI tự chọn người mặc" }).click();
+      await expect(preview).toHaveCount(0);
+      const sameFileChooser = page.waitForEvent("filechooser");
+      await dialog.getByText("Tùy chọn: tải ảnh nhân vật").click();
+      await (await sameFileChooser).setFiles("public/images/heritage/thumb_nguyen_ao_tac.jpg");
+      await expect(dialog.getByText("thumb_nguyen_ao_tac.jpg")).toBeVisible();
+      await expect(dialog.getByRole("img", { name: "Ảnh người mẫu đã chọn" })).toBeInViewport();
+    }
+    await dialog.getByRole("button", { name: "Tạo ảnh thử đồ" }).click();
+    await expect(dialog.getByRole("alert")).toContainText(withPerson ? "Gemini đang quá tải" : "Kiểm tra quota");
+    await expect(dialog.getByRole("alert")).toBeInViewport();
+    expect(uploads).toHaveLength(withPerson ? 2 : 1);
+    expect(uploads[0].bytes.subarray(0, 8).toString("hex")).toBe("89504e470d0a1a0a");
+    expect(synthesis.outfit_image_id).toBe("media-1");
+    expect(synthesis.user_image_id).toBe(withPerson ? "media-2" : null);
+    expect(synthesis.legacy_item_ids).toEqual([TEST_GARMENT.itemId]);
+    expect(synthesis.outfit.selections).toHaveLength(withPerson ? 1 : 0);
+    if (!withPerson) await expect(dialog.getByText(/chưa có thẩm định V3/)).toBeVisible();
+    await expect(dialog.getByRole("button", { name: "Tải ảnh bản phối" })).toBeEnabled();
+  });
+}
+
+test("authenticated focus keeps the chosen photo and same-file selection works", async ({ page }) => {
+  await mockApi(page);
+  await loginForGeneration(page);
+  await seedDraft(page, TEST_DOCUMENT, "generation-user");
+  let calls = 0;
+  await page.route("**/api/auth/me", async route => {
+    calls++;
+    await new Promise(resolve => setTimeout(resolve, 200));
+    await route.fulfill({ json: { id: "generation-user", email: "generation@example.invalid", roles: ["user"] } });
+  });
+  await page.goto("/studio");
+  await page.getByRole("button", { name: "Thử đồ AI" }).click();
+  const dialog = page.getByRole("dialog", { name: "Thử đồ bằng Gemini" });
+  await dialog.locator("input[type=file]").setInputFiles("public/images/heritage/thumb_nguyen_ao_tac.jpg");
+  const preview = dialog.getByAltText("Ảnh người mẫu đã chọn");
+  await expect(preview).toBeVisible();
+  const oldSrc = await preview.getAttribute("src");
+  const count = calls;
+  const refreshed = page.waitForResponse("**/api/auth/me");
+  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+  await refreshed;
+  expect(calls).toBeGreaterThan(count);
+  await expect(preview).toHaveAttribute("src", oldSrc!);
+  await expect(dialog.getByLabel("Prompt thử đồ thủ công")).toContainText("Preserve their identity");
+});
+
+async function mockGenerationMedia(page: Page, brokenResult = false) {
+  const state = { uploads: 0, access: 0, brokenResult };
+  await page.route("**/test-upload/*", route => route.fulfill({ body: "ok" }));
+  await page.route("**/api/media/**", route => {
+    const path = new URL(route.request().url()).pathname;
+    if (path === "/api/media/uploads") {
+      const id = `media-${++state.uploads}`;
+      return route.fulfill({ json: { media_id: id, upload_url: `http://127.0.0.1:3100/test-upload/${id}`, method: "PUT", storage_type: "r2" } });
+    }
+    if (path.endsWith("/access")) { state.access++; return route.fulfill({ json: { access_url: state.brokenResult ? "/fixture-missing.png" : "/fixture.png" } }); }
+    return route.fulfill({ json: {} });
+  });
+  return state;
+}
+
+test("generation locks immediately, resumes after reload and retries only the broken result image", async ({ page }) => {
+  await mockApi(page);
+  await loginForGeneration(page);
+  await seedDraft(page, TEST_DOCUMENT, "generation-user");
+  const media = await mockGenerationMedia(page, true);
+  let mappings = 0, submissions = 0, completed = false;
+  let releaseMapping!: () => void;
+  const mappingGate = new Promise<void>(resolve => { releaseMapping = resolve; });
+  await page.route("**/api/v3/legacy-mappings*", async route => {
+    mappings++;
+    await mappingGate;
+    await route.fulfill({ json: { dataset_version: "dev", mappings: [] } });
+  });
+  await page.route("**/api/v3/generation/jobs**", route => {
+    if (route.request().method() === "POST") submissions++;
+    return route.fulfill({ status: route.request().method() === "POST" ? 202 : 200, json: {
+      job_id: "recoverable-job", status: completed ? "completed" : "running",
+      result: completed ? { status: "completed", result_media_id: "result-image" } : null, error: null,
+    } });
+  });
+  await page.goto("/studio");
+  await page.getByRole("button", { name: "Thử đồ AI" }).click();
+  let dialog = page.getByRole("dialog", { name: "Thử đồ bằng Gemini" });
+  await dialog.locator("input[type=file]").setInputFiles("public/images/heritage/thumb_nguyen_ao_tac.jpg");
+  const generate = dialog.getByRole("button", { name: "Tạo ảnh thử đồ" });
+  await generate.evaluate((button: HTMLButtonElement) => { button.click(); button.click(); });
+  await expect.poll(() => mappings).toBe(1);
+  await expect(generate).toBeDisabled();
+  await expect(dialog.locator("input[type=file]")).toBeDisabled();
+  await expect(dialog.getByRole("button", { name: "Bỏ ảnh nhân vật để AI tự chọn người mặc" })).toBeDisabled();
+  releaseMapping();
+  await expect.poll(() => submissions).toBe(1);
+  await expect.poll(() => page.evaluate(() => JSON.parse(sessionStorage.getItem("vietstylist_generation:generation-user") || "null")?.jobId)).toBe("recoverable-job");
+  expect(media.uploads).toBe(2);
+  await page.reload();
+  completed = true;
+  await page.getByRole("button", { name: "Thử đồ AI" }).click();
+  dialog = page.getByRole("dialog", { name: "Thử đồ bằng Gemini" });
+  await expect(dialog.getByRole("alert")).toContainText("Ảnh đã được tạo nhưng chưa tải được");
+  await expect(dialog.getByText("Ảnh đã tạo và tải thành công. Ảnh kết quả được lưu trong Tài khoản → Ảnh AI.")).toHaveCount(0);
+  media.brokenResult = false;
+  await dialog.getByRole("button", { name: "Tải lại ảnh kết quả" }).click();
+  await expect(dialog.getByText("Ảnh đã tạo và tải thành công. Ảnh kết quả được lưu trong Tài khoản → Ảnh AI.")).toBeVisible();
+  await expect(dialog.getByAltText("Kết quả thử đồ Gemini")).toHaveJSProperty("naturalWidth", 16);
+  expect(submissions).toBe(1);
+  expect(media.uploads).toBe(2);
+});
+
+test("catalog outage offers retry without claiming clothes were deleted", async ({ page }) => {
+  await mockApi(page);
+  await loginForGeneration(page);
+  await seedDraft(page, TEST_DOCUMENT, "generation-user");
+  await page.route("**/api/catalog/items?*", route => route.fulfill({ status: 503, json: { error: { code: "UNAVAILABLE", message: "Catalog outage" } } }));
+  await page.goto("/studio");
+  await page.getByRole("button", { name: "Thử đồ AI" }).click();
+  const dialog = page.getByRole("dialog", { name: "Thử đồ bằng Gemini" });
+  await expect(dialog.getByRole("alert")).toContainText("Chưa tải được kho trang phục");
+  await expect(dialog.getByText(/không còn ở kho/)).toHaveCount(0);
+  await expect(dialog.getByRole("button", { name: "Tạo ảnh thử đồ" })).toBeDisabled();
+  await page.unroute("**/api/catalog/items?*");
+  await dialog.getByRole("button", { name: "Tải lại kho trang phục" }).click();
+  await expect(dialog.getByRole("button", { name: "Tạo ảnh thử đồ" })).toBeEnabled();
+});
+
+test("missing garment image blocks generation before any upload", async ({ page }) => {
+  await mockApi(page, { real_image_url: "/fixture-missing.png" });
+  await loginForGeneration(page);
+  await seedDraft(page, TEST_DOCUMENT, "generation-user");
+  const media = await mockGenerationMedia(page);
+  await page.goto("/studio");
+  await expect(page.getByRole("button", { name: "Thử lại ảnh" })).toBeVisible();
+  await page.getByRole("button", { name: "Thử đồ AI" }).click();
+  const dialog = page.getByRole("dialog", { name: "Thử đồ bằng Gemini" });
+  await dialog.getByRole("button", { name: "Tạo ảnh thử đồ" }).click();
+  await expect(dialog.getByRole("alert")).toContainText("Một số ảnh trang phục chưa tải được");
+  expect(media.uploads).toBe(0);
+});
+
+test("upload has a deadline and exposes an actionable error", async ({ page }) => {
+  await mockApi(page);
+  await loginForGeneration(page);
+  await seedDraft(page, TEST_DOCUMENT, "generation-user");
+  const media = await mockGenerationMedia(page);
+  let started = false;
+  await page.route("**/test-upload/*", () => { started = true; });
+  await page.clock.install();
+  await page.goto("/studio");
+  await page.getByRole("button", { name: "Thử đồ AI" }).click();
+  const dialog = page.getByRole("dialog", { name: "Thử đồ bằng Gemini" });
+  await dialog.getByRole("button", { name: "Tạo ảnh thử đồ" }).click();
+  await expect.poll(() => started).toBe(true);
+  await page.clock.fastForward(61000);
+  await expect(dialog.getByRole("alert")).toContainText("Tải ảnh vượt quá 60 giây");
+  await expect(dialog.getByRole("button", { name: "Tạo ảnh thử đồ" })).toBeEnabled();
+  expect(media.uploads).toBe(1);
+});
+
+test("failed save connection preserves the draft and can be retried", async ({ page }) => {
+  const saves = await mockApi(page);
+  await loginForGeneration(page);
+  await page.route("**/api/catalog/occasions", route => route.fulfill({ json: [] }));
+  await page.route("**/api/outfits", route => route.abort("failed"));
+  await page.goto("/studio");
+  const title = page.locator("input").first();
+  await title.fill("Bộ phối cần giữ khi mất mạng");
+  const before = await readDraft(page);
+  await expect(page.getByText("Chưa có lựa chọn hoàn cảnh. Bạn vẫn có thể lưu bộ phối.")).toBeVisible();
+  await page.getByRole("button", { name: "Lưu bộ phối", exact: true }).click();
+  await expect(page.getByText(/Không kết nối được máy chủ để xác nhận lưu/)).toBeVisible();
+  await expect(page.getByText("Failed to fetch", { exact: true })).toHaveCount(0);
+  expect((await readDraft(page)).snapshot).toEqual(before.snapshot);
+  await expect(title).toHaveValue("Bộ phối cần giữ khi mất mạng");
+  await page.unroute("**/api/outfits");
+  await page.getByRole("button", { name: "Lưu bộ phối", exact: true }).click();
+  await expect(page.getByText("Đã lưu bộ phối vào Tủ đồ.")).toBeVisible();
+  expect(saves).toHaveLength(1);
+  expect((await readDraft(page)).outfitId).toBe("saved-1");
 });
 
 test("R08 records Canvas frame intervals and draft writes for one gesture", async ({ page }) => {
   await mockApi(page);
+  await seedDraft(page);
   await page.addInitScript((key) => {
     const original = Storage.prototype.setItem;
     let writes = 0;
@@ -203,7 +747,8 @@ test("empty draft restores all document settings and undo includes presentation"
     }
   }, { key: DRAFT_KEY, document: { title: "Bộ phối rỗng", snapshot: { ...INITIAL_DOCUMENT.snapshot, items: [], lockedSlots: ["headwear"], backgroundTheme: "dopaper", aspectRatio: "1:1" } } });
   await page.goto("/studio");
-  await page.getByRole("button", { name: /Khôi phục bản phối/ }).click();
+  await expect(page.getByText("Dùng cho kiểm tra văn hóa và gợi ý AI. Ảnh trên bảng phối không đổi hướng; ứng dụng không lật ảnh để giả lập cài vạt.")).toBeVisible();
+  await page.getByRole("button", { name: "Tiếp tục bản nháp", exact: true }).click();
   await expect(page.locator("input").first()).toHaveValue("Bộ phối rỗng");
   expect((await readDraft(page)).snapshot.items).toEqual([]);
   await page.getByRole("button", { name: "Remix Đương đại" }).click();
@@ -216,6 +761,7 @@ test("empty draft restores all document settings and undo includes presentation"
 
 test("save in flight preserves newer edits and prevents duplicate submissions", async ({ page }) => {
   await mockApi(page);
+  await loginForGeneration(page);
   let release!: () => void;
   const held = new Promise<void>(resolve => { release = resolve; });
   let posts = 0;
@@ -242,6 +788,7 @@ test("save in flight preserves newer edits and prevents duplicate submissions", 
 
 test("revision conflict preserves local edits until explicit server selection", async ({ page }) => {
   await mockApi(page);
+  await loginForGeneration(page);
   await page.goto("/studio");
   const title = page.locator("input").first();
   await title.fill("Saved version");
@@ -280,6 +827,7 @@ test("expired session does not expose or erase the account draft", async ({ page
 
 test("opening an outfit link requires choosing before replacing unsaved work", async ({ page }) => {
   await mockApi(page);
+  await loginForGeneration(page);
   let reads = 0;
   await page.route("**/api/outfits/from-link", route => {
     reads++;
@@ -298,8 +846,31 @@ test("opening an outfit link requires choosing before replacing unsaved work", a
   await expect(page.locator("input").first()).toHaveValue("Nháp chưa lưu cần giữ");
 });
 
+test("starting a fresh Studio draft archives the restored draft instead of discarding it", async ({ page }) => {
+  await mockApi(page);
+  await loginForGeneration(page);
+  await seedDraft(page, { ...TEST_DOCUMENT, title: "Nháp cần giữ lại" }, "generation-user");
+  await page.goto("/studio");
+  await expect(page.getByRole("button", { name: "Tiếp tục bản nháp" })).toBeVisible();
+  await page.getByRole("button", { name: "Tạo bản phối trống" }).click();
+
+  await expect(page.locator("input").first()).toHaveValue(INITIAL_DOCUMENT.title);
+  const archived = await page.evaluate(key => {
+    const recoveryKey = Object.keys(localStorage).find(candidate => candidate.startsWith(`${key}:generation-user:recovery:`));
+    return recoveryKey ? JSON.parse(localStorage.getItem(recoveryKey) || "null") : null;
+  }, DRAFT_KEY);
+  expect(archived.title).toBe("Nháp cần giữ lại");
+  expect(archived.snapshot.items).toHaveLength(1);
+  expect((await readDraft(page)).snapshot.items).toHaveLength(0);
+  await page.getByRole("button", { name: "Khôi phục Nháp cần giữ lại" }).click();
+  await expect(page.locator("input").first()).toHaveValue("Nháp cần giữ lại");
+  expect((await readDraft(page)).snapshot.items).toHaveLength(1);
+  await expect(page.getByRole("button", { name: "Khôi phục Nháp cần giữ lại" })).toHaveCount(0);
+});
+
 test("an outfit load finishing after a new edit cannot overwrite it", async ({ page }) => {
   await mockApi(page);
+  await loginForGeneration(page);
   let release!: () => void;
   const held = new Promise<void>(resolve => { release = resolve; });
   let reads = 0;
@@ -342,11 +913,12 @@ test("an account switch in another tab hides old work and ignores its pending sa
   await page.getByRole("button", { name: "Lưu bộ phối", exact: true }).click();
   await expect.poll(() => saves).toBe(1);
   const otherTab = await context.newPage();
-  await otherTab.goto("/favicon.ico");
+  await otherTab.goto("/images/heritage/thumb_nguyen_ao_tac.png");
   await otherTab.evaluate(user => {
     localStorage.setItem("viet_stylist_user", JSON.stringify(user));
     localStorage.setItem("viet_stylist_auth_token", "token-b");
   }, account("account-b"));
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem("viet_stylist_user") || "null")?.id)).toBe("account-b");
   await expect(page.locator("input").first()).toHaveValue(INITIAL_DOCUMENT.title);
   const completed = page.waitForResponse("**/api/outfits");
   release(); await completed;
@@ -356,4 +928,48 @@ test("an account switch in another tab hides old work and ignores its pending sa
   expect(draft.outfitId).toBeUndefined();
   expect(await page.evaluate(key => JSON.parse(localStorage.getItem(`${key}:account-a`) || "null").title, DRAFT_KEY)).toBe("Riêng tư tài khoản A");
   await otherTab.close();
+});
+
+
+test("styling recommendation previews Gemini results before applying and supports Enter", async ({ page }) => {
+  await mockApi(page);
+  await loginForGeneration(page);
+  let calls = 0;
+  await page.route("**/api/recommendations/ai", async route => {
+    calls++;
+    expect(route.request().postDataJSON().prompt).toBe("Cổ phục nam chụp kỷ yếu");
+    await route.fulfill({ contentType: "application/json", body: JSON.stringify({ source: "gemini", model: "test", outfits: [{
+      title: "Gợi ý đã kiểm thử", explanation: "Chọn từ danh mục", items: [{ slot: TEST_GARMENT.slot, item_id: TEST_GARMENT.itemId, variant_id: TEST_GARMENT.variantId, hex_color: TEST_GARMENT.colorHex, item_name: "Trang phục 0" }],
+    }] }) });
+  });
+  await page.goto("/studio");
+  const panel = page.getByRole("region", { name: "Gợi ý phối đồ", exact: true });
+  await panel.getByRole("textbox").fill("Cổ phục nam chụp kỷ yếu");
+  await panel.getByRole("textbox").press("Enter");
+  await expect(panel.getByText("Nguồn: Gemini")).toBeVisible();
+  expect((await readDraft(page))?.snapshot.items || []).toHaveLength(0);
+  await panel.getByRole("button", { name: "Áp dụng gợi ý" }).click();
+  await expect.poll(async () => (await readDraft(page))?.snapshot.items[0]?.itemId).toBe(TEST_GARMENT.itemId);
+  expect(calls).toBe(1);
+});
+
+test("styling recommendation shows failures and fallback beside the input and can retry", async ({ page }) => {
+  await mockApi(page);
+  await loginForGeneration(page);
+  let calls = 0;
+  await page.route("**/api/recommendations/ai", route => {
+    calls++;
+    return calls === 1
+      ? route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ error: { code: "UNAVAILABLE", message: "Máy chủ đang bận" } }) })
+      : route.fulfill({ contentType: "application/json", body: JSON.stringify({ source: "cultural_rule_engine", model: "fallback", notice: "Gemini đã chạm hạn mức. Đây là gợi ý dự phòng.", outfits: [{ title: "Tham khảo", explanation: "Chọn theo vị trí", items: [{ slot: TEST_GARMENT.slot, item_id: TEST_GARMENT.itemId, item_name: "Trang phục 0" }] }] }) });
+  });
+  await page.goto("/studio");
+  const panel = page.getByRole("region", { name: "Gợi ý phối đồ", exact: true });
+  await panel.getByRole("textbox").fill("Cổ phục");
+  await panel.getByRole("button", { name: "Gợi ý", exact: true }).click();
+  await expect(panel.getByRole("alert")).toContainText("Máy chủ đang bận");
+  await panel.getByRole("button", { name: "Gợi ý", exact: true }).click();
+  await expect(panel.getByRole("alert")).toHaveCount(0);
+  await expect(panel.getByRole("status")).toContainText("Gemini đã chạm hạn mức");
+  await expect(panel.getByText("Nguồn: bộ quy tắc")).toBeVisible();
 });

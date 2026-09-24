@@ -1,61 +1,157 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { Lookbook } from "@/lib/types/api";
 import { api } from "@/lib/api/client";
+import { shareUrlForOrigin } from "@/lib/shareUrl";
 import { useAuth } from "@/lib/auth/context";
+import { useCatalog } from "@/lib/catalog/CatalogProvider";
 import { ArrowLeft, Share2, Trash2, Globe, Lock, Sparkles, Check } from "lucide-react";
+import AuthModal from "@/components/AuthModal";
+import { useConfirmDialog } from "@/components/ui/ConfirmDialog";
 
 export default function LookbookDetailPage() {
+  const { confirm, dialog } = useConfirmDialog();
   const params = useParams();
   const router = useRouter();
   const lookbookId = params.id as string;
-  const { user } = useAuth();
+  const { user, isLoggedIn, isReady } = useAuth();
+  const { catalogItems } = useCatalog();
+  const currentOwnerId = useRef(user?.id);
+  currentOwnerId.current = user?.id;
+  const requestGeneration = useRef(0);
 
   const [lookbook, setLookbook] = useState<Lookbook | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [actionMessage, setActionMessage] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isSharing, setIsSharing] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [loadedOwnerId, setLoadedOwnerId] = useState<string | null>(null);
+
+  const loadLookbook = useCallback(async () => {
+    const generation = ++requestGeneration.current;
+    if (!isReady) return;
+    if (!isLoggedIn || !user?.id) {
+      setLookbook(null);
+      setLoadedOwnerId(null);
+      setLoadError(null);
+      setIsLoading(false);
+      return;
+    }
+    if (!lookbookId) return;
+    const ownerId = user.id;
+    setIsLoading(true);
+    setLoadError(null);
+    setLookbook(null);
+    setLoadedOwnerId(null);
+    setShareUrl(null);
+    setActionMessage(null);
+    try {
+      const result = await api.getLookbook(lookbookId);
+      if (generation === requestGeneration.current && ownerId === currentOwnerId.current) {
+        setLookbook(result);
+        setLoadedOwnerId(ownerId);
+      }
+    } catch (err: any) {
+      if (generation === requestGeneration.current && ownerId === currentOwnerId.current) {
+        setLookbook(null);
+        setLoadError(err?.statusCode === 401
+          ? "Phiên đăng nhập đã hết hạn. Hãy đăng nhập lại rồi thử tải Lookbook."
+          : err?.message || "Không tải được Lookbook.");
+      }
+    } finally {
+      if (generation === requestGeneration.current && ownerId === currentOwnerId.current) setIsLoading(false);
+    }
+  }, [isLoggedIn, isReady, lookbookId, user?.id]);
 
   useEffect(() => {
-    if (!lookbookId) return;
-    setIsLoading(true);
-
-    api
-      .getLookbook(lookbookId)
-      .then((data) => setLookbook(data))
-      .catch((err) => console.error("Lỗi lấy lookbook:", err))
-      .finally(() => setIsLoading(false));
-  }, [lookbookId]);
+    void loadLookbook();
+    return () => { requestGeneration.current++; };
+  }, [loadLookbook]);
 
   const handleShare = async () => {
+    if (!isLoggedIn) {
+      setShowAuthModal(true);
+      return;
+    }
+    const ownerId = user?.id;
+    if (!ownerId || loadedOwnerId !== ownerId || isSharing) return;
+    setIsSharing(true);
+    setActionMessage(null);
     try {
       const res = await api.shareLookbook(lookbookId, 30);
-      setShareUrl(res.share_url);
+      if (ownerId === currentOwnerId.current && loadedOwnerId === ownerId) {
+        setShareUrl(shareUrlForOrigin(res.share_token, window.location.origin));
+      setActionMessage("Đã tạo liên kết xem có hiệu lực trong 30 ngày.");
+      }
     } catch (err: any) {
-      alert("Lỗi chia sẻ: " + err.message);
+      if (ownerId === currentOwnerId.current) setActionMessage("Không tạo được liên kết chia sẻ: " + (err?.message || "Máy chủ không khả dụng."));
+    } finally {
+      if (ownerId === currentOwnerId.current) setIsSharing(false);
     }
   };
 
   const handleDelete = async () => {
-    if (!confirm("Bạn có chắc chắn muốn xóa Lookbook này không?")) return;
+    if (!isLoggedIn) {
+      setShowAuthModal(true);
+      return;
+    }
+    const ownerId = user?.id;
+    const currentLookbook = lookbook;
+    if (!ownerId || !currentLookbook || loadedOwnerId !== ownerId || isDeleting) return;
+    if (!await confirm({
+      title: "Xóa Lookbook này?",
+      description: `“${currentLookbook.title}” sẽ bị xóa khỏi danh sách Lookbook. Các bộ phối đã lưu trong Tủ đồ vẫn được giữ.`,
+      confirmLabel: "Xóa Lookbook",
+      tone: "danger",
+    })) return;
+    setIsDeleting(true);
     try {
       await api.deleteLookbook(lookbookId);
-      router.push("/lookbook");
+      if (ownerId === currentOwnerId.current) router.push("/lookbook");
     } catch (err: any) {
-      alert("Lỗi xóa: " + err.message);
+      if (ownerId === currentOwnerId.current) setActionMessage("Không xóa được Lookbook: " + (err?.message || "Máy chủ không khả dụng."));
+    } finally {
+      if (ownerId === currentOwnerId.current) setIsDeleting(false);
     }
   };
 
-  if (isLoading) {
+  const copyShareLink = async () => {
+    if (!shareUrl) return;
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error("Clipboard unavailable");
+      await navigator.clipboard.writeText(shareUrl);
+      setActionMessage("Đã sao chép liên kết chia sẻ.");
+    } catch { setActionMessage("Trình duyệt không cho phép sao chép. Bôi đen liên kết bên dưới để sao chép thủ công."); }
+  };
+
+  if (!isReady || isLoading || (isLoggedIn && loadedOwnerId !== user?.id)) {
     return <div className="py-24 text-center text-xs text-stone-500">Đang tải chi tiết Lookbook...</div>;
+  }
+
+  if (!isLoggedIn) {
+    return (
+      <div className="max-w-3xl mx-auto px-4 py-20 text-center space-y-4">
+        <h1 className="text-xl font-serif font-bold text-stone-900">Đăng nhập để xem Lookbook của bạn</h1>
+        <p className="text-sm text-stone-600">Lookbook thuộc tài khoản cá nhân. Đăng nhập để tiếp tục xem và quản lý.</p>
+        <button type="button" onClick={() => setShowAuthModal(true)} className="rounded-lg bg-stone-900 px-4 py-2 text-sm font-semibold text-white">Đăng nhập</button>
+        <Link href="/lookbook" className="block text-sm text-heritage-red font-semibold hover:underline">Quay lại danh sách</Link>
+        <AuthModal isOpen={showAuthModal} onClose={() => setShowAuthModal(false)} />
+      </div>
+    );
   }
 
   if (!lookbook) {
     return (
       <div className="max-w-4xl mx-auto px-4 py-20 text-center space-y-4">
-        <h2 className="text-xl font-serif font-bold text-stone-900">Không tìm thấy Lookbook</h2>
+        <h2 className="text-xl font-serif font-bold text-stone-900">{loadError ? "Không tải được Lookbook" : "Không tìm thấy Lookbook"}</h2>
+        {loadError && <p role="alert" className="text-sm text-rose-800">{loadError}</p>}
+        {loadError && <button type="button" onClick={() => void loadLookbook()} className="rounded-lg border border-stone-300 px-4 py-2 text-sm font-semibold">Thử tải lại</button>}
         <Link href="/lookbook" className="text-xs text-heritage-red font-semibold hover:underline">
           ← Quay lại danh sách
         </Link>
@@ -78,16 +174,21 @@ export default function LookbookDetailPage() {
         <div className="flex items-center space-x-2">
           <button
             onClick={handleShare}
+            disabled={isSharing}
+            aria-label="Tạo liên kết chia sẻ Lookbook"
+            title={isSharing ? "Đang tạo liên kết" : "Tạo liên kết chia sẻ"}
             className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl border border-stone-300 hover:bg-stone-50 text-xs font-semibold text-stone-700 transition-colors"
           >
             <Share2 className="w-4 h-4 text-heritage-indigo" />
-            <span>Tạo link chia sẻ (F09)</span>
+            <span>{isSharing ? "Đang tạo liên kết…" : "Tạo liên kết chia sẻ"}</span>
           </button>
 
           <button
             onClick={handleDelete}
+            disabled={isDeleting}
             className="p-2 rounded-xl text-stone-400 hover:text-red-600 hover:bg-red-50 transition-colors"
             title="Xóa Lookbook"
+            aria-label="Xóa Lookbook"
           >
             <Trash2 className="w-4 h-4" />
           </button>
@@ -100,28 +201,27 @@ export default function LookbookDetailPage() {
           <div className="space-y-0.5">
             <span className="font-bold flex items-center space-x-1">
               <Check className="w-4 h-4 text-emerald-600" />
-              <span>Link chia sẻ công khai có thời hạn:</span>
+              <span>Liên kết xem có hiệu lực trong 30 ngày:</span>
             </span>
-            <span className="font-mono text-emerald-700 select-all block text-[11px]">{shareUrl}</span>
+            <span className="font-mono text-emerald-700 select-all block break-all text-[11px]">{shareUrl}</span>
           </div>
           <button
-            onClick={() => {
-              navigator.clipboard.writeText(shareUrl);
-              alert("Đã copy link!");
-            }}
+            onClick={() => void copyShareLink()}
             className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg font-semibold hover:bg-emerald-700 transition-colors"
           >
-            Copy Link
+            Sao chép liên kết
           </button>
         </div>
       )}
+
+      {actionMessage && <div role="status" className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">{actionMessage}</div>}
 
       {/* Header thông tin Lookbook */}
       <div className="bg-white rounded-3xl border border-stone-200 p-6 sm:p-8 shadow-sm space-y-4">
         <div className="flex items-center space-x-2">
           <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase bg-stone-100 text-stone-700 flex items-center space-x-1">
             {lookbook.visibility === "public" ? <Globe className="w-3 h-3" /> : <Lock className="w-3 h-3" />}
-            <span>{lookbook.visibility}</span>
+            <span>{lookbook.visibility === "public" ? "Công khai" : lookbook.visibility === "unlisted" ? "Người có liên kết" : "Riêng tư"}</span>
           </span>
           <span className="text-xs text-stone-400">
             Khởi tạo ngày: {new Date(lookbook.created_at).toLocaleDateString("vi-VN")}
@@ -163,8 +263,8 @@ export default function LookbookDetailPage() {
                   {entry.snapshot.items.map((it) => (
                     <div key={it.slot} className="flex items-center justify-between">
                       <span className="text-stone-500 capitalize">{it.slot}:</span>
-                      <span className="font-medium text-stone-800 truncate max-w-[200px]">
-                        {it.itemId}
+                      <span className="font-medium text-stone-800 truncate max-w-[200px]" title={it.itemId}>
+                        {catalogItems.find(item => item.id === it.itemId)?.name || "Trang phục không còn trong danh mục"}
                       </span>
                     </div>
                   ))}
@@ -175,7 +275,7 @@ export default function LookbookDetailPage() {
                     Phong cách: <strong className="capitalize">{entry.snapshot.styleMode}</strong>
                   </span>
                   <Link
-                    href="/"
+                    href={`/studio?loadOutfit=${encodeURIComponent(entry.outfit_id)}`}
                     className="px-3 py-1 bg-stone-100 hover:bg-stone-900 hover:text-white rounded-lg font-medium text-stone-700 transition-colors"
                   >
                     Mở lại trong Studio
@@ -186,6 +286,8 @@ export default function LookbookDetailPage() {
           </div>
         )}
       </div>
+      <AuthModal isOpen={showAuthModal} onClose={() => setShowAuthModal(false)} />
+      {dialog}
     </div>
   );
 }

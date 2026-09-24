@@ -17,7 +17,7 @@ VietStylist là nền tảng web hỗ trợ khám phá, phối và lưu trữ c�
 - Lưu media trên Cloudflare R2 hoặc thư mục local trong môi trường phát triển.
 
 > [!NOTE]
-> Tính năng AI Virtual Try-On đã có adapter Gemini và mặc định tắt. Khi chưa có khóa, model ảnh hoặc cờ bật hợp lệ, API chủ động trả về HTTP `503`; Studio phối đồ 2D và xuất ảnh vẫn hoạt động bình thường.
+> Thử đồ AI gửi ảnh bản phối Studio làm tham chiếu; ảnh nhân vật là tùy chọn. Có ảnh nhân vật, prompt yêu cầu giữ danh tính người đó; không có ảnh, AI chọn người mặc trưởng thành phù hợp. Gemini mặc định tắt và API trả HTTP `503` nếu chưa cấu hình. Chế độ thủ công luôn cho tải ảnh bản phối và sao chép prompt để dùng ở công cụ khác; lưu bộ phối lên tài khoản cần đăng nhập.
 
 ## Công nghệ sử dụng
 
@@ -26,11 +26,11 @@ VietStylist là nền tảng web hỗ trợ khám phá, phối và lưu trữ c�
 | Frontend | Next.js 14, React 18, TypeScript, Tailwind CSS |
 | Studio 2D | Konva, React Konva |
 | Backend | Python 3.11+, FastAPI, Pydantic |
-| Database local | SQLite, tự khởi tạo schema và dữ liệu mẫu |
+| Database runtime | PostgreSQL trên Supabase, migration chạy tường minh |
 | Xác thực | JWT HS256, Google Identity Services |
 | AI | Google Gemini API, rule-based fallback |
 | Thời tiết | Open-Meteo |
-| Lưu trữ | Cloudflare R2, local storage fallback |
+| Lưu trữ | Cloudflare R2; local storage chỉ cho môi trường phát triển/test |
 | Kiểm thử | Pytest, Playwright |
 
 ## Cấu trúc thư mục
@@ -50,9 +50,9 @@ VietStylist là nền tảng web hỗ trợ khám phá, phối và lưu trữ c�
 │   ├── src/components/      # Component dùng chung
 │   ├── src/features/studio/ # Studio phối đồ 2D
 │   └── tests/               # Kiểm thử Playwright
-├── media_storage/           # Media local khi không dùng R2
+├── media_storage/           # Media local cho test/phát triển
 ├── shared/openapi.json      # Đặc tả API dùng chung
-├── supabase/                # Migration PostgreSQL và seed data
+├── supabase/                # Di sản migration/seed cũ; runtime schema ở backend/app/data
 ├── start_dev.bat            # Khởi động nhanh trên Windows
 └── stop_dev.bat             # Dừng dịch vụ trên cổng 3000 và 4000
 ```
@@ -63,7 +63,7 @@ VietStylist là nền tảng web hỗ trợ khám phá, phối và lưu trữ c�
 - Node.js 18.17 trở lên và npm.
 - Windows PowerShell cho các lệnh minh họa bên dưới. Trên macOS/Linux, dùng lệnh kích hoạt virtual environment tương ứng.
 
-Các dịch vụ Gemini, Supabase, Google OAuth và Cloudflare R2 là tùy chọn. Cấu hình mặc định vẫn chạy local bằng SQLite, media local và bộ gợi ý theo luật.
+Runtime cần PostgreSQL (có thể dùng Supabase) và Cloudflare R2. Gemini sinh ảnh và Google OAuth chỉ hoạt động khi được cấu hình; SQLite và media local dành cho kiểm thử/phát triển có kiểm soát.
 
 ## Cài đặt
 
@@ -75,11 +75,16 @@ Từ thư mục gốc của dự án:
 py -3.11 -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
-python -m pip install "fastapi>=0.115.0" "uvicorn[standard]>=0.34.0" "pydantic>=2.10.0" "pydantic-settings>=2.7.0" "pyjwt[crypto]>=2.10.0" "httpx>=0.28.0" "boto3>=1.35.0" "python-multipart>=0.0.20" "aiofiles>=24.1.0" "pytest>=8.3.0" "pytest-asyncio>=0.24.0"
+python -m pip install -e "./backend[dev]"
 Copy-Item backend\.env.example backend\.env
+Set-Location backend
+python scripts/migrate.py --dry-run
+python scripts/migrate.py
+python scripts/migrate.py --check
+Set-Location ..
 ```
 
-Chỉnh `backend/.env` nếu cần tích hợp dịch vụ ngoài. Không commit file này lên Git.
+Điền URI PostgreSQL Session pooler và R2 vào `backend/.env` trước khi chạy migration; không commit file này lên Git. Chi tiết cấu hình và lệnh kiểm tra kết nối có trong [backend/README.md](backend/README.md).
 
 ### 2. Frontend
 
@@ -117,7 +122,7 @@ Sau khi khởi động:
 - Swagger UI: <http://localhost:4000/docs>
 - ReDoc: <http://localhost:4000/redoc>
 
-Ở lần chạy backend đầu tiên, ứng dụng tự tạo `backend/viet_phuc_remix.db`, khởi tạo schema và nạp dữ liệu mẫu từ `supabase/seed.sql`.
+Trước lần chạy backend đầu tiên, cấu hình PostgreSQL Supabase rồi chạy migration từ thư mục `backend` như hướng dẫn trên; startup chỉ kiểm tra schema, không tự tạo bảng hoặc nạp dữ liệu mẫu. SQLite chỉ dùng trong test.
 
 ### Khởi động nhanh trên Windows
 
@@ -149,18 +154,19 @@ Task Backend ưu tiên `.venv` ở thư mục gốc (nếu không có sẽ dùng
 | --- | --- | --- |
 | `ENVIRONMENT`, `HOST`, `PORT`, `DEBUG` | Cấu hình máy chủ FastAPI | Không |
 | `CORS_ORIGINS` | Danh sách origin được phép truy cập API | Không |
-| `DATABASE_URL` | Đường dẫn SQLite; mặc định `sqlite:///./viet_phuc_remix.db` | Không |
-| `SUPABASE_JWT_SECRET` | Ký và xác minh access token | Có cho môi trường production |
+| `SUPABASE_DATABASE_URL`, `DATABASE_SCHEMA` | PostgreSQL Supabase và schema riêng cho runtime; SQLite chỉ dùng khi `ENVIRONMENT=test` | Có |
+| `JWT_SIGNING_SECRET` | Ký và xác minh access token của ứng dụng | Có cho production |
+| `FRONTEND_PUBLIC_ORIGIN`, `API_PUBLIC_ORIGIN` | Origin HTTPS thật để tạo link chia sẻ và URL API | Có cho production |
 | `GOOGLE_CLIENT_ID` | Xác minh Google ID token ở backend | Chỉ khi dùng Google Sign-In |
 | `GEMINI_API_KEY` | Bật gợi ý phối đồ qua Gemini | Không |
 | `GEMINI_MODEL_TEXT` | Model Gemini dùng cho gợi ý văn bản | Không |
 | `GEMINI_MODEL_IMAGE` | Model Gemini có khả năng trả về ảnh | Chỉ khi dùng AI Virtual Try-On |
-| `GEMINI_TRY_ON_ENABLED` | Bật endpoint sinh ảnh sau khi đã cấu hình và kiểm tra model | Không |
-| `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` | Bật lưu trữ Cloudflare R2 | Không |
-| `R2_BUCKET_PUBLIC`, `R2_BUCKET_PRIVATE`, `R2_PUBLIC_DOMAIN` | Tên bucket và public domain của R2 | Không |
-| `LOCAL_MEDIA_DIR` | Thư mục media fallback | Không |
+| `GEMINI_TRY_ON_ENABLED` | Bật API sinh ảnh V3 sau khi kiểm tra provider; endpoint F05 cũ vẫn chưa triển khai | Không |
+| `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` | Lưu ảnh và video trên Cloudflare R2 | Có cho production |
+| `R2_BUCKET_PUBLIC`, `R2_BUCKET_PRIVATE`, `R2_PUBLIC_DOMAIN` | Bucket riêng/công khai và domain HTTPS cho ảnh công khai | Có cho production |
+| `LOCAL_MEDIA_DIR` | Cache ảnh tách nền trên backend; media local chỉ dùng cho test/development | Không |
 
-`SUPABASE_URL`, `SUPABASE_ANON_KEY` và `SUPABASE_SERVICE_ROLE_KEY` đã có chỗ cấu hình để phục vụ tích hợp mở rộng. Runtime database hiện tại của backend sử dụng lớp truy cập SQLite; migration PostgreSQL nằm trong `supabase/migrations/`.
+`SUPABASE_URL`, `SUPABASE_ANON_KEY` và `SUPABASE_SERVICE_ROLE_KEY` dành cho tích hợp mở rộng. Backend dùng PostgreSQL ở runtime; chạy migration tường minh theo [hướng dẫn backend](backend/README.md) trước khi khởi động. Không chuyển dữ liệu từ SQLite test sang Supabase.
 
 ### Frontend — `frontend/.env.local`
 
@@ -172,7 +178,7 @@ Task Backend ưu tiên `.venv` ở thư mục gốc (nếu không có sẽ dùng
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL cho tích hợp mở rộng | Không |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anonymous key | Không |
 
-Trong production, hãy thay toàn bộ secret mặc định, giới hạn `CORS_ORIGINS` theo domain thật và không đưa secret backend vào biến có tiền tố `NEXT_PUBLIC_`.
+Trong production, đặt `ENVIRONMENT=production`, `DEBUG=false`, origin HTTPS thật cho cả frontend/API/R2, `CORS_ORIGINS` chứa origin frontend và không đưa secret backend vào biến có tiền tố `NEXT_PUBLIC_`. Đặt `NEXT_PUBLIC_API_ORIGIN` trỏ tới API thật rồi chạy `npm run build:production` trong `frontend/`; lệnh này từ chối URL localhost/HTTP. Thay biến API cần build lại. Link Lookbook trong UI dùng origin của trang đang mở. Kiểm tra `/ready` và chạy smoke bằng trình duyệt trên domain deploy trước khi mở traffic.
 
 ## Các nhóm API
 

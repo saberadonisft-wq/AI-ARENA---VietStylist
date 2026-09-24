@@ -75,16 +75,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isReady, setIsReady] = useState(false);
   const authGeneration = useRef(0);
+  const restoredToken = useRef<string | null>(null);
 
   // Restore identity before account-scoped drafts are read; observe other tabs.
   useEffect(() => {
     let cancelled = false;
     const restore = async () => {
       const generation = ++authGeneration.current;
-      setIsReady(false);
       try {
         const savedToken = localStorage.getItem("viet_stylist_auth_token");
         const savedUser = localStorage.getItem("viet_stylist_user");
+        // A focus refresh of the same account must not unmount its active forms.
+        if (savedToken !== restoredToken.current) setIsReady(false);
+        restoredToken.current = savedToken;
         if (!savedToken || !savedUser) {
           setToken(null);
           setUser(null);
@@ -95,11 +98,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(cached);
         try {
           const mapped = mapAuthUserToUser(await api.getMe());
-          if (cancelled || generation !== authGeneration.current) return;
+          if (cancelled || generation !== authGeneration.current || localStorage.getItem("viet_stylist_auth_token") !== savedToken) return;
           setUser(mapped);
           localStorage.setItem("viet_stylist_user", JSON.stringify(mapped));
         } catch (err: any) {
-          if (cancelled || generation !== authGeneration.current) return;
+          if (cancelled || generation !== authGeneration.current || localStorage.getItem("viet_stylist_auth_token") !== savedToken) return;
           if (err?.statusCode === 401) {
             setToken(null);
             setUser(null);
@@ -121,11 +124,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (event.key === null || event.key === "viet_stylist_auth_token") void restore();
     };
     window.addEventListener("storage", onStorage);
-    return () => { cancelled = true; window.removeEventListener("storage", onStorage); };
+    const onFocus = () => { void restore(); };
+    window.addEventListener("focus", onFocus);
+    return () => { cancelled = true; window.removeEventListener("storage", onStorage); window.removeEventListener("focus", onFocus); };
   }, []);
 
   const handleAuthSuccess = (res: AuthResponse): User => {
     authGeneration.current++;
+    restoredToken.current = res.access_token;
     setIsReady(true);
     const mappedUser = mapAuthUserToUser(res.user);
     setToken(res.access_token);

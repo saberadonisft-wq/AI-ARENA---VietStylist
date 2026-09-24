@@ -20,7 +20,7 @@ class TryOnService:
     @staticmethod
     def get_job_status(job_id: str, owner_id: str) -> TryOnJobResponse:
         job = TryOnRepository.get_job_by_id(job_id)
-        if not job or job.get("owner_id") != owner_id:
+        if not job or job.get("owner_id") != owner_id or job.get("task_type") == "v3_generation":
             raise AppError(code="JOB_NOT_FOUND", message="Không tìm thấy tác vụ thử đồ AI", status_code=404)
 
         return TryOnService._format_job_response(job)

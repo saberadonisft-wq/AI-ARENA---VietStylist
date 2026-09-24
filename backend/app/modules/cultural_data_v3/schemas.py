@@ -155,6 +155,8 @@ class PromptSynthesisResponse(BaseModel):
 
 class SynthesizeRequest(BaseModel):
     outfit: OutfitSpecV2
+    legacy_item_ids: List[str] = Field(default_factory=list, max_length=32)
+    outfit_image_id: str
     user_image_id: Optional[str] = None
     model_id: Optional[
         Literal[
@@ -165,7 +167,7 @@ class SynthesizeRequest(BaseModel):
         ]
     ] = None
     options: Dict[str, Any] = {}
-    idempotency_key: Optional[str] = None
+    idempotency_key: Optional[str] = Field(default=None, min_length=1, max_length=160)
 
 
 class SynthesizeResponse(BaseModel):
@@ -175,3 +177,14 @@ class SynthesizeResponse(BaseModel):
     prompt_used: str = ""
     post_validation: Dict[str, Any] = {}
     metadata: Dict[str, Any] = {}
+
+
+class GenerationAvailabilityResponse(BaseModel):
+    enabled: bool
+
+
+class GenerationJobResponse(BaseModel):
+    job_id: str
+    status: Literal["running", "completed", "failed"]
+    result: Optional[SynthesizeResponse] = None
+    error: Optional[Dict[str, Any]] = None

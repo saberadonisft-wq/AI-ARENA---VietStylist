@@ -35,7 +35,7 @@ export const CulturalKnowledgeBadge: React.FC<CulturalKnowledgeBadgeProps> = ({
                 : "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
             }`}
           >
-            {validationStatus === 'clear' ? "Không phát hiện vi phạm trong bộ luật đã kiểm tra" : validationStatus === 'error' ? "Có vi phạm" : validationStatus === 'warning' ? "Cần xem xét" : "Chưa đủ dữ liệu kiểm tra"}
+            {validationStatus === 'clear' ? "Không phát hiện vi phạm trong các quy tắc đã kiểm tra" : validationStatus === 'error' ? "Có vi phạm nghiêm trọng theo quy tắc đã kiểm tra" : validationStatus === 'warning' ? "Có cảnh báo hoặc dữ liệu chưa đủ" : "Chưa thể kết luận với dữ liệu hiện có"}
           </span>
         )}
       </div>

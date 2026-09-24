@@ -1,5 +1,5 @@
 import anyio
-from app.infrastructure.gemini.schemas import parse_recommendations
+from app.infrastructure.gemini.schemas import ModelRecommendations, parse_recommendations
 import json
 import logging
 from typing import Any, Dict, List, Optional
@@ -36,13 +36,15 @@ class GeminiClient:
                 "slot": it["slot"],
                 "gender": it.get("gender", "unisex"),
                 "description": it.get("description", ""),
+                "variants": it.get("variants", []),
             }
             for it in available_items
         ]
 
         if not self.is_configured:
             return self._fallback_styling(
-                prompt, occasion_id, available_items, locked_items
+                prompt, occasion_id, available_items, locked_items,
+                notice="Gemini chưa được cấu hình. Đây là gợi ý dự phòng từ danh mục, chưa phân tích đầy đủ yêu cầu của bạn.",
             )
 
         system_instruction = (
@@ -50,6 +52,8 @@ class GeminiClient:
             "Nhiệm vụ của bạn là chọn từ danh sách trang phục được cung cấp để tạo ra 1 đến 2 bộ phối trang phục phù hợp với sự kiện và yêu cầu người dùng. "
             "QUAN TRỌNG: Chỉ chọn ID món đồ có trong danh sách được cung cấp. Phải giữ nguyên các món đồ đã khóa (locked_items). "
             "Giải thích ngắn gọn lý do phối đồ dựa trên nét đẹp truyền thống và tính thẩm mỹ đương đại."
+            " Mỗi vị trí chỉ chọn một món. Chỉ chọn variant_id được cung cấp cho món đó, nếu không có thì trả null."
+            " Không khẳng định thẩm định văn hóa. Nếu danh mục không đáp ứng yêu cầu, giải thích rõ giới hạn."
         )
 
         user_content = {
@@ -70,7 +74,8 @@ class GeminiClient:
                 }
             ],
             "generationConfig": {
-                "response_mime_type": "application/json",
+                "responseMimeType": "application/json",
+                "responseJsonSchema": ModelRecommendations.model_json_schema(by_alias=False),
                 "temperature": 0.3,
             },
         }
@@ -79,8 +84,10 @@ class GeminiClient:
             _provider_slots.acquire_nowait()
         except anyio.WouldBlock:
             return self._fallback_styling(
-                prompt, occasion_id, available_items, locked_items
+                prompt, occasion_id, available_items, locked_items,
+                notice="Gemini đang bận. Đây là gợi ý dự phòng từ danh mục; bạn có thể thử lại sau.",
             )
+        notice = "Gemini trả kết quả chưa hợp lệ. Đây là gợi ý dự phòng từ danh mục."
         try:
             from app.core.http_client import get_shared_async_client
 
@@ -95,8 +102,14 @@ class GeminiClient:
                 data = resp.json()
                 candidates = data.get("candidates", [])
                 if candidates:
-                    text_response = candidates[0]["content"]["parts"][0]["text"]
+                    text_response = "".join(
+                        part.get("text", "")
+                        for part in candidates[0].get("content", {}).get("parts", [])
+                        if not part.get("thought")
+                    )
                     parsed = json.loads(text_response)
+                    if not isinstance(parsed, dict):
+                        raise ValueError("Expected an outfit object")
                     recs = parsed.get(
                         "outfits",
                         parsed.get(
@@ -114,10 +127,23 @@ class GeminiClient:
                         logger.warning(
                             "Gemini output structure invalid (empty recommendations), activating fallback"
                         )
+            if resp.status_code != 200:
+                reason = {
+                    400: "Cấu hình yêu cầu Gemini chưa hợp lệ",
+                    401: "Khóa API Gemini không được chấp nhận",
+                    403: "Khóa API chưa có quyền dùng Gemini",
+                    404: "Model Gemini được cấu hình hiện không khả dụng",
+                    429: "Gemini đã chạm hạn mức sử dụng",
+                }.get(resp.status_code, "Gemini tạm thời không khả dụng")
+                notice = f"{reason}. Đây là gợi ý dự phòng từ danh mục, chưa phân tích đầy đủ yêu cầu của bạn."
             logger.warning(
                 f"Gemini API returned status {resp.status_code}, activating fallback"
             )
         except Exception as e:
+            if isinstance(e, (TimeoutError, httpx.TimeoutException)):
+                notice = "Gemini phản hồi quá chậm. Đây là gợi ý dự phòng từ danh mục; bạn có thể thử lại."
+            elif isinstance(e, httpx.RequestError):
+                notice = "Không kết nối được Gemini. Đây là gợi ý dự phòng từ danh mục."
             logger.warning(
                 "Gemini call failed (%s), activating fallback", type(e).__name__
             )
@@ -125,7 +151,7 @@ class GeminiClient:
             _provider_slots.release()
 
         return self._fallback_styling(
-            prompt, occasion_id, available_items, locked_items
+            prompt, occasion_id, available_items, locked_items, notice=notice
         )
 
     def _fallback_styling(
@@ -134,6 +160,7 @@ class GeminiClient:
         occasion_id: Optional[str],
         available_items: List[Dict[str, Any]],
         locked_items: List[Dict[str, Any]],
+        notice: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Quy tắc phối đồ dự phòng thông minh (Rule-based Fallback) tuân thủ di sản văn hóa."""
         locked_slots = {it.get("slot") for it in locked_items if it.get("slot")}
@@ -195,12 +222,13 @@ class GeminiClient:
         return {
             "source": "cultural_rule_engine",
             "model": "rule-based-fallback-v1",
+            "notice": notice,
             "recommendations": [
                 {
-                    "title": "Bản phối Cổ phong Thanh lịch",
+                    "title": "Bản phối tham khảo từ danh mục",
                     "explanation": (
-                        "Bộ phối trang nhã tuân thủ cấu trúc cổ phục truyền thống với áo ngũ thân cài vạt hữu nhậm, "
-                        "lớp áo lót tinh khôi hé lộ nơi cổ áo cùng quần lụa suông và quạt xếp cổ truyền."
+                        "Chọn các món đang xuất bản theo vị trí trang phục và giữ các món đã khóa. "
+                        "Gợi ý dự phòng chưa phân tích đầy đủ yêu cầu và chưa được thẩm định văn hóa."
                     ),
                     "items": selected_items,
                 }

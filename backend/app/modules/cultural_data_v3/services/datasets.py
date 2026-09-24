@@ -9,7 +9,7 @@ import hashlib
 import json
 import sqlite3
 
-from app.core.database import Database, db_transaction, get_db_connection
+from app.core.database import Database, db_transaction, get_db_connection, table_columns
 from app.core.errors import AppError
 from app.modules.cultural_data_v3.repository import GraphReadRepository, decode_record
 from app.modules.cultural_data_v3.services.publication import PublicationPolicy
@@ -123,7 +123,8 @@ def load_content(dataset_id):
 def ensure_not_withdrawn(content):
     # Do not silently filter a frozen graph: that would change its grounding hash.
     with get_db_connection() as conn:
-        conn.execute("BEGIN")
+        if not conn.in_transaction:
+            conn.execute("BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY" if getattr(conn, "dialect", None) == "postgresql" else "BEGIN")
         current = capture_public_graph(conn)["tables"]
         for table in TABLES:
             key = "key" if table in ("attribute_definitions", "relation_definitions") else "id"
@@ -158,7 +159,7 @@ def dataset_resolver(dataset_version="dev", ruleset_version=None):
         # Table/column names come only from this application's installed schema;
         # archived input supplies values, never executable SQL or schema text.
         for table in TABLES:
-            columns = [r["name"] for r in Database.fetch_all(f"PRAGMA table_info({table})")]
+            columns = table_columns(table)
             conn.execute(f'CREATE TABLE "{table}" ({",".join(chr(34) + c + chr(34) for c in columns)})')
             for row in content["tables"][table]:
                 if set(row) - set(columns):

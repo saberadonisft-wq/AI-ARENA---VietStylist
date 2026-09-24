@@ -2,6 +2,7 @@
 
 import React, { useRef, useImperativeHandle, forwardRef, useState, useEffect } from "react";
 import { Avatar, AssetLayer, SnapshotItem, CatalogItem } from "@/lib/types/api";
+import { API_ORIGIN } from "@/lib/api/client";
 import {
   RotateCcw,
   RotateCw,
@@ -36,6 +37,7 @@ export interface Canvas2DProps {
   onSelectItem?: (slot: string) => void;
   lockedSlots?: string[];
   onTransformsCommit?: (changes: Record<string, ItemTransform | undefined>) => void;
+  onColorLoadFailure?: (itemId: string, colorHex: string) => void;
   className?: string;
 }
 
@@ -325,12 +327,83 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
       onSelectItem,
       lockedSlots = [],
       onTransformsCommit,
+      onColorLoadFailure,
       className = "",
     },
     ref
   ) => {
     const containerRef = useRef<HTMLDivElement | null>(null);
     const svgRef = useRef<SVGSVGElement | null>(null);
+    const [imageSizes, setImageSizes] = useState<Record<string, { url: string; width: number; height: number }>>({});
+    const [imageErrors, setImageErrors] = useState<Record<string, string>>({});
+    const [imageRetry, setImageRetry] = useState(0);
+    const colorFailureRef = useRef(onColorLoadFailure);
+    colorFailureRef.current = onColorLoadFailure;
+
+    const imageUrlFor = (item: CatalogItem | undefined, colorHex?: string, sourceVersion?: string, algorithmVersion?: string) => {
+      if (!item) return undefined;
+      const defaultColor = item.variants.find(variant => variant.is_default)?.hex_color || item.variants[0]?.hex_color;
+      if (item.metadata?.catalog_media_id && colorHex && defaultColor && colorHex.toLowerCase() !== defaultColor.toLowerCase()) {
+        const params = new URLSearchParams({ color: colorHex.toUpperCase() });
+        if (sourceVersion) params.set("source_version", sourceVersion);
+        if (algorithmVersion) params.set("algorithm_version", algorithmVersion);
+        if (imageRetry) params.set("retry", String(imageRetry));
+        return `${API_ORIGIN}/api/catalog/items/${encodeURIComponent(item.id)}/studio-image?${params.toString()}`;
+      }
+      const source = item.metadata?.catalog_media_id
+        ? `${API_ORIGIN}/api/catalog/items/${encodeURIComponent(item.id)}/studio-image`
+        : (item.metadata?.flatlay_image_url as string | undefined) || (item.metadata?.real_image_url as string | undefined);
+      if (!source || !imageRetry) return source;
+      const hashStart = source.indexOf("#");
+      const path = hashStart < 0 ? source : source.slice(0, hashStart);
+      const hash = hashStart < 0 ? "" : source.slice(hashStart);
+      return `${path}${path.includes("?") ? "&" : "?"}retry=${imageRetry}${hash}`;
+    };
+
+    const imageRequestKey = JSON.stringify(equippedItems.map(equipped => ({
+      itemId: equipped.itemId,
+      url: imageUrlFor(catalogItems.find(candidate => candidate.id === equipped.itemId), equipped.colorHex, equipped.colorSourceVersion, equipped.colorAlgorithmVersion),
+    })));
+
+    useEffect(() => {
+      let cancelled = false;
+      const requests = JSON.parse(imageRequestKey) as Array<{ itemId: string; url?: string }>;
+      for (const { itemId, url } of requests) {
+        if (!url) continue;
+        const image = new Image();
+        image.onload = () => {
+          if (cancelled) return;
+          setImageSizes(previous => ({ ...previous, [itemId]: {
+            url, width: image.naturalWidth, height: image.naturalHeight,
+          } }));
+          setImageErrors(previous => {
+            if (!previous[itemId]) return previous;
+            const next = { ...previous };
+            delete next[itemId];
+            return next;
+          });
+        };
+        image.onerror = () => {
+          if (cancelled) return;
+          setImageErrors(previous => ({ ...previous, [itemId]: url }));
+          if (url.includes("color=")) {
+            const requestedColor = new URL(url).searchParams.get("color");
+            if (requestedColor) colorFailureRef.current?.(itemId, requestedColor);
+            const item = catalogItems.find(candidate => candidate.id === itemId);
+            const fallbackUrl = imageUrlFor(item);
+            if (fallbackUrl) {
+              const fallback = new Image();
+              fallback.onload = () => {
+                if (!cancelled) setImageSizes(previous => ({ ...previous, [itemId]: { url: fallbackUrl, width: fallback.naturalWidth, height: fallback.naturalHeight } }));
+              };
+              fallback.src = fallbackUrl;
+            }
+          }
+        };
+        image.src = url;
+      }
+      return () => { cancelled = true; };
+    }, [imageRequestKey, catalogItems]);
 
     // Quản lý slot đang được chọn
     const [activeSlot, setActiveSlot] = useState<string | null>(externalSelectedSlot || null);
@@ -365,8 +438,18 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
 
     // Lấy thông số hình học chuẩn của món đồ
     const getItemGeometry = (eq: SnapshotItem): ItemGeometry => {
-      if (ITEM_GEOMETRIES[eq.itemId]) return ITEM_GEOMETRIES[eq.itemId];
-      return DEFAULT_SLOT_GEOMETRY[eq.slot] || DEFAULT_SLOT_GEOMETRY.outerwear;
+      const base = ITEM_GEOMETRIES[eq.itemId] || DEFAULT_SLOT_GEOMETRY[eq.slot] || DEFAULT_SLOT_GEOMETRY.outerwear;
+      const item = catalogItems.find(candidate => candidate.id === eq.itemId);
+      const size = imageSizes[eq.itemId];
+      if (!size || size.url !== imageUrlFor(item, eq.colorHex, eq.colorSourceVersion, eq.colorAlgorithmVersion)) return base;
+      const bounds = eq.slot === "undergarment" ? { width: 360, height: 460, cy: 470 }
+        : eq.slot === "footwear" ? { width: 260, height: 160, cy: 1040 }
+        : { width: base.width, height: base.height, cy: base.cy };
+      const factor = Math.min(bounds.width / size.width, bounds.height / size.height);
+      const width = Math.round(size.width * factor);
+      const height = Math.round(size.height * factor);
+      return { ...base, x: base.cx - width / 2, y: bounds.cy - height / 2,
+        width, height, cx: base.cx, cy: bounds.cy };
     };
 
     // Lấy transform hiện hành của món đồ
@@ -385,13 +468,10 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
     // Quy đổi tọa độ chuột sang tọa độ viewBox (800 x 1200) của SVG
     const getSvgCoordinates = (e: React.PointerEvent | PointerEvent) => {
       if (!svgRef.current) return { x: 0, y: 0 };
-      const rect = svgRef.current.getBoundingClientRect();
-      const scaleX = 800 / rect.width;
-      const scaleY = 1200 / rect.height;
-      return {
-        x: (e.clientX - rect.left) * scaleX,
-        y: (e.clientY - rect.top) * scaleY,
-      };
+      const matrix = svgRef.current.getScreenCTM();
+      if (!matrix) return { x: 0, y: 0 };
+      const point = new DOMPoint(e.clientX, e.clientY).matrixTransform(matrix.inverse());
+      return { x: point.x, y: point.y };
     };
 
     // Bắt đầu kéo di chuyển
@@ -487,7 +567,7 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
         );
         const currentDist = Math.hypot(pt.x - center.x, pt.y - center.y);
         const factor = initialDist > 10 ? currentDist / initialDist : 1.0;
-        const newScale = Math.max(0.3, Math.min(2.5, dragSession.initialTransform.scale * factor));
+        const newScale = Math.max(0.05, Math.min(20, dragSession.initialTransform.scale * factor));
 
         setTransforms((prev) => ({
           ...prev,
@@ -563,6 +643,16 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
       resetAllTransforms,
       exportToDataUrl: async (ratio: "1:1" | "9:16") => {
         if (!svgRef.current) throw new Error("SVG artboard chưa sẵn sàng");
+        const missing = equippedItems.some(item => {
+          const url = imageUrlFor(getItemInfo(item.itemId), item.colorHex, item.colorSourceVersion, item.colorAlgorithmVersion);
+          return url ? imageErrors[item.itemId] === url : !layers.some(layer => layer.item_id === item.itemId && layer.svg_content);
+        });
+        if (missing) throw new Error("Một số ảnh trang phục chưa tải được. Đóng hộp thoại và chọn Thử lại ảnh trước khi xuất bản phối hoặc tạo ảnh AI.");
+        const pending = equippedItems.some(item => {
+          const url = imageUrlFor(getItemInfo(item.itemId), item.colorHex, item.colorSourceVersion, item.colorAlgorithmVersion);
+          return url && imageSizes[item.itemId]?.url !== url;
+        });
+        if (pending) throw new Error("Ảnh trang phục đang tải. Vui lòng đợi ảnh hiển thị đầy đủ rồi thử lại.");
 
         setIsExporting(true);
         await new Promise((r) => setTimeout(r, 50));
@@ -679,7 +769,11 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
       const geom = getItemGeometry(eq);
       const t = getTransform(eq);
 
-      const realImageUrl = (dbItem?.metadata as any)?.real_image_url;
+      const candidateImageUrl = imageUrlFor(dbItem, eq.colorHex, eq.colorSourceVersion, eq.colorAlgorithmVersion);
+      const colorLoadFailed = imageErrors[eq.itemId] === candidateImageUrl && Boolean(candidateImageUrl?.includes("color="));
+      const garmentImageUrl = imageErrors[eq.itemId] === candidateImageUrl
+        ? colorLoadFailed ? imageUrlFor(dbItem) : undefined
+        : candidateImageUrl;
       const customHex = eq.colorHex;
 
       // Tâm quay và co dãn chính xác của món này
@@ -703,13 +797,9 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
               onPointerDown={(e) => handlePointerDownMove(e, eq.slot)}
             >
               {/* 1. Ảnh thật bóc tách (Cloudflare R2 / Public) */}
-              {realImageUrl ? (
+              {garmentImageUrl ? (
                 <image
-                  href={
-                    realImageUrl.includes(".png") && !realImageUrl.includes("_transparent")
-                      ? realImageUrl.replace(".png", "_transparent.png")
-                      : realImageUrl
-                  }
+                  href={garmentImageUrl}
                   x={x}
                   y={y}
                   width={w}
@@ -726,9 +816,7 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
                   }}
                   dangerouslySetInnerHTML={{
                     __html: customHex
-                      ? layer.svg_content
-                          .replaceAll("VAR_COLOR_PRIMARY", customHex)
-                          .replaceAll("#1A365D", customHex)
+                      ? layer.svg_content.replaceAll("VAR_COLOR_PRIMARY", customHex)
                       : layer.svg_content,
                   }}
                 />
@@ -993,9 +1081,6 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
                   let processedSvg = layer.svg_content;
                   if (customHex) {
                     processedSvg = processedSvg.replaceAll("VAR_COLOR_PRIMARY", customHex);
-                    if (layer.slot === "outerwear" && customHex) {
-                      processedSvg = processedSvg.replaceAll("#1A365D", customHex);
-                    }
                   }
 
                   return (
@@ -1013,6 +1098,30 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
             </g>
           )}
         </svg>
+
+        {equippedItems.some(item => {
+          const url = imageUrlFor(getItemInfo(item.itemId), item.colorHex, item.colorSourceVersion, item.colorAlgorithmVersion);
+          return Boolean(url && imageErrors[item.itemId] === url);
+        }) && (
+          <div role="alert" className="absolute left-3 top-3 z-20 flex items-center gap-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800 shadow">
+            <span>{equippedItems.some(item => imageErrors[item.itemId]?.includes("color=")) ? "Không tải được ảnh đổi màu; canvas đang giữ ảnh gốc. Hãy kiểm tra kết nối, thử lại hoặc khôi phục màu gốc trước khi xuất." : "Không tải được ảnh trang phục. Kiểm tra backend hoặc kết nối rồi thử lại."}</span>
+            <button type="button" onClick={() => setImageRetry(value => value + 1)} className="shrink-0 rounded border border-red-300 bg-white px-2 py-1 font-semibold hover:bg-red-100">Thử lại ảnh</button>
+          </div>
+        )}
+
+        {viewMode === "flatlay" && selectedEq && selectedTransform && !lockedSlots.includes(selectedEq.slot) && (
+          <div className="absolute left-3 top-3 z-20 flex items-center gap-2 rounded-lg border border-stone-200 bg-white/95 p-1.5 text-sm shadow">
+            <button type="button" aria-label="Thu nhỏ trang phục" className="rounded p-1.5 hover:bg-stone-100"
+              onClick={() => onTransformsCommit?.({ [selectedEq.slot]: { ...selectedTransform, scale: Math.max(0.05, Math.round((selectedTransform.scale / 1.25) * 100) / 100) } })}>
+              <ZoomOut size={18} />
+            </button>
+            <span aria-label="Mức phóng trang phục" className="min-w-12 text-center tabular-nums">{Math.round(selectedTransform.scale * 100)}%</span>
+            <button type="button" aria-label="Phóng to trang phục" className="rounded p-1.5 hover:bg-stone-100"
+              onClick={() => onTransformsCommit?.({ [selectedEq.slot]: { ...selectedTransform, scale: Math.min(20, Math.round((selectedTransform.scale * 1.25) * 100) / 100) } })}>
+              <ZoomIn size={18} />
+            </button>
+          </div>
+        )}
 
         {/* Hướng dẫn tương tác */}
         <div className="absolute bottom-3 left-3 z-20 flex items-center space-x-1.5 bg-stone-900/75 backdrop-blur-md text-white text-[10px] px-2.5 py-1 rounded-lg font-sans pointer-events-none shadow-xs">

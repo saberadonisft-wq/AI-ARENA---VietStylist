@@ -74,7 +74,7 @@ export default function WeatherWidget({ onApplyWeatherSuggestion }: WeatherWidge
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-1.5 text-stone-700 font-semibold">
           <MapPin className="w-3.5 h-3.5 text-heritage-red" />
-          <span>Thời tiết & Bối cảnh (F06)</span>
+          <span>Thời tiết & Bối cảnh</span>
         </div>
         <select
           value={selectedCity}

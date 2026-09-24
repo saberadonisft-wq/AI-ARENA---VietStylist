@@ -1,20 +1,27 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { Lookbook, OutfitResponse } from "@/lib/types/api";
 import { api } from "@/lib/api/client";
+import { shareUrlForOrigin } from "@/lib/shareUrl";
 import { useAuth } from "@/lib/auth/context";
 import { FolderHeart, Plus, Share2, Eye, Lock, Globe, Sparkles, Check } from "lucide-react";
 import { LookbookCardSkeleton } from "@/components/ui/Skeleton";
 import AuthModal from "@/components/AuthModal";
 
 export default function LookbookPage() {
-  const { user, isLoggedIn } = useAuth();
+  const { user, isLoggedIn, isReady } = useAuth();
+  const currentOwnerId = useRef(user?.id);
+  currentOwnerId.current = user?.id;
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [lookbooks, setLookbooks] = useState<Lookbook[]>([]);
   const [userOutfits, setUserOutfits] = useState<OutfitResponse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [actionMessage, setActionMessage] = useState<string | null>(null);
+  const requestGeneration = useRef(0);
+  const [loadedOwnerId, setLoadedOwnerId] = useState<string | null>(null);
 
   // Modal tạo lookbook mới
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -26,29 +33,66 @@ export default function LookbookPage() {
 
   // Share link
   const [activeShareData, setActiveShareData] = useState<{ id: string; url: string } | null>(null);
+  const [activeShareOwnerId, setActiveShareOwnerId] = useState<string | null>(null);
+  const [sharingLookbookId, setSharingLookbookId] = useState<string | null>(null);
+  const visibleUserOutfits = loadedOwnerId === user?.id ? userOutfits : [];
 
-  const fetchLookbooks = () => {
-    if (!isLoggedIn) {
+  useEffect(() => {
+    setActiveShareData(null);
+    setActiveShareOwnerId(null);
+    setSharingLookbookId(null);
+    setActionMessage(null);
+    setIsCreateOpen(false);
+    setIsCreating(false);
+  }, [user?.id]);
+
+  const fetchLookbooks = useCallback(async () => {
+    const generation = ++requestGeneration.current;
+    setLoadError(null);
+    setLookbooks([]);
+    setUserOutfits([]);
+    setLoadedOwnerId(null);
+    if (!isReady) {
+      setIsLoading(true);
+      return;
+    }
+    if (!isLoggedIn || !user?.id) {
       setIsLoading(false);
       return;
     }
+    const ownerId = user.id;
     setIsLoading(true);
-    Promise.all([api.listLookbooks(), api.listUserOutfits()])
-      .then(([lbs, outfits]) => {
+    try {
+      const [lbs, outfits] = await Promise.all([api.listLookbooks(), api.listUserOutfits()]);
+      if (generation === requestGeneration.current && ownerId === currentOwnerId.current) {
         setLookbooks(lbs);
         setUserOutfits(outfits);
-      })
-      .catch((err) => console.error("Lỗi lấy lookbooks:", err))
-      .finally(() => setIsLoading(false));
-  };
+        setLoadedOwnerId(ownerId);
+      }
+    } catch (err: any) {
+      if (generation === requestGeneration.current && ownerId === currentOwnerId.current) {
+        setLoadError(err?.statusCode === 401
+          ? "Phiên đăng nhập đã hết hạn. Hãy đăng nhập lại để tải Lookbook."
+          : err?.message || "Không tải được Lookbook.");
+      }
+    } finally {
+      if (generation === requestGeneration.current && ownerId === currentOwnerId.current) setIsLoading(false);
+    }
+  }, [isLoggedIn, isReady, user?.id]);
 
   useEffect(() => {
-    fetchLookbooks();
-  }, [isLoggedIn]);
+    void fetchLookbooks();
+    return () => { requestGeneration.current++; };
+  }, [fetchLookbooks]);
 
   const handleCreateLookbook = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newTitle.trim()) return;
+    if (!newTitle.trim() || isCreating) return;
+    const ownerId = user?.id;
+    if (!isLoggedIn || !ownerId || loadedOwnerId !== ownerId) {
+      setActionMessage("Hãy đăng nhập và tải xong dữ liệu tài khoản trước khi tạo Lookbook.");
+      return;
+    }
     setIsCreating(true);
     try {
       const entries = selectedOutfitVersionIds.map((vId, idx) => ({
@@ -63,24 +107,51 @@ export default function LookbookPage() {
         entries,
       });
 
-      setIsCreateOpen(false);
-      setNewTitle("");
-      setNewDesc("");
-      setSelectedOutfitVersionIds([]);
-      fetchLookbooks();
+      if (ownerId === currentOwnerId.current) {
+        setIsCreateOpen(false);
+        setNewTitle("");
+        setNewDesc("");
+        setSelectedOutfitVersionIds([]);
+        setActionMessage("Đã tạo Lookbook trong tài khoản của bạn.");
+        await fetchLookbooks();
+      }
     } catch (err: any) {
-      alert("Lỗi khi tạo lookbook: " + err.message);
+      if (ownerId === currentOwnerId.current) setActionMessage("Không tạo được Lookbook: " + (err?.message || "Máy chủ không khả dụng."));
     } finally {
-      setIsCreating(false);
+      if (ownerId === currentOwnerId.current) setIsCreating(false);
     }
   };
 
   const handleShare = async (lookbookId: string) => {
+    const ownerId = user?.id;
+    if (!isLoggedIn || !ownerId) {
+      setShowAuthModal(true);
+      return;
+    }
+    if (loadedOwnerId !== ownerId || sharingLookbookId) return;
+    setSharingLookbookId(lookbookId);
     try {
       const res = await api.shareLookbook(lookbookId, 30);
-      setActiveShareData({ id: lookbookId, url: res.share_url });
+      if (ownerId === currentOwnerId.current && loadedOwnerId === ownerId) {
+        setActiveShareData({ id: lookbookId, url: shareUrlForOrigin(res.share_token, window.location.origin) });
+        setActiveShareOwnerId(ownerId);
+        setActionMessage("Đã tạo liên kết chia sẻ có hiệu lực trong 30 ngày.");
+      }
     } catch (err: any) {
-      alert("Lỗi tạo link chia sẻ: " + err.message);
+      if (ownerId === currentOwnerId.current) setActionMessage("Không tạo được liên kết chia sẻ: " + (err?.message || "Máy chủ không khả dụng."));
+    } finally {
+      if (ownerId === currentOwnerId.current) setSharingLookbookId(null);
+    }
+  };
+
+  const copyShareLink = async () => {
+    if (!activeShareData || activeShareOwnerId !== user?.id) return;
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error("Clipboard unavailable");
+      await navigator.clipboard.writeText(activeShareData.url);
+      setActionMessage("Đã sao chép liên kết chia sẻ.");
+    } catch {
+      setActionMessage("Trình duyệt không cho phép sao chép. Liên kết vẫn hiển thị để bạn bôi đen và sao chép thủ công.");
     }
   };
 
@@ -91,13 +162,13 @@ export default function LookbookPage() {
         <div className="space-y-1">
           <div className="flex items-center space-x-2 text-heritage-red text-xs font-bold uppercase tracking-widest">
             <FolderHeart className="w-4 h-4" />
-            <span>Bộ sưu tập cá nhân (F09)</span>
+              <span>Bộ sưu tập cá nhân</span>
           </div>
           <h1 className="font-serif text-3xl font-bold text-stone-900 tracking-tight">
             Lookbook Việt Phục
           </h1>
           <p className="text-stone-600 text-xs leading-relaxed max-w-xl">
-            Tập hợp các bộ phối tâm đắc thành bộ sưu tập chủ đề (Kỷ yếu, Lễ cưới, Du xuân) và tạo liên kết chia sẻ bảo mật cao cho bạn bè.
+            Tập hợp các bộ phối đã lưu thành bộ sưu tập theo chủ đề. Bạn có thể tạo liên kết chia sẻ có thời hạn và tự chọn quyền xem.
           </p>
         </div>
 
@@ -120,32 +191,34 @@ export default function LookbookPage() {
         )}
       </div>
 
+      {actionMessage && <div role="status" className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">{actionMessage}</div>}
+      {loadError && <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900"><span>Không tải được dữ liệu Lookbook: {loadError}</span><button type="button" onClick={() => void fetchLookbooks()} disabled={isLoading} className="rounded-lg border border-rose-300 bg-white px-3 py-1.5 text-xs font-semibold disabled:opacity-50">Thử tải lại</button></div>}
+
       {/* Thông báo chia sẻ vừa tạo */}
-      {activeShareData && (
+      {activeShareData && activeShareOwnerId === user?.id && (
         <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center justify-between text-xs text-emerald-900">
           <div className="space-y-0.5">
             <div className="font-bold flex items-center space-x-1.5">
               <Check className="w-4 h-4 text-emerald-600" />
-              <span>Đã tạo liên kết chia sẻ công khai có bảo mật (Token Hash):</span>
+              <span>Liên kết chia sẻ đã sẵn sàng:</span>
             </div>
             <div className="font-mono text-[11px] text-emerald-700 select-all">
               {activeShareData.url}
             </div>
           </div>
           <button
-            onClick={() => {
-              navigator.clipboard.writeText(activeShareData.url);
-              alert("Đã copy link chia sẻ vào bộ nhớ tạm!");
-            }}
+              onClick={() => void copyShareLink()}
             className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg font-semibold hover:bg-emerald-700 transition-colors shrink-0"
           >
-            Copy Link
+            Sao chép liên kết
           </button>
         </div>
       )}
 
       {/* Danh sách Lookbooks */}
-      {!isLoggedIn ? (
+      {!isReady ? (
+        <div role="status" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">{[1, 2, 3].map(i => <LookbookCardSkeleton key={i} />)}</div>
+      ) : !isLoggedIn ? (
         <div className="bg-white rounded-3xl border border-stone-200 p-12 text-center space-y-4 shadow-sm">
           <FolderHeart className="w-12 h-12 text-stone-300 mx-auto" />
           <div className="space-y-1">
@@ -153,7 +226,7 @@ export default function LookbookPage() {
               Bạn đang ở chế độ Khách (Guest)
             </h3>
             <p className="text-stone-500 text-xs max-w-md mx-auto">
-              Đăng nhập để lưu nhiều Lookbook, đồng bộ giữa các thiết bị và cấp liên kết chia sẻ công khai không lộ ID tài khoản.
+              Đăng nhập để lưu Lookbook trong tài khoản, đồng bộ giữa các thiết bị và quản lý liên kết chia sẻ.
             </p>
           </div>
           <button
@@ -169,6 +242,8 @@ export default function LookbookPage() {
             <LookbookCardSkeleton key={i} />
           ))}
         </div>
+      ) : loadError ? null : loadedOwnerId !== user?.id ? (
+        <div role="status" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">{[1, 2, 3].map(i => <LookbookCardSkeleton key={i} />)}</div>
       ) : lookbooks.length === 0 ? (
         <div className="bg-white rounded-3xl border border-stone-200 p-12 text-center space-y-4 shadow-sm">
           <FolderHeart className="w-12 h-12 text-stone-300 mx-auto" />
@@ -185,7 +260,7 @@ export default function LookbookPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {lookbooks.map((lb) => (
+        {lookbooks.map((lb) => (
             <div
               key={lb.id}
               className="bg-white rounded-2xl border border-stone-200 overflow-hidden shadow-sm hover:shadow-md transition-all p-5 flex flex-col justify-between space-y-4"
@@ -206,7 +281,7 @@ export default function LookbookPage() {
                     ) : (
                       <Lock className="w-3 h-3" />
                     )}
-                    <span>{lb.visibility}</span>
+                    <span>{lb.visibility === "public" ? "Công khai" : lb.visibility === "unlisted" ? "Người có liên kết" : "Riêng tư"}</span>
                   </span>
                   <span className="text-[11px] text-stone-400 font-mono">
                     {new Date(lb.created_at).toLocaleDateString("vi-VN")}
@@ -227,10 +302,13 @@ export default function LookbookPage() {
                 <div className="flex items-center space-x-2">
                   <button
                     onClick={() => handleShare(lb.id)}
-                    className="p-1.5 rounded-lg border border-stone-200 hover:bg-stone-50 text-stone-700 transition-colors"
-                    title="Chia sẻ link"
+                    type="button"
+                    disabled={isLoading || loadedOwnerId !== user?.id || sharingLookbookId !== null}
+                    className="p-1.5 rounded-lg border border-stone-200 hover:bg-stone-50 text-stone-700 transition-colors disabled:opacity-50"
+                    title={sharingLookbookId === lb.id ? "Đang tạo liên kết" : "Tạo liên kết chia sẻ"}
+                    aria-label={`Tạo liên kết chia sẻ ${lb.title}`}
                   >
-                    <Share2 className="w-3.5 h-3.5" />
+                    <Share2 className={`w-3.5 h-3.5 ${sharingLookbookId === lb.id ? "animate-pulse" : ""}`} />
                   </button>
 
                   <Link
@@ -292,13 +370,13 @@ export default function LookbookPage() {
               </div>
 
               {/* Chọn bộ phối đính kèm */}
-              {userOutfits.length > 0 && (
+              {visibleUserOutfits.length > 0 && (
                 <div className="space-y-1.5">
                   <label className="font-semibold text-stone-700">
                     Chọn bộ phối đính kèm ({selectedOutfitVersionIds.length})
                   </label>
                   <div className="max-h-36 overflow-y-auto space-y-1.5 border border-stone-200 p-2 rounded-lg bg-stone-50">
-                    {userOutfits.map((outfit) => {
+                    {visibleUserOutfits.map((outfit) => {
                       if (!outfit.current_version_id) return null;
                       const isChecked = selectedOutfitVersionIds.includes(outfit.current_version_id);
                       return (

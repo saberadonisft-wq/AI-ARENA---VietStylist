@@ -52,7 +52,7 @@ export default function PublicSharePage() {
       <div className="p-3.5 bg-heritage-indigo/10 border border-heritage-indigo/20 rounded-2xl flex items-center justify-between text-xs text-heritage-indigo">
         <div className="flex items-center space-x-2">
           <Globe className="w-4 h-4" />
-          <span>Bạn đang xem bản phối được chia sẻ công khai qua liên kết bảo mật (F09).</span>
+          <span>Bạn đang xem bản phối được chia sẻ qua liên kết này.</span>
         </div>
         <Link href="/studio" className="font-bold underline hover:text-heritage-red">
           Tự phối đồ của riêng bạn →

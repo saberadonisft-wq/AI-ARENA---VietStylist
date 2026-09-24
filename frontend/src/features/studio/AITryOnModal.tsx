@@ -99,7 +99,7 @@ export default function AITryOnModal({
           <div className="flex items-center space-x-2">
             <Sparkles className="w-5 h-5 text-heritage-gold" />
             <h3 className="font-serif text-base font-bold text-stone-900">
-              Thử Đồ Việt Phục Trên Ảnh Cá Nhân Bằng AI (F05)
+              Thử đồ Việt phục trên ảnh cá nhân bằng AI
             </h3>
           </div>
           <button onClick={onClose} className="text-stone-400 hover:text-stone-700">

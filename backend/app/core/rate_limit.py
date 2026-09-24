@@ -1,4 +1,4 @@
-"""SQLite-backed fixed windows shared by all workers of this SQLite deployment."""
+"""Database-backed fixed windows shared by workers using the same runtime database."""
 
 import hashlib
 import time
@@ -15,16 +15,14 @@ def consume(scope, identity, limit, seconds):
     with db_transaction() as conn:
         conn.execute("DELETE FROM rate_limits WHERE resets_at<=?", (now,))
         row = conn.execute(
-            "SELECT count,resets_at FROM rate_limits WHERE key_hash=?", (key,)
+            "INSERT INTO rate_limits VALUES(?,1,?) ON CONFLICT(key_hash) DO UPDATE SET count=rate_limits.count+1 "
+            "WHERE rate_limits.count < ? RETURNING count,resets_at",
+            (key, now + seconds, limit),
         ).fetchone()
-        if row and row["count"] >= limit:
+        if row is None:
             denied = True
-            retry_after = row["resets_at"] - now
-        else:
-            conn.execute(
-                "INSERT INTO rate_limits VALUES(?,1,?) ON CONFLICT(key_hash) DO UPDATE SET count=count+1",
-                (key, now + seconds),
-            )
+            existing = conn.execute("SELECT resets_at FROM rate_limits WHERE key_hash=?", (key,)).fetchone()
+            retry_after = max(1, existing["resets_at"] - now)
     if denied:
         raise AppError(
             "RATE_LIMIT_EXCEEDED",

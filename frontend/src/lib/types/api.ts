@@ -60,6 +60,10 @@ export interface CatalogItem {
   era?: string;
   is_published: boolean;
   metadata: Record<string, any>;
+  color_change_supported?: boolean;
+  color_change_reason?: string;
+  color_algorithm_version?: string;
+  image_version?: string;
   variants: ItemVariant[];
   default_layer?: AssetLayer;
 }
@@ -106,7 +110,17 @@ export interface SnapshotItem {
   assetVersion: number;
   colorOptionId?: string;
   colorHex?: string;
+  originalColorHex?: string;
+  colorAlgorithmVersion?: string;
+  colorSourceVersion?: string;
   transform?: ItemTransform;
+}
+
+export interface AIMediaItem {
+  media_id: string;
+  purposes: Array<"person" | "outfit" | "result">;
+  status: "pending" | "uploaded" | "uploading" | "processing" | "ready" | "deleting" | "deleted" | "rejected";
+  created_at: string;
 }
 
 export interface OutfitSnapshot {
@@ -185,6 +199,17 @@ export interface WeatherData {
   weather_condition: string;
   is_rainy: boolean;
   wind_speed_kmh: number;
+}
+
+export interface RecommendationResponse {
+  source: string;
+  model: string;
+  notice?: string | null;
+  outfits: Array<{
+    title: string;
+    explanation: string;
+    items: Array<{ slot: string; item_id: string; variant_id?: string | null; item_name: string; hex_color?: string | null }>;
+  }>;
 }
 
 export interface WeatherRecommendation {

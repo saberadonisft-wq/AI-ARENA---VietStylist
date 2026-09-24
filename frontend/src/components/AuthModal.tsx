@@ -21,7 +21,7 @@ import {
 
 interface AuthModalProps {
   isOpen: boolean;
-  onClose: () => void;
+  onClose: (authenticated?: boolean) => void;
   defaultTab?: "login" | "register";
   defaultRole?: "admin" | "stylist" | "user";
 }
@@ -45,7 +45,6 @@ export default function AuthModal({
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
-  const [selectedRole, setSelectedRole] = useState<"user" | "stylist">("user");
 
   // UI status
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -83,7 +82,7 @@ export default function AuthModal({
               }.`
             );
             setTimeout(() => {
-              handleClose();
+              handleClose(true);
             }, 600);
           } catch (err: any) {
             console.error("Google authentication error:", err);
@@ -148,10 +147,10 @@ export default function AuthModal({
 
   if (!isOpen) return null;
 
-  const handleClose = () => {
+  const handleClose = (authenticated = false) => {
     setErrorMsg(null);
     setSuccessMsg(null);
-    onClose();
+    onClose(authenticated);
   };
 
   const handleFormSubmit = async (e: React.FormEvent) => {
@@ -170,7 +169,7 @@ export default function AuthModal({
         await loginWithCredentials(email.trim(), password);
         setSuccessMsg("Đăng nhập thành công!");
         setTimeout(() => {
-          handleClose();
+          handleClose(true);
         }, 600);
       } else {
         if (!displayName.trim() || !email.trim() || !password) {
@@ -187,11 +186,11 @@ export default function AuthModal({
           email: email.trim(),
           password,
           displayName: displayName.trim(),
-          role: selectedRole,
+          role: "user",
         });
         setSuccessMsg("Đăng ký tài khoản thành công! Đang kích hoạt phiên...");
         setTimeout(() => {
-          handleClose();
+          handleClose(true);
         }, 700);
       }
     } catch (err: any) {
@@ -222,7 +221,7 @@ export default function AuthModal({
   const isBusy = isSubmitting || authContextLoading;
 
   return (
-    <div className="fixed inset-0 z-[100] bg-stone-900/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200">
+    <div role="dialog" aria-modal="true" aria-label="Đăng nhập hoặc tạo tài khoản" className="fixed inset-0 z-[100] bg-stone-900/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200">
       <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl border border-stone-200 overflow-hidden flex flex-col max-h-[92vh]">
         {/* Header Modal */}
         <div className="bg-stone-50/90 border-b border-stone-200 px-6 py-4 flex items-center justify-between">
@@ -233,8 +232,10 @@ export default function AuthModal({
             </span>
           </div>
           <button
-            onClick={handleClose}
+            type="button"
+            onClick={() => handleClose()}
             disabled={isBusy}
+            aria-label="Đóng cửa sổ đăng nhập"
             className="p-1.5 rounded-lg text-stone-400 hover:text-stone-700 hover:bg-stone-200/60 transition-colors"
           >
             <X className="w-5 h-5" />
@@ -288,7 +289,7 @@ export default function AuthModal({
                     d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
                   />
                 </svg>
-                <span>Tiếp tục với Google OAuth</span>
+                <span>Tiếp tục với Google</span>
               </button>
             )}
           </div>
@@ -336,7 +337,7 @@ export default function AuthModal({
           <form onSubmit={handleFormSubmit} className="space-y-3.5">
             {activeTab === "register" && (
               <div>
-                <label className="block text-[11px] font-semibold text-stone-700 mb-1">
+                <label htmlFor="auth-display-name" className="block text-[11px] font-semibold text-stone-700 mb-1">
                   Họ và tên / Tên hiển thị
                 </label>
                 <div className="relative">
@@ -344,7 +345,9 @@ export default function AuthModal({
                     <UserIcon className="w-4 h-4" />
                   </div>
                   <input
+                    id="auth-display-name"
                     type="text"
+                    autoComplete="name"
                     required
                     value={displayName}
                     onChange={(e) => setDisplayName(e.target.value)}
@@ -356,7 +359,7 @@ export default function AuthModal({
             )}
 
             <div>
-              <label className="block text-[11px] font-semibold text-stone-700 mb-1">
+              <label htmlFor="auth-email" className="block text-[11px] font-semibold text-stone-700 mb-1">
                 Địa chỉ Email
               </label>
               <div className="relative">
@@ -364,7 +367,9 @@ export default function AuthModal({
                   <Mail className="w-4 h-4" />
                 </div>
                 <input
+                  id="auth-email"
                   type="email"
+                  autoComplete="email"
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -375,7 +380,7 @@ export default function AuthModal({
             </div>
 
             <div>
-              <label className="block text-[11px] font-semibold text-stone-700 mb-1">
+              <label htmlFor="auth-password" className="block text-[11px] font-semibold text-stone-700 mb-1">
                 Mật khẩu
               </label>
               <div className="relative">
@@ -383,7 +388,9 @@ export default function AuthModal({
                   <Lock className="w-4 h-4" />
                 </div>
                 <input
+                  id="auth-password"
                   type={showPassword ? "text" : "password"}
+                  autoComplete={activeTab === "login" ? "current-password" : "new-password"}
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -393,6 +400,7 @@ export default function AuthModal({
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
+                  aria-label={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
                   className="absolute inset-y-0 right-0 pr-3 flex items-center text-stone-400 hover:text-stone-600"
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -401,51 +409,7 @@ export default function AuthModal({
             </div>
 
             {activeTab === "register" && (
-              <div>
-                <label className="block text-[11px] font-semibold text-stone-700 mb-1">
-                  Vai trò phân quyền (Role)
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  <label
-                    className={`flex flex-col items-center p-2 rounded-lg border cursor-pointer text-center transition-all ${
-                      selectedRole === "user"
-                        ? "border-heritage-red bg-red-50/40 text-heritage-red font-bold"
-                        : "border-stone-200 text-stone-600 hover:bg-stone-50"
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name="role"
-                      value="user"
-                      checked={selectedRole === "user"}
-                      onChange={() => setSelectedRole("user")}
-                      className="sr-only"
-                    />
-                    <span className="text-[11px]">Sinh viên</span>
-                    <span className="text-[9px] text-stone-600">Người dùng</span>
-                  </label>
-
-                  <label
-                    className={`flex flex-col items-center p-2 rounded-lg border cursor-pointer text-center transition-all ${
-                      selectedRole === "stylist"
-                        ? "border-heritage-red bg-red-50/40 text-heritage-red font-bold"
-                        : "border-stone-200 text-stone-600 hover:bg-stone-50"
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name="role"
-                      value="stylist"
-                      checked={selectedRole === "stylist"}
-                      onChange={() => setSelectedRole("stylist")}
-                      className="sr-only"
-                    />
-                    <span className="text-[11px]">Stylist</span>
-                    <span className="text-[9px] text-stone-600">Tạo mẫu</span>
-                  </label>
-
-                </div>
-              </div>
+              <p className="text-xs text-stone-600">Tài khoản mới có quyền sinh viên. Quản trị viên sẽ cấp quyền stylist khi được duyệt.</p>
             )}
 
             <button

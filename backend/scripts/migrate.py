@@ -11,6 +11,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from app.core.database import SQLITE_DB_PATH
 from app.core.migrations import MIGRATIONS, preflight, run_migrations, verify_schema
+from app.core.config import settings
 
 
 def connect(path, readonly=False):
@@ -62,6 +63,17 @@ def main():
         help="JSON mapping owner_id to explicitly selected form id; all other copies are archived",
     )
     args = parser.parse_args()
+    if settings.is_postgres():
+        if args.resolve_forms:
+            parser.error("--resolve-forms applies only to SQLite test databases")
+        from app.core.postgres_migrations import migrate_postgres
+        try:
+            report = migrate_postgres(dry_run=args.dry_run, check=args.check)
+            print(json.dumps(report, ensure_ascii=False))
+            return 0 if report["schema_ready"] else 1
+        except Exception as exc:
+            print(json.dumps({"schema_ready": False, "error_type": type(exc).__name__, "sqlstate": getattr(exc, "sqlstate", None)}))
+            return 1
     path = Path(SQLITE_DB_PATH)
     choices = (
         json.loads(args.resolve_forms.read_text(encoding="utf-8"))

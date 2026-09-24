@@ -16,9 +16,15 @@ import {
   SolutionForm,
   AuthUser,
   AuthResponse,
+  AIMediaItem,
+  RecommendationResponse,
 } from "../types/api";
 
-const API_ORIGIN = process.env.NEXT_PUBLIC_API_ORIGIN || "http://localhost:4000";
+const configuredApiOrigin = process.env.NEXT_PUBLIC_API_ORIGIN;
+if (!configuredApiOrigin && process.env.NODE_ENV === "production") {
+  throw new Error("NEXT_PUBLIC_API_ORIGIN must be set when building the production frontend.");
+}
+export const API_ORIGIN = (configuredApiOrigin || "http://localhost:4000").replace(/\/$/, "");
 
 export class ApiError extends Error {
   code: string;
@@ -89,7 +95,7 @@ export async function apiFetch<T>(endpoint: string, options: RequestInit & { tim
       );
     }
     throw new ApiError(
-      err.message || "Không thể kết nối đến máy chủ backend",
+      "Không thể kết nối đến máy chủ. Hãy kiểm tra kết nối rồi thử lại.",
       "NETWORK_ERROR",
       503
     );
@@ -140,6 +146,7 @@ export const api = {
     }
   },
   getItemDetail: (id: string) => apiFetch<CatalogItem>(`/api/catalog/items/${id}`),
+  previewCatalogColor: (id: string, color: string) => apiFetch<{ supported: boolean; image_url?: string; reason?: string; algorithm_version?: string; source_version?: string }>(`/api/catalog/items/${encodeURIComponent(id)}/color-preview?color=${encodeURIComponent(color)}`),
   getAvatars: () => apiFetch<Avatar[]>("/api/catalog/avatars"),
   getStarterOutfits: () => apiFetch<StarterOutfit[]>("/api/catalog/starter-outfits"),
 
@@ -199,8 +206,9 @@ export const api = {
     gender?: string;
     style_mode?: string;
     locked_items?: Array<{ slot: string; item_id: string; variant_id?: string }>;
-  }) => apiFetch<any>("/api/recommendations/context", {
+  }) => apiFetch<RecommendationResponse>("/api/recommendations/context", {
     method: "POST",
+    timeoutMs: 45000,
     body: JSON.stringify(payload),
   }),
   getAIRecommendations: (payload: {
@@ -209,9 +217,10 @@ export const api = {
     gender?: string;
     style_mode?: string;
     locked_items?: Array<{ slot: string; item_id: string; variant_id?: string }>;
-  }) => apiFetch<any>("/api/recommendations/ai", {
+  }, signal?: AbortSignal) => apiFetch<RecommendationResponse>("/api/recommendations/ai", {
     method: "POST",
-    timeoutMs: 35000,
+    timeoutMs: 45000,
+    signal,
     body: JSON.stringify(payload),
   }),
 
@@ -223,8 +232,9 @@ export const api = {
     style_mode?: string;
     snapshot: OutfitSnapshot;
     preview_image_url?: string;
-  }) => apiFetch<OutfitResponse>("/api/outfits", {
+  }, idempotencyKey?: string) => apiFetch<OutfitResponse>("/api/outfits", {
     method: "POST",
+    headers: idempotencyKey ? { "Idempotency-Key": idempotencyKey } : undefined,
     body: JSON.stringify(payload),
   }),
   getOutfit: (id: string) => apiFetch<OutfitResponse>(`/api/outfits/${id}`),
@@ -240,6 +250,9 @@ export const api = {
     body: JSON.stringify(payload),
   }),
   deleteOutfit: (id: string) => apiFetch<{ message: string }>(`/api/outfits/${id}`, { method: "DELETE" }),
+  listAiMedia: (limit = 30, offset = 0) => apiFetch<AIMediaItem[]>(`/api/media/ai?limit=${limit}&offset=${offset}`),
+  getMediaAccess: (id: string) => apiFetch<{ access_url: string; expires_in: number }>(`/api/media/${encodeURIComponent(id)}/access`),
+  deleteMedia: (id: string) => apiFetch<{ message: string; status: string }>(`/api/media/${encodeURIComponent(id)}`, { method: "DELETE" }),
   compareOutfits: (payload: { snapshot_a: OutfitSnapshot; snapshot_b: OutfitSnapshot }) =>
     apiFetch<any>("/api/outfits/compare", {
       method: "POST",

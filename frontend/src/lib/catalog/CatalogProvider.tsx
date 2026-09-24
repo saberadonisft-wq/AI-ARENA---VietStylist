@@ -12,6 +12,7 @@ interface CatalogContextValue {
   isLoading: boolean;
   isLoaded: boolean;
   error: string | null;
+  itemsError: string | null;
   refreshCatalog: () => Promise<void>;
 }
 
@@ -23,6 +24,7 @@ const CatalogContext = createContext<CatalogContextValue>({
   isLoading: true,
   isLoaded: false,
   error: null,
+  itemsError: null,
   refreshCatalog: async () => {},
 });
 
@@ -34,23 +36,26 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isLoaded, setIsLoaded] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [itemsError, setItemsError] = useState<string | null>(null);
 
   const loadData = useCallback(async (isRefresh = false) => {
     if (!isRefresh && isLoaded) return;
     setIsLoading(true);
     setError(null);
+    setItemsError(null);
 
     try {
       const [gtRes, occRes, itemsRes, avtRes] = await Promise.allSettled([
         api.getGarmentTypes(),
         api.getOccasions(),
-        api.getCatalogItems(),
+        api.getAllCatalogItems(),
         api.getAvatars(),
       ]);
 
       if (gtRes.status === "fulfilled") setGarmentTypes(gtRes.value || []);
       if (occRes.status === "fulfilled") setOccasions(occRes.value || []);
       if (itemsRes.status === "fulfilled") setCatalogItems(itemsRes.value || []);
+      else setItemsError("Chưa tải được kho trang phục. Hãy thử tải lại để kiểm tra bộ phối.");
       if (avtRes.status === "fulfilled") setAvatars(avtRes.value || []);
 
       const anyRejected = [gtRes, occRes, itemsRes, avtRes].some((r) => r.status === "rejected");
@@ -84,6 +89,7 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
         isLoading,
         isLoaded,
         error,
+        itemsError,
         refreshCatalog,
       }}
     >

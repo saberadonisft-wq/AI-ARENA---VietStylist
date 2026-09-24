@@ -3,7 +3,7 @@ import time
 import uuid
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
-from fastapi.middleware.cors import CORSMiddleware
+from app.core.cors import CORSEnabledFastAPI
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -34,6 +34,7 @@ from app.modules.admin.router import router as admin_router
 from app.modules.auth.router import router as auth_router
 from app.modules.auth.service import AuthService
 from app.modules.cultural_data_v3.router import router as cultural_v3_router
+from app.modules.stylist.router import router as stylist_router
 
 
 from app.core.http_client import close_shared_async_client
@@ -43,16 +44,25 @@ from fastapi.responses import JSONResponse
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Khởi tạo database và dữ liệu di sản mẫu khi startup
-    if settings.ENVIRONMENT in ("development", "test"):
+    if settings.is_postgres():
+        from starlette.concurrency import run_in_threadpool
+        await run_in_threadpool(init_database, False)
+    elif settings.ENVIRONMENT == "test":
         init_database()
+    else:
+        raise RuntimeError("SQLite is for tests only. Configure SUPABASE_DATABASE_URL and run migrations.")
     try:
         yield
     finally:
+        from app.modules.cultural_data_v3.services.generation_jobs import shutdown
+        await shutdown()
         await close_shared_async_client()
         from starlette.concurrency import run_in_threadpool
         from app.infrastructure.r2.client import r2_client
 
         await run_in_threadpool(r2_client.close)
+        from app.core.postgres import close_pool
+        await run_in_threadpool(close_pool)
 
 
 from app.core.errors import ErrorEnvelope
@@ -68,13 +78,13 @@ class ReadinessResponse(BaseModel):
 
 
 def create_app():
-    app = FastAPI(
+    app = CORSEnabledFastAPI(
         title=settings.PROJECT_NAME,
         description="Backend REST API phục vụ nền tảng phối đồ Việt phục Remix (VietStylist)",
         version="1.0.0",
         lifespan=lifespan,
         responses={
-            code: {"model": ErrorEnvelope}
+            code: {"model": ErrorEnvelope, **({"description": {413: "Request Entity Too Large", 422: "Unprocessable Entity"}[code]} if code in (413, 422) else {})}
             for code in (400, 401, 403, 404, 409, 410, 413, 422, 429, 500, 503)
         },
         docs_url="/docs",
@@ -105,19 +115,7 @@ def create_app():
         response.headers["X-Process-Time"] = f"{process_time:.4f}s"
         return response
 
-    # CORS Configuration
-    origins = (
-        settings.CORS_ORIGINS
-        if isinstance(settings.CORS_ORIGINS, list)
-        else [settings.CORS_ORIGINS]
-    )
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=origins,
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
+    # CORS wraps the entire stack in CORSEnabledFastAPI, including 500 errors.
     app.add_middleware(GZipMiddleware, minimum_size=1000)
     from app.core.body_limit import LocalUploadBodyLimit
 
@@ -220,6 +218,7 @@ def create_app():
     app.include_router(try_on_router, prefix=api_prefix)
     app.include_router(solution_forms_router, prefix=api_prefix)
     app.include_router(admin_router, prefix=api_prefix)
+    app.include_router(stylist_router, prefix=api_prefix)
     app.include_router(auth_router, prefix=api_prefix)
     app.include_router(cultural_v3_router, prefix=api_prefix)
     return app

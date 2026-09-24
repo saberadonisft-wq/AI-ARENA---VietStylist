@@ -41,7 +41,6 @@ export default function Navbar() {
     { href: "/thu-vien", label: "Thư viện Cổ phục", icon: BookOpen },
     { href: "/lookbook", label: "Lookbook", icon: FolderHeart },
     { href: "/chuyen-co-phuc", label: "Chuyện Cổ phục", icon: Feather },
-    ...(isAdmin ? [{ href: "/quan-tri", label: "Quản trị F15", icon: ShieldCheck }] : []),
   ];
 
   const getRoleBadge = () => {
@@ -49,7 +48,7 @@ export default function Navbar() {
       return (
         <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-heritage-red text-white shadow-xs">
           <ShieldCheck className="w-3 h-3" />
-          <span>Admin F15</span>
+          <span>Quản trị</span>
         </span>
       );
     }
@@ -127,6 +126,22 @@ export default function Navbar() {
 
             {/* User Auth Control */}
             <div className="hidden md:flex items-center space-x-3 relative">
+              {isLoggedIn && (isStylist || isAdmin) && (
+                <Link
+                  href="/stylist"
+                  onClick={() => {
+                    if (pathname !== "/stylist") setNavigatingTo("/stylist");
+                  }}
+                  className={`hidden lg:inline-flex items-center space-x-1.5 px-3 py-2 rounded-full text-xs font-semibold border transition-colors ${
+                    pathname === "/stylist"
+                      ? "bg-amber-100 text-amber-900 border-amber-300"
+                      : "bg-white text-stone-700 border-stone-200 hover:border-amber-400 hover:text-amber-800"
+                  }`}
+                >
+                  <Palette className="w-3.5 h-3.5" />
+                  <span>Workplace Stylist</span>
+                </Link>
+              )}
               {isLoggedIn ? (
                 <div className="relative">
                   <div className="flex items-center space-x-2 bg-stone-100/90 pl-1.5 pr-2.5 py-1 rounded-full border border-stone-200 text-sm hover:border-stone-300 transition-all">
@@ -176,7 +191,18 @@ export default function Navbar() {
                           className="flex items-center space-x-2 px-3 py-2 text-xs text-stone-700 hover:bg-stone-50 hover:text-heritage-red transition-colors"
                         >
                           <ShieldCheck className="w-3.5 h-3.5 text-heritage-red" />
-                          <span>Cổng Quản trị F15 (Admin)</span>
+                          <span>Khu vực quản trị</span>
+                        </Link>
+                      )}
+
+                      {(isStylist || isAdmin) && (
+                        <Link
+                          href="/stylist"
+                          onClick={() => setShowUserDropdown(false)}
+                          className="flex items-center space-x-2 px-3 py-2 text-xs text-stone-700 hover:bg-stone-50 hover:text-heritage-red transition-colors"
+                        >
+                          <Palette className="w-3.5 h-3.5 text-amber-600" />
+                          <span>Workplace Stylist</span>
                         </Link>
                       )}
 
@@ -223,7 +249,10 @@ export default function Navbar() {
             {/* Mobile menu button */}
             <div className="md:hidden flex items-center">
               <button
+                type="button"
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                aria-label={isMobileMenuOpen ? "Đóng menu điều hướng" : "Mở menu điều hướng"}
+                aria-expanded={isMobileMenuOpen}
                 className="p-2 rounded-md text-stone-600 hover:text-stone-900 hover:bg-stone-100"
               >
                 {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
@@ -273,7 +302,7 @@ export default function Navbar() {
                     {getRoleBadge()}
                   </div>
 
-                  <div className="flex items-center gap-2 pt-1">
+                  <div className="grid grid-cols-2 gap-2 pt-1">
                     <Link
                       href="/tai-khoan"
                       onClick={() => setIsMobileMenuOpen(false)}
@@ -281,12 +310,30 @@ export default function Navbar() {
                     >
                       Trang cá nhân
                     </Link>
+                    {isAdmin && (
+                      <Link
+                        href="/quan-tri"
+                        onClick={() => setIsMobileMenuOpen(false)}
+                        className="flex-1 py-1.5 px-3 text-center rounded-lg bg-white border border-stone-300 text-xs font-medium text-stone-700"
+                      >
+                        Quản trị
+                      </Link>
+                    )}
+                    {(isStylist || isAdmin) && (
+                      <Link
+                        href="/stylist"
+                        onClick={() => setIsMobileMenuOpen(false)}
+                        className="flex-1 py-1.5 px-3 text-center rounded-lg bg-white border border-stone-300 text-xs font-medium text-stone-700"
+                      >
+                        Workplace Stylist
+                      </Link>
+                    )}
                     <button
                       onClick={() => {
                         setIsMobileMenuOpen(false);
                         logout();
                       }}
-                      className="py-1.5 px-3 rounded-lg bg-red-100 text-xs font-medium text-red-700 hover:bg-red-200 flex items-center space-x-1"
+                      className={`py-1.5 px-3 rounded-lg bg-red-100 text-xs font-medium text-red-700 hover:bg-red-200 flex items-center justify-center space-x-1 ${(isAdmin || isStylist) ? "col-span-2" : ""}`}
                     >
                       <LogOut className="w-3.5 h-3.5" />
                       <span>Thoát</span>

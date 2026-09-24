@@ -1,5 +1,6 @@
 from typing import List, Optional
 from fastapi import APIRouter, Query
+from fastapi.responses import Response
 from app.modules.catalog.schemas import (
     GarmentTypeResponse,
     OccasionResponse,
@@ -7,8 +8,11 @@ from app.modules.catalog.schemas import (
     ItemDetailResponse,
     AvatarResponse,
     StarterOutfitResponse,
+    ColorPreviewResponse,
 )
 from app.modules.catalog.service import CatalogService
+from app.modules.catalog.studio_images import get_studio_image, preview_studio_color
+from app.core.errors import AppError
 
 router = APIRouter(prefix="/catalog", tags=["Catalog"])
 
@@ -61,6 +65,30 @@ def get_item_detail(item_id: str):
 def list_avatars():
     """Lấy danh sách nhân vật mẫu (Avatars) 2D với dữ liệu vector SVG chuẩn hóa."""
     return CatalogService.list_avatars()
+
+
+@router.get("/items/{item_id}/studio-image", response_class=Response,
+            responses={200: {"content": {"image/png": {"schema": {"type": "string", "format": "binary"}}}}})
+def studio_image(
+    item_id: str,
+    color: Optional[str] = Query(None, pattern=r"^#[0-9A-Fa-f]{6}$"),
+    source_version: Optional[str] = Query(None, pattern=r"^[a-f0-9]{64}$"),
+    algorithm_version: Optional[str] = Query(None, max_length=64),
+):
+    """Ảnh PNG tách nền, cắt sát trang phục đã công khai, dùng để phối và xuất ảnh."""
+    return Response(get_studio_image(item_id, color, source_version, algorithm_version), media_type="image/png", headers={
+        "Cache-Control": "no-cache", "X-Content-Type-Options": "nosniff",
+    })
+
+
+@router.get("/items/{item_id}/color-preview", response_model=ColorPreviewResponse)
+def color_preview(item_id: str, color: str = Query(..., pattern=r"^#[0-9A-Fa-f]{6}$")):
+    try:
+        return preview_studio_color(item_id, color)
+    except AppError as exc:
+        if exc.code != "COLOR_CHANGE_UNSUPPORTED":
+            raise
+        return ColorPreviewResponse(supported=False, reason=exc.message)
 
 
 @router.get("/starter-outfits", response_model=List[StarterOutfitResponse])

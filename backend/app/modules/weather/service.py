@@ -157,8 +157,11 @@ class WeatherService:
         await run_in_threadpool(
             Database.execute,
             """
-            INSERT OR REPLACE INTO weather_cache (id, location_key, latitude, longitude, weather_data, expires_at)
+            INSERT INTO weather_cache (id, location_key, latitude, longitude, weather_data, expires_at)
             VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(location_key) DO UPDATE SET latitude=excluded.latitude,
+                longitude=excluded.longitude, weather_data=excluded.weather_data,
+                expires_at=excluded.expires_at, created_at=CURRENT_TIMESTAMP
         """,
             (
                 str(uuid.uuid4()),

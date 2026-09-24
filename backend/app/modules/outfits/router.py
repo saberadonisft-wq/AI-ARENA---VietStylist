@@ -1,5 +1,5 @@
 from typing import List
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Header
 from app.core.security import require_current_user, AuthenticatedUser
 from app.modules.outfits.schemas import (
     CreateOutfitRequest,
@@ -22,10 +22,11 @@ def list_user_outfits(user: AuthenticatedUser = Depends(require_current_user)):
 @router.post("", response_model=OutfitResponse)
 def create_outfit(
     req: CreateOutfitRequest,
+    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key", min_length=1, max_length=128),
     user: AuthenticatedUser = Depends(require_current_user),
 ):
     """Lưu bộ phối mới của người dùng đã đăng nhập (R04)."""
-    return OutfitService.create_outfit(user.user_id, req)
+    return OutfitService.create_outfit(user.user_id, req, idempotency_key)
 
 
 @router.get("/{outfit_id}", response_model=OutfitResponse)

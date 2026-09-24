@@ -14,6 +14,7 @@ from app.modules.media.schemas import (
     CompleteUploadRequest,
     MediaAssetResponse,
     AccessUrlResponse,
+    AIMediaResponse,
 )
 from app.modules.media.service import MediaService
 from app.modules.media.repository import MediaRepository
@@ -32,6 +33,15 @@ def request_upload_url(
     req: RequestUploadUrlInput, user: AuthenticatedUser = Depends(require_current_user)
 ):
     return MediaService.create_upload_session(user.user_id, req, user.roles)
+
+
+@router.get("/ai", response_model=list[AIMediaResponse])
+def list_ai_media(
+    limit: int = Query(default=30, ge=1, le=100),
+    offset: int = Query(default=0, ge=0, le=10000),
+    user: AuthenticatedUser = Depends(require_current_user),
+):
+    return MediaService.list_ai_media(user.user_id, limit=limit, offset=offset)
 
 
 @router.post("/{media_id}/complete", response_model=MediaAssetResponse)

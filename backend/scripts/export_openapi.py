@@ -23,16 +23,19 @@ import secrets
 os.environ.update(
     {
         "VIETSTYLIST_IGNORE_DOTENV": "1",
-        "DATABASE_URL": "sqlite:///:memory:",
+        "DATABASE_URL": "postgresql://schema-check@localhost/unused",
+        "SUPABASE_DATABASE_URL": "",
         "ENVIRONMENT": "production",
         "DEBUG": "false",
         "LOCAL_MEDIA_ENABLED": "false",
         "JWT_SIGNING_SECRET": secrets.token_urlsafe(48),
         "FRONTEND_PUBLIC_ORIGIN": "https://example.invalid",
         "API_PUBLIC_ORIGIN": "https://api.example.invalid",
-        "R2_ACCOUNT_ID": "",
-        "R2_ACCESS_KEY_ID": "",
-        "R2_SECRET_ACCESS_KEY": "",
+        "CORS_ORIGINS": '["https://example.invalid"]',
+        "R2_ACCOUNT_ID": "schema-check",
+        "R2_ACCESS_KEY_ID": "schema-check",
+        "R2_SECRET_ACCESS_KEY": "schema-check",
+        "R2_PUBLIC_DOMAIN": "https://media.example.invalid",
         "GEMINI_API_KEY": "",
     }
 )

@@ -1,12 +1,13 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth/context";
 import { api } from "@/lib/api/client";
 import { HeritageArticle, CatalogItem } from "@/lib/types/api";
 import AuthModal from "@/components/AuthModal";
+import { useConfirmDialog } from "@/components/ui/ConfirmDialog";
 import {
   BookOpen,
   Feather,
@@ -35,10 +36,16 @@ import {
 export default function ChuyenCoPhucPage() {
   const router = useRouter();
   const { user, isLoggedIn, isAdmin, isStylist } = useAuth();
+  const { confirm, dialog } = useConfirmDialog();
 
   const [articles, setArticles] = useState<HeritageArticle[]>([]);
   const [catalogItems, setCatalogItems] = useState<CatalogItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const articleRequestGeneration = useRef(0);
+  const [articleLoadError, setArticleLoadError] = useState<string | null>(null);
+  const [articleActionError, setArticleActionError] = useState<string | null>(null);
+  const [articleActionNotice, setArticleActionNotice] = useState<string | null>(null);
+  const [isDeletingArticle, setIsDeletingArticle] = useState(false);
 
   // Filters & Search
   const [selectedEra, setSelectedEra] = useState<string>("all");
@@ -80,20 +87,22 @@ export default function ChuyenCoPhucPage() {
   ];
 
   // Fetch articles
-  const fetchArticles = async () => {
+  const fetchArticles = async (filters = { era: selectedEra, category: selectedCategory, search: searchQuery }) => {
+    const generation = ++articleRequestGeneration.current;
     setIsLoading(true);
+    setArticleLoadError(null);
     try {
       const data = await api.getHeritageArticles({
-        era: selectedEra !== "all" ? selectedEra : undefined,
-        category: selectedCategory !== "all" ? selectedCategory : undefined,
-        search: searchQuery.trim() || undefined,
+        era: filters.era !== "all" ? filters.era : undefined,
+        category: filters.category !== "all" ? filters.category : undefined,
+        search: filters.search.trim() || undefined,
       });
-      setArticles(data || []);
+      if (generation === articleRequestGeneration.current) setArticles(data || []);
     } catch (err: any) {
       console.error("Lỗi tải bài viết blog:", err);
-      setArticles([]);
+      if (generation === articleRequestGeneration.current) setArticleLoadError(err?.message || "Không tải được câu chuyện. Hãy thử lại.");
     } finally {
-      setIsLoading(false);
+      if (generation === articleRequestGeneration.current) setIsLoading(false);
     }
   };
 
@@ -158,13 +167,24 @@ export default function ChuyenCoPhucPage() {
   };
 
   const handleDeleteArticle = async (articleId: string, title: string) => {
-    if (!confirm(`Bạn có chắc muốn xóa câu chuyện "${title}" không?`)) return;
+    if (!await confirm({
+      title: "Xóa câu chuyện này?",
+      description: `“${title}” sẽ bị xóa khỏi Chuyện Cổ phục và không còn xuất hiện trong danh sách bài viết.`,
+      confirmLabel: "Xóa câu chuyện",
+      tone: "danger",
+    })) return;
+    setIsDeletingArticle(true);
+    setArticleActionError(null);
+    setArticleActionNotice(null);
     try {
       await api.deleteHeritageArticle(articleId);
       setSelectedArticle(null);
-      fetchArticles();
+      setArticleActionNotice(`Đã xóa câu chuyện “${title}”.`);
+      void fetchArticles();
     } catch (err: any) {
-      alert("Lỗi khi xóa bài: " + (err?.message || "Không có quyền"));
+      setArticleActionError(`Không xóa được câu chuyện: ${err?.message || "Bạn không có quyền hoặc máy chủ không khả dụng."}`);
+    } finally {
+      setIsDeletingArticle(false);
     }
   };
 
@@ -197,17 +217,20 @@ export default function ChuyenCoPhucPage() {
           {/* Action Call for Stylists */}
           <div className="pt-3 flex items-center justify-center gap-3 flex-wrap">
             {isStylist || isAdmin ? (
-              <button
-                onClick={() => {
-                  setActionError(null);
-                  setActionSuccess(null);
-                  setShowCreateModal(true);
-                }}
-                className="inline-flex items-center space-x-2 px-5 py-2.5 rounded-full bg-heritage-red hover:bg-heritage-red-dark text-white text-xs sm:text-sm font-semibold shadow-md hover:shadow-lg transition-all"
-              >
-                <Plus className="w-4 h-4" />
-                <span>Đăng tải câu chuyện mới (Stylist Post)</span>
-              </button>
+              <>
+                <button
+                  onClick={() => {
+                    setActionError(null);
+                    setActionSuccess(null);
+                    setShowCreateModal(true);
+                  }}
+                  className="inline-flex items-center space-x-2 px-5 py-2.5 rounded-full bg-heritage-red hover:bg-heritage-red-dark text-white text-xs sm:text-sm font-semibold shadow-md hover:shadow-lg transition-all"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Đăng tải câu chuyện mới (Stylist Post)</span>
+                </button>
+                {!isAdmin && <Link href="/stylist" className="inline-flex items-center space-x-2 px-5 py-2.5 rounded-full bg-white hover:bg-amber-50 text-amber-900 border border-amber-300 text-xs sm:text-sm font-semibold shadow-sm transition-all"><Palette className="w-4 h-4" /><span>Mở Workplace Stylist</span></Link>}
+              </>
             ) : (
               <button
                 onClick={() => setShowAuthModal(true)}
@@ -293,7 +316,13 @@ export default function ChuyenCoPhucPage() {
         </div>
 
         {/* Stories Grid */}
-        {isLoading ? (
+        {articleActionNotice && <p role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">{articleActionNotice}</p>}
+        {articleLoadError ? (
+          <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-center">
+            <p role="alert" className="text-sm text-red-800">{articleLoadError}</p>
+            <button type="button" onClick={() => void fetchArticles()} className="mt-4 min-h-11 rounded-lg border border-red-300 bg-white px-4 text-sm font-semibold text-red-800 hover:bg-red-100">Thử tải lại câu chuyện</button>
+          </div>
+        ) : isLoading ? (
           <div className="py-24 text-center space-y-3">
             <Loader2 className="w-8 h-8 text-heritage-red animate-spin mx-auto" />
             <p className="text-xs text-stone-500 font-serif">Đang mở trang sách điển tích di sản...</p>
@@ -309,10 +338,11 @@ export default function ChuyenCoPhucPage() {
             </p>
             <button
               onClick={() => {
+                const filtersAlreadyClear = selectedEra === "all" && selectedCategory === "all";
                 setSelectedEra("all");
                 setSelectedCategory("all");
                 setSearchQuery("");
-                fetchArticles();
+                if (filtersAlreadyClear) void fetchArticles({ era: "all", category: "all", search: "" });
               }}
               className="mt-2 px-4 py-2 bg-stone-800 text-white text-xs font-semibold rounded-xl hover:bg-heritage-red transition-colors"
             >
@@ -324,7 +354,7 @@ export default function ChuyenCoPhucPage() {
             {articles.map((article, idx) => (
               <article
                 key={article.id || idx}
-                onClick={() => setSelectedArticle(article)}
+                onClick={() => { setArticleActionError(null); setSelectedArticle(article); }}
                 className="group bg-white rounded-2xl border border-stone-200/90 overflow-hidden shadow-xs hover:shadow-xl hover:border-heritage-red/40 transition-all duration-300 flex flex-col cursor-pointer"
               >
                 {/* Image Banner / Illustration */}
@@ -437,6 +467,8 @@ export default function ChuyenCoPhucPage() {
 
             {/* Modal Scrollable Article Body */}
             <div className="p-6 sm:p-8 overflow-y-auto space-y-6">
+              {articleActionError && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800">{articleActionError}</p>}
+              {isDeletingArticle && <p role="status" aria-live="polite" className="text-sm text-stone-600">Đang xóa câu chuyện…</p>}
               {/* Title & Byline */}
               <div className="space-y-3 border-b border-stone-200 pb-5">
                 <h1 className="font-serif text-2xl sm:text-3xl font-bold text-stone-900 leading-tight">
@@ -462,11 +494,14 @@ export default function ChuyenCoPhucPage() {
                   <div className="flex items-center space-x-2">
                     {(isAdmin || (user && user.id === selectedArticle.author_id)) && (
                       <button
-                        onClick={() => handleDeleteArticle(selectedArticle.id, selectedArticle.title)}
-                        className="p-1.5 text-stone-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors"
+                        type="button"
+                        aria-label="Xóa câu chuyện"
+                        disabled={isDeletingArticle}
+                        onClick={() => void handleDeleteArticle(selectedArticle.id, selectedArticle.title)}
+                        className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-stone-500 hover:text-red-700 hover:bg-red-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-heritage-red disabled:opacity-50"
                         title="Xóa bài viết này"
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Trash2 className="w-4 h-4" aria-hidden="true" />
                       </button>
                     )}
                   </div>
@@ -791,7 +826,7 @@ export default function ChuyenCoPhucPage() {
         onClose={() => setShowAuthModal(false)}
         defaultRole="stylist"
       />
+      {dialog}
     </div>
   );
 }
-

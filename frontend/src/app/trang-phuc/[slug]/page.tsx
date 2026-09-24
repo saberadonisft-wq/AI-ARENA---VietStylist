@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { CatalogItem, HeritageArticle } from "@/lib/types/api";
-import { api } from "@/lib/api/client";
+import { api, API_ORIGIN } from "@/lib/api/client";
 import { BookOpen, Sparkles, ArrowLeft, Shield, Check, Compass } from "lucide-react";
 import { Skeleton } from "@/components/ui/Skeleton";
 
@@ -15,25 +15,50 @@ export default function TrangPhucDetailPage() {
   const [item, setItem] = useState<CatalogItem | null>(null);
   const [article, setArticle] = useState<HeritageArticle | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [notFound, setNotFound] = useState(false);
+  const [imageLoadFailed, setImageLoadFailed] = useState(false);
+  const [retry, setRetry] = useState(0);
 
   useEffect(() => {
     if (!slug) return;
+    let active = true;
     setIsLoading(true);
+    setLoadError(null);
+    setNotFound(false);
+    setItem(null);
+    setArticle(null);
+    setImageLoadFailed(false);
 
     api
       .getItemDetail(slug)
       .then((itemData) => {
-        setItem(itemData);
+        if (!active) return null;
+        if (!itemData || typeof itemData !== "object" || Array.isArray(itemData) ||
+            typeof itemData.id !== "string" || typeof itemData.name !== "string" || typeof itemData.slot !== "string") {
+          throw new Error("Máy chủ trả dữ liệu trang phục không hợp lệ. Hãy thử tải lại.");
+        }
+        const safeItem: CatalogItem = {
+          ...itemData,
+          metadata: itemData.metadata && typeof itemData.metadata === "object" && !Array.isArray(itemData.metadata) ? itemData.metadata : {},
+          variants: Array.isArray(itemData.variants) ? itemData.variants : [],
+        };
+        setItem(safeItem);
         // Tìm bài viết di sản liên quan (ví dụ: art_ngu_than hoặc art_ao_tac)
-        const articleKey = itemData.garment_type_id ? `art_${itemData.garment_type_id}` : "art_ngu_than";
+        const articleKey = safeItem.garment_type_id ? `art_${safeItem.garment_type_id}` : "art_ngu_than";
         return api.getHeritageArticle(articleKey).catch(() => null);
       })
       .then((artData) => {
-        if (artData) setArticle(artData);
+        if (active && artData) setArticle(artData);
       })
-      .catch((err) => console.error("Lỗi lấy chi tiết:", err))
-      .finally(() => setIsLoading(false));
-  }, [slug]);
+      .catch((err) => {
+        if (!active) return;
+        if (err?.statusCode === 404) setNotFound(true);
+        else setLoadError(err?.message || "Không tải được dữ liệu trang phục.");
+      })
+      .finally(() => { if (active) setIsLoading(false); });
+    return () => { active = false; };
+  }, [slug, retry]);
 
   if (isLoading) {
     return (
@@ -63,7 +88,9 @@ export default function TrangPhucDetailPage() {
   if (!item) {
     return (
       <div className="max-w-4xl mx-auto px-4 py-20 text-center space-y-4">
-        <h2 className="text-xl font-serif font-bold text-stone-900">Không tìm thấy thông tin trang phục</h2>
+        <h2 className="text-xl font-serif font-bold text-stone-900">{loadError ? "Không tải được thông tin trang phục" : notFound ? "Không tìm thấy thông tin trang phục" : "Thông tin trang phục chưa sẵn sàng"}</h2>
+        {loadError && <p role="alert" className="text-sm text-rose-800">{loadError}</p>}
+        {loadError && <button type="button" onClick={() => setRetry(value => value + 1)} className="rounded-lg border border-stone-300 bg-white px-4 py-2 text-sm font-semibold">Thử tải lại</button>}
         <Link href="/thu-vien" className="text-xs text-heritage-red font-semibold hover:underline">
           ← Quay lại Thư viện
         </Link>
@@ -86,10 +113,11 @@ export default function TrangPhucDetailPage() {
       <div className="grid grid-cols-1 md:grid-cols-12 gap-8 bg-white rounded-3xl border border-stone-200 p-6 sm:p-8 shadow-sm items-center">
         {/* Vector Preview hoặc Ảnh thật */}
         <div className="md:col-span-5 bg-[#FAF8F5] rounded-2xl p-6 flex flex-col items-center justify-center border border-stone-100 min-h-[360px] relative">
-          {item.metadata?.real_image_url ? (
+          {(item.metadata?.real_image_url || item.metadata?.catalog_media_id) && !imageLoadFailed ? (
             <img
-              src={item.metadata.real_image_url}
+              src={item.metadata.real_image_url || `${API_ORIGIN}/api/catalog/items/${encodeURIComponent(item.id)}/studio-image`}
               alt={item.name}
+              onError={() => setImageLoadFailed(true)}
               className="w-full max-h-80 object-contain drop-shadow-md transition-transform hover:scale-105 duration-300"
             />
           ) : item.default_layer?.svg_content ? (
@@ -101,7 +129,8 @@ export default function TrangPhucDetailPage() {
           ) : (
             <div className="text-stone-400 text-xs font-serif">Ảnh tư liệu cổ phục</div>
           )}
-          {item.metadata?.real_image_url && (
+          {imageLoadFailed && <span role="alert" className="mt-2 text-xs text-amber-800">Không tải được ảnh trang phục. Thông tin bên dưới vẫn dùng được.</span>}
+          {item.metadata?.real_image_url && !imageLoadFailed && (
             <span className="absolute bottom-3 right-3 text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full bg-heritage-red text-white shadow-sm">
               Ảnh hiện vật thực tế
             </span>
@@ -153,7 +182,7 @@ export default function TrangPhucDetailPage() {
           {/* Nút phối đồ ngay */}
           <div className="pt-3">
             <Link
-              href="/"
+              href={`/studio?itemId=${encodeURIComponent(item.id)}`}
               className="inline-flex items-center space-x-2 px-6 py-2.5 bg-heritage-red hover:bg-heritage-red-dark text-white rounded-xl text-xs font-semibold shadow-sm transition-all"
             >
               <Sparkles className="w-4 h-4 text-heritage-gold-light" />
@@ -168,7 +197,7 @@ export default function TrangPhucDetailPage() {
         <div className="bg-white rounded-3xl border border-stone-200 p-6 sm:p-8 shadow-sm space-y-6">
           <div className="flex items-center space-x-2 text-heritage-indigo text-xs font-bold uppercase tracking-wider">
             <BookOpen className="w-4 h-4" />
-            <span>Thẻ Kiến Thức Di Sản & Khảo Cứu Lịch Sử (F04)</span>
+            <span>Kiến thức di sản & tư liệu tham khảo</span>
           </div>
 
           {/* Tóm tắt ngắn dưới 80 từ theo đúng tiêu chuẩn đề bài */}

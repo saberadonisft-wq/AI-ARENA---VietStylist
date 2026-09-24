@@ -1,6 +1,7 @@
 import pytest
 from fastapi.testclient import TestClient
 from app.main import app
+from conftest import auth_header
 
 client = TestClient(app)
 
@@ -26,7 +27,7 @@ def test_context_recommendations():
             {"slot": "outerwear", "item_id": "item_ngu_than_nam_xanh"}
         ]
     }
-    res = client.post("/api/recommendations/context", json=payload)
+    res = client.post("/api/recommendations/context", headers={"Authorization": auth_header("dev-user-test-1")}, json=payload)
     assert res.status_code == 200
     data = res.json()
     assert len(data["outfits"]) > 0
@@ -38,6 +39,13 @@ def test_context_recommendations():
     assert outer_item["item_id"] == "item_ngu_than_nam_xanh"
 
 
+def test_recommendations_require_login():
+    context = client.post("/api/recommendations/context", json={"occasion_id": "ky_yeu"})
+    ai = client.post("/api/recommendations/ai", json={"prompt": "Gợi ý một bộ cổ phục"})
+    assert context.status_code == 401
+    assert ai.status_code == 401
+
+
 def test_ai_styling_recommendations():
     payload = {
         "prompt": "Gợi ý cho tôi một bộ cổ phục thanh lịch màu hồng cho bạn nữ chụp ảnh tốt nghiệp",
@@ -46,7 +54,7 @@ def test_ai_styling_recommendations():
         "style_mode": "traditional",
         "locked_items": []
     }
-    res = client.post("/api/recommendations/ai", json=payload)
+    res = client.post("/api/recommendations/ai", headers={"Authorization": auth_header("dev-user-test-1")}, json=payload)
     assert res.status_code == 200
     data = res.json()
     assert len(data["outfits"]) > 0

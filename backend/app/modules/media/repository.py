@@ -1,6 +1,7 @@
 import time
 import uuid
-from app.core.database import Database, db_transaction
+import json
+from app.core.database import Database, db_transaction, get_db_connection
 from app.core.config import settings
 from app.core.errors import AppError
 
@@ -127,6 +128,56 @@ class MediaRepository:
             "UPDATE media_assets SET status='deleting',operation_token=NULL,lease_until=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=? AND (status NOT IN ('processing','uploading') OR lease_until<?)",
             (media_id, int(time.time())),
         )
+
+    @staticmethod
+    def mark_media_deleting_if_unused(media_id, owner_id):
+        """Serialize deletion with image-generation reservation before changing status."""
+        with get_db_connection() as conn:
+            with conn:
+                conn.execute("BEGIN IMMEDIATE")
+                jobs = conn.execute(
+                    "SELECT input_params,result_data FROM ai_jobs WHERE owner_id=? AND task_type='v3_generation' AND status='running' ORDER BY created_at DESC",
+                    (owner_id,),
+                ).fetchall()
+                for job in jobs:
+                    for raw in (job["input_params"], job["result_data"]):
+                        try:
+                            payload = json.loads(raw) if isinstance(raw, str) else (raw or {})
+                        except (TypeError, ValueError):
+                            continue
+                        if media_id in {
+                            payload.get("user_image_id"), payload.get("outfit_image_id"),
+                            payload.get("result_media_id"),
+                        }:
+                            return "in_use"
+                changed = conn.execute(
+                    "UPDATE media_assets SET status='deleting',operation_token=NULL,lease_until=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=? AND owner_id=? AND (status NOT IN ('processing','uploading') OR lease_until<?)",
+                    (media_id, owner_id, int(time.time())),
+                ).rowcount
+                return "marked" if changed else "busy"
+
+    @staticmethod
+    def list_recent_ai_jobs(owner_id, limit=500, offset=0):
+        return Database.fetch_all(
+            "SELECT id,input_params,result_data,created_at FROM ai_jobs WHERE owner_id=? AND task_type='v3_generation' ORDER BY created_at DESC,id DESC LIMIT ? OFFSET ?",
+            (owner_id, limit, offset),
+        )
+
+    @staticmethod
+    def get_owned_ai_images(media_ids, owner_id):
+        """Resolve only this owner's image records for explicit AI job references."""
+        identifiers = sorted({media_id for media_id in media_ids if isinstance(media_id, str) and media_id})
+        rows = []
+        # Keep below SQLite's conservative parameter limit; PostgreSQL accepts the
+        # same bounded query, so this path behaves consistently on both databases.
+        for start in range(0, len(identifiers), 500):
+            batch = identifiers[start:start + 500]
+            placeholders = ",".join("?" for _ in batch)
+            rows.extend(Database.fetch_all(
+                f"SELECT id,status,created_at FROM media_assets WHERE owner_id=? AND media_type='image' AND id IN ({placeholders})",
+                (owner_id, *batch),
+            ))
+        return rows
 
     @staticmethod
     def mark_media_deleted(media_id):

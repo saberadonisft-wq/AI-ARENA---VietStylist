@@ -1,5 +1,6 @@
 """Integration and unit tests for V3 AI Generation Pipeline."""
 import base64
+import uuid
 
 import pytest
 from fastapi.testclient import TestClient
@@ -22,6 +23,19 @@ from app.modules.cultural_data_v3.providers.mock import MockGenerationProvider
 from scripts.seed_v3_pilot_data import seed_pilot_data
 
 client = TestClient(app)
+
+
+def ready_private_image(media_id, owner_id="dev-user-test-1"):
+    from app.core.config import settings
+    from app.modules.media.repository import MediaRepository
+
+    bucket = settings.R2_BUCKET_PRIVATE
+    object_key = f"assets/{media_id}/image.png"
+    MediaRepository.create_pending_media(
+        media_id, bucket, object_key, "image", "image/png", owner_id,
+        "private", 4, bucket, f"staging/{media_id}/image.png", 9999999999,
+    )
+    Database.execute("UPDATE media_assets SET status='ready' WHERE id=?", (media_id,))
 
 
 @pytest.fixture(autouse=True)
@@ -70,6 +84,13 @@ def test_prompt_builder_synthesizes_strict_invariants():
     assert "five-panel" in pos or "ngũ thân" in pos
     assert "standing collar" in pos
     assert "left_over_right_closure" in neg
+
+    without_person = PromptBuilder.build_try_on(grounding, has_person_image=False)
+    with_person = PromptBuilder.build_try_on(grounding, has_person_image=True)
+    assert "Image 1 is the outfit board" in without_person
+    assert "Choose one adult wearer" in without_person
+    assert "Image 2 is the person" in with_person
+    assert "Preserve this person's identity" in with_person
 
 
 def test_completed_job_does_not_imply_cultural_compliance():
@@ -208,6 +229,8 @@ def test_api_generation_prompt_endpoint():
 
 def test_api_generation_synthesize_endpoint():
     """Provider acceptance is not done: authenticated callers receive honest unavailability."""
+    ready_private_image("user_face_01")
+    ready_private_image("private-outfit-board")
     response = client.post("/api/v3/generation/synthesize", headers={"Authorization": auth_header("dev-user-test-1")}, json={
         "outfit": {
             "schema_version": "2.0",
@@ -221,11 +244,16 @@ def test_api_generation_synthesize_endpoint():
             ],
         },
         "user_image_id": "user_face_01",
+        "outfit_image_id": "private-outfit-board",
         "options": {},
     })
     assert response.status_code == 503
     assert response.json()["error"]["code"] == "GENERATION_UNAVAILABLE"
     assert "result_media_id" not in response.json()
+    assert Database.fetch_one(
+        "SELECT COUNT(*) AS n FROM ai_jobs WHERE owner_id=? AND task_type='v3_generation'",
+        ("dev-user-test-1",),
+    )["n"] == 0
 
 
 def test_grounding_rejects_unpublished_entities_and_duplicate_slots():
@@ -244,6 +272,32 @@ def test_synthesis_requires_login():
     assert response.status_code == 401
 
 
+def test_generation_status_reports_configured_flag(monkeypatch):
+    from app.core.config import settings
+
+    monkeypatch.setattr(settings, "GEMINI_TRY_ON_ENABLED", False)
+    assert client.get("/api/v3/generation/status").json() == {"enabled": False}
+    monkeypatch.setattr(settings, "GEMINI_TRY_ON_ENABLED", True)
+    monkeypatch.setattr(settings, "GEMINI_API_KEY", "test-only-key")
+    assert client.get("/api/v3/generation/status").json() == {"enabled": True}
+
+
+def test_synthesis_requires_outfit_board_even_with_a_person_photo(monkeypatch):
+    from app.core.config import settings
+
+    monkeypatch.setattr(settings, "GEMINI_TRY_ON_ENABLED", True)
+    monkeypatch.setattr(settings, "GEMINI_API_KEY", "test-only-key")
+    response = client.post(
+        "/api/v3/generation/synthesize",
+        headers={"Authorization": auth_header("dev-user-test-1")},
+        json={
+            "outfit": {"schema_version": "2.0", "dataset_version": "dev", "selections": []},
+            "user_image_id": "person-1",
+        },
+    )
+    assert response.status_code == 422
+
+
 @pytest.mark.asyncio
 async def test_unaccepted_provider_cannot_synthesize_mock_media():
     from app.core.errors import AppError
@@ -259,6 +313,7 @@ async def test_gemini_provider_stores_a_real_private_image(monkeypatch, png_byte
     from app.core.config import settings
     from app.modules.cultural_data_v3.providers import gemini as gemini_module
     from app.modules.media.repository import MediaRepository
+    from app.modules.media.service import MediaService
 
     captured = {}
 
@@ -291,9 +346,14 @@ async def test_gemini_provider_stores_a_real_private_image(monkeypatch, png_byte
     monkeypatch.setattr(settings, "GEMINI_TRY_ON_ENABLED", True)
     monkeypatch.setattr(settings, "GEMINI_API_KEY", "test-only-key")
     monkeypatch.setattr(gemini_module, "get_shared_async_client", lambda timeout: FakeClient())
+    requested = []
+    def read_image(media_id, owner_id):
+        requested.append((media_id, owner_id))
+        return png_bytes, "image/png"
+    monkeypatch.setattr(MediaService, "read_owned_image", read_image)
 
     result = await gemini_module.GeminiGenerationProvider("dev-user-test-1").generate(
-        ProviderRequest(prompt="Generate Vietnamese attire", idempotency_key="idem-1")
+        ProviderRequest(prompt="Generate Vietnamese attire", outfit_image_id="board-1", user_image_id="person-1", idempotency_key="idem-1")
     )
 
     media = MediaRepository.get_media_by_id(result.result_media_id)
@@ -304,12 +364,17 @@ async def test_gemini_provider_stores_a_real_private_image(monkeypatch, png_byte
     assert "test-only-key" not in captured["url"]
     assert captured["headers"]["X-goog-api-key"] == "test-only-key"
     assert captured["payload"]["generationConfig"]["responseModalities"] == ["Image"]
+    assert requested == [("board-1", "dev-user-test-1"), ("person-1", "dev-user-test-1")]
+    parts = captured["payload"]["contents"][0]["parts"]
+    assert len(parts) == 3
+    assert [base64.b64decode(part["inlineData"]["data"]) for part in parts[1:]] == [png_bytes, png_bytes]
 
 
 @pytest.mark.asyncio
 async def test_gemini_provider_uses_requested_image_model(monkeypatch, png_bytes):
     from app.core.config import settings
     from app.modules.cultural_data_v3.providers import gemini as gemini_module
+    from app.modules.media.service import MediaService
 
     captured = {}
 
@@ -333,18 +398,42 @@ async def test_gemini_provider_uses_requested_image_model(monkeypatch, png_bytes
     class FakeClient:
         async def post(self, url, *, headers, json):
             captured["url"] = url
+            captured["payload"] = json
             return FakeResponse()
 
     monkeypatch.setattr(settings, "GEMINI_TRY_ON_ENABLED", True)
     monkeypatch.setattr(settings, "GEMINI_API_KEY", "test-only-key")
     monkeypatch.setattr(gemini_module, "get_shared_async_client", lambda timeout: FakeClient())
+    monkeypatch.setattr(MediaService, "read_owned_image", lambda media_id, owner_id: (png_bytes, "image/png"))
 
     result = await gemini_module.GeminiGenerationProvider(
         "dev-user-test-1", model_id="gemini-3.1-flash-image"
-    ).generate(ProviderRequest(prompt="Generate Vietnamese attire"))
+    ).generate(ProviderRequest(prompt="Generate Vietnamese attire", outfit_image_id="board-1"))
 
     assert result.model_id == "gemini-3.1-flash-image"
     assert captured["url"].endswith("/v1/models/gemini-3.1-flash-image:generateContent")
+    assert len(captured["payload"]["contents"][0]["parts"]) == 2
+
+
+@pytest.mark.asyncio
+async def test_gemini_rejects_foreign_outfit_board_before_provider_call(monkeypatch):
+    from app.core.config import settings
+    from app.modules.cultural_data_v3.providers import gemini as gemini_module
+    from app.modules.media.service import MediaService
+
+    def reject_foreign(_media_id, _owner_id):
+        raise AppError("MEDIA_NOT_FOUND", "Không tìm thấy file", 404)
+
+    monkeypatch.setattr(settings, "GEMINI_TRY_ON_ENABLED", True)
+    monkeypatch.setattr(settings, "GEMINI_API_KEY", "test-only-key")
+    monkeypatch.setattr(MediaService, "read_owned_image", reject_foreign)
+    monkeypatch.setattr(gemini_module, "get_shared_async_client", lambda timeout: pytest.fail("Provider must not be called"))
+
+    with pytest.raises(AppError) as error:
+        await gemini_module.GeminiGenerationProvider("owner-1").generate(
+            ProviderRequest(prompt="Try on", outfit_image_id="foreign-board")
+        )
+    assert error.value.code == "MEDIA_NOT_FOUND"
 
 
 def test_synthesis_rejects_unknown_image_model():
@@ -361,11 +450,15 @@ def test_synthesis_rejects_unknown_image_model():
 
 
 def test_api_generation_synthesize_success(monkeypatch, png_bytes):
+    ready_private_image("private-outfit-board")
     from app.core.config import settings
     from app.modules.cultural_data_v3.providers.gemini import GeminiGenerationProvider
     from app.modules.media.service import MediaService
 
     async def generate(_self, request):
+        assert request.outfit_image_id == "private-outfit-board"
+        assert request.user_image_id is None
+        assert "Choose one adult wearer" in request.prompt
         media = MediaService.ingest_generated_image(
             "dev-user-test-1", png_bytes, "image/png"
         )
@@ -396,6 +489,7 @@ def test_api_generation_synthesize_success(monkeypatch, png_bytes):
                 ],
             },
             "options": {},
+            "outfit_image_id": "private-outfit-board",
         },
     )
     assert response.status_code == 200
@@ -403,6 +497,65 @@ def test_api_generation_synthesize_success(monkeypatch, png_bytes):
     assert payload["status"] == "completed"
     assert payload["result_media_id"]
     assert payload["post_validation"]["review_status"] == "not_evaluated"
+
+
+def test_synthesis_uses_published_catalog_when_v3_has_no_mapping(monkeypatch, png_bytes):
+    from app.core.config import settings
+    from app.modules.cultural_data_v3.providers.gemini import GeminiGenerationProvider
+    from app.modules.media.service import MediaService
+
+    item_id = f"published_{uuid.uuid4().hex[:10]}"
+    Database.execute(
+        "INSERT INTO items(id,garment_type_id,name,slot,gender,era,is_published) VALUES(?,?,?,?,?,?,1)",
+        (item_id, "ngu_than", "Áo bào đã duyệt", "outerwear", "unisex", "nguyen"),
+    )
+    seen = {}
+
+    async def generate(_self, request):
+        seen["prompt"] = request.prompt
+        media = MediaService.ingest_generated_image("dev-user-test-1", png_bytes, "image/png")
+        return ProviderResult(status="completed", model_id="gemini-test-image", result_media_id=media.id)
+
+    monkeypatch.setattr(settings, "GEMINI_TRY_ON_ENABLED", True)
+    monkeypatch.setattr(settings, "GEMINI_API_KEY", "test-only-key")
+    monkeypatch.setattr(GeminiGenerationProvider, "generate", generate)
+    ready_private_image("private-board")
+    response = client.post(
+        "/api/v3/generation/synthesize",
+        headers={"Authorization": auth_header("dev-user-test-1")},
+        json={
+            "outfit": {"schema_version": "2.0", "dataset_version": "dev", "selections": []},
+            "legacy_item_ids": [item_id],
+            "outfit_image_id": "private-board",
+        },
+    )
+    assert response.status_code == 200
+    assert "Áo bào đã duyệt" in seen["prompt"]
+    assert "Image 1 is the outfit board" in seen["prompt"]
+    assert response.json()["post_validation"]["review_status"] == "not_evaluated"
+
+
+def test_synthesis_rejects_unpublished_catalog_item(monkeypatch):
+    from app.core.config import settings
+
+    item_id = f"unpublished_{uuid.uuid4().hex[:10]}"
+    Database.execute(
+        "INSERT INTO items(id,garment_type_id,name,slot,gender,era,is_published) VALUES(?,?,?,?,?,?,0)",
+        (item_id, "ngu_than", "Bản nháp không công khai", "outerwear", "unisex", "nguyen"),
+    )
+    monkeypatch.setattr(settings, "GEMINI_TRY_ON_ENABLED", True)
+    monkeypatch.setattr(settings, "GEMINI_API_KEY", "test-only-key")
+    response = client.post(
+        "/api/v3/generation/synthesize",
+        headers={"Authorization": auth_header("dev-user-test-1")},
+        json={
+            "outfit": {"schema_version": "2.0", "dataset_version": "dev", "selections": []},
+            "legacy_item_ids": [item_id],
+            "outfit_image_id": "private-board",
+        },
+    )
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "ITEM_NOT_FOUND"
 
 
 def test_reference_permission_requires_explicit_purpose_and_review():

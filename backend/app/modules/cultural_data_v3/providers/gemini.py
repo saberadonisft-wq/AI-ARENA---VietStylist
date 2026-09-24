@@ -40,29 +40,6 @@ class GeminiGenerationProvider:
                 503,
             )
 
-        parts = [{"text": self._combined_prompt(request)}]
-        if request.user_image_id:
-            image_bytes, mime_type = await anyio.to_thread.run_sync(
-                MediaService.read_owned_image, request.user_image_id, self.owner_id
-            )
-            parts.append(
-                {
-                    "inlineData": {
-                        "mimeType": mime_type,
-                        "data": base64.b64encode(image_bytes).decode("ascii"),
-                    }
-                }
-            )
-
-        payload = {
-            "contents": [{"parts": parts}],
-            "generationConfig": {"responseModalities": ["Image"]},
-        }
-        url = (
-            "https://generativelanguage.googleapis.com/v1/models/"
-            f"{self.model_id}:generateContent"
-        )
-
         try:
             _provider_slots.acquire_nowait()
         except anyio.WouldBlock as exc:
@@ -71,6 +48,39 @@ class GeminiGenerationProvider:
             ) from exc
 
         try:
+            parts = [{"text": self._combined_prompt(request)}]
+            if request.outfit_image_id:
+                outfit_bytes, outfit_mime = await anyio.to_thread.run_sync(
+                    MediaService.read_owned_image, request.outfit_image_id, self.owner_id
+                )
+                parts.append(
+                    {"inlineData": {
+                        "mimeType": outfit_mime,
+                        "data": base64.b64encode(outfit_bytes).decode("ascii"),
+                    }}
+                )
+            if request.user_image_id:
+                image_bytes, mime_type = await anyio.to_thread.run_sync(
+                    MediaService.read_owned_image, request.user_image_id, self.owner_id
+                )
+                parts.append(
+                    {
+                        "inlineData": {
+                            "mimeType": mime_type,
+                            "data": base64.b64encode(image_bytes).decode("ascii"),
+                        }
+                    }
+                )
+
+            payload = {
+                "contents": [{"parts": parts}],
+                "generationConfig": {"responseModalities": ["Image"]},
+            }
+            url = (
+                "https://generativelanguage.googleapis.com/v1/models/"
+                f"{self.model_id}:generateContent"
+            )
+
             client = get_shared_async_client(timeout=55.0)
             with anyio.fail_after(60):
                 response = await client.post(
@@ -84,7 +94,7 @@ class GeminiGenerationProvider:
             if response.status_code == 429:
                 raise AppError(
                     "GENERATION_RATE_LIMITED",
-                    "Gemini đang giới hạn lượt gọi, vui lòng thử lại sau.",
+                    "Gemini báo đã chạm hạn mức hoặc đang giới hạn lượt gọi. Hãy kiểm tra quota của API key rồi thử lại.",
                     429,
                 )
             if response.status_code != 200:
@@ -149,11 +159,6 @@ class GeminiGenerationProvider:
                 "\n\nDo not introduce any of these traits: "
                 + request.negative_prompt.strip()
                 + "."
-            )
-        if request.user_image_id:
-            prompt += (
-                "\n\nEdit the supplied person photo. Preserve the person's identity, pose, "
-                "body proportions, and background unless the clothing requires a natural occlusion."
             )
         return prompt
 

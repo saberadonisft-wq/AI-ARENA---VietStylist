@@ -25,6 +25,9 @@ class SnapshotItem(BaseModel):
     assetVersion: int = 1
     colorOptionId: Optional[str] = None
     colorHex: Optional[str] = None
+    originalColorHex: Optional[str] = None
+    colorAlgorithmVersion: Optional[str] = None
+    colorSourceVersion: Optional[str] = None
     transform: Optional[ItemTransform] = None
 
 
@@ -32,7 +35,7 @@ class OutfitSnapshot(BaseModel):
     schemaVersion: int = 1
     avatarId: str = "avatar_nam_chuan"
     poseId: str = "front_01"
-    occasionId: Optional[str] = "ky_yeu"
+    occasionId: Optional[str] = None
     styleMode: str = "traditional" # traditional, remix, modern_fusion
     overlapDirection: str = "right_over_left"
     items: List[SnapshotItem] = []

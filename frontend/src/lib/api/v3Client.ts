@@ -28,6 +28,23 @@ export interface SynthesisResult {
   metadata: Record<string, any>;
 }
 
+export interface GenerationRequest {
+  outfit: OutfitSpecV2;
+  legacy_item_ids: string[];
+  outfit_image_id: string;
+  user_image_id: string | null;
+  model_id: string;
+  options: Record<string, unknown>;
+  idempotency_key: string;
+}
+
+export interface GenerationJob {
+  job_id: string;
+  status: "running" | "completed" | "failed";
+  result: SynthesisResult | null;
+  error: { code: string; message: string } | null;
+}
+
 export function projectionQuery(context?: Partial<ContextQualifier>, datasetVersion?: string): string {
   const params = new URLSearchParams();
   if (datasetVersion) params.set("dataset_version", datasetVersion);
@@ -86,13 +103,14 @@ export const v3Api = {
     });
   },
 
-  async uploadPrivateImage(file: File): Promise<string> {
+  async uploadPrivateImage(file: File, signal?: AbortSignal): Promise<string> {
     const session = await apiFetch<{
       media_id: string;
       upload_url: string;
       method: string;
       storage_type: "local" | "r2";
     }>("/api/media/uploads", {
+      signal,
       method: "POST",
       body: JSON.stringify({
         filename: file.name,
@@ -107,27 +125,50 @@ export const v3Api = {
     const headers = new Headers();
     if (body instanceof FormData) body.append("file", file);
     else headers.set("Content-Type", file.type);
-    const uploaded = await fetch(session.upload_url, {
-      method: session.method,
-      headers,
-      body,
-    });
-    if (!uploaded.ok) throw new Error("Không thể tải ảnh người mẫu lên kho media.");
+    const controller = new AbortController();
+    const abort = () => controller.abort();
+    if (signal?.aborted) abort();
+    else signal?.addEventListener("abort", abort, { once: true });
+    const timer = setTimeout(abort, 60000);
+    try {
+      const uploaded = await fetch(session.upload_url, {
+        method: session.method, headers, body, signal: controller.signal,
+      });
+      if (!uploaded.ok) throw new Error("Không thể tải ảnh lên kho media.");
+    } catch (error) {
+      if (controller.signal.aborted && !signal?.aborted) throw new Error("Tải ảnh vượt quá 60 giây. Hãy kiểm tra kết nối rồi thử lại.");
+      throw error;
+    } finally {
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", abort);
+    }
 
     await apiFetch(`/api/media/${encodeURIComponent(session.media_id)}/complete`, {
       method: "POST",
       body: JSON.stringify({}),
       timeoutMs: 30000,
+      signal,
     });
     return session.media_id;
   },
 
-  async synthesize(outfit: OutfitSpecV2, userImageId: string, modelId: string): Promise<SynthesisResult> {
+  async getGenerationStatus(): Promise<{ enabled: boolean }> {
+    return apiFetch<{ enabled: boolean }>("/api/v3/generation/status");
+  },
+
+  startGeneration: (request: GenerationRequest, signal?: AbortSignal) => apiFetch<GenerationJob>("/api/v3/generation/jobs", {
+    method: "POST", body: JSON.stringify(request), signal,
+  }),
+  getGenerationJob: (jobId: string, signal?: AbortSignal) => apiFetch<GenerationJob>(`/api/v3/generation/jobs/${encodeURIComponent(jobId)}`, { signal }),
+
+  async synthesize(outfit: OutfitSpecV2, legacyItemIds: string[], outfitImageId: string, userImageId: string | null, modelId: string): Promise<SynthesisResult> {
     return apiFetch<SynthesisResult>("/api/v3/generation/synthesize", {
       method: "POST",
       timeoutMs: 70000,
       body: JSON.stringify({
         outfit,
+        legacy_item_ids: legacyItemIds,
+        outfit_image_id: outfitImageId,
         user_image_id: userImageId,
         model_id: modelId,
         options: {},

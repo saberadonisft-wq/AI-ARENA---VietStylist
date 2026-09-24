@@ -1,3 +1,4 @@
+import json
 import time
 import uuid
 from pathlib import PurePosixPath
@@ -13,11 +14,70 @@ from app.modules.media.schemas import (
     UploadUrlResponse,
     MediaAssetResponse,
     AccessUrlResponse,
+    AIMediaResponse,
 )
 from app.modules.media.validation import TYPES, byte_limit, validate_content
 
 
 class MediaService:
+    @staticmethod
+    def delete_catalog_public_image(media_id):
+        """Delete a tracked public image only when it is an immutable catalog asset."""
+        media = MediaRepository.get_media_by_id(media_id)
+        if not media:
+            return
+        if (
+            media.get("visibility") != "public"
+            or media.get("media_type") != "image"
+            or media.get("bucket") != settings.R2_BUCKET_PUBLIC
+            or not media.get("object_key", "").startswith(f"assets/{media_id}/")
+        ):
+            raise AppError(
+                "UNSAFE_CATALOG_MEDIA_REFERENCE",
+                "Ảnh không khớp với tài nguyên công khai của danh mục.",
+                409,
+            )
+        MediaService.delete_media(media_id, media["owner_id"])
+
+    @staticmethod
+    def copy_stylist_submission_image(media_id, source_owner_id, moderator_id):
+        """Create a separately tracked public catalog image from a private submission."""
+        from app.modules.media.schemas import RequestUploadUrlInput, CompleteUploadRequest
+
+        if r2_client.is_configured and not settings.R2_PUBLIC_DOMAIN:
+            raise AppError(
+                "PUBLIC_MEDIA_DOMAIN_REQUIRED",
+                "Chưa cấu hình domain công khai cho ảnh thư viện; không thể duyệt ảnh an toàn.",
+                503,
+            )
+        content, mime_type = MediaService.read_owned_image(media_id, source_owner_id)
+        extension = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp"}.get(mime_type)
+        if not extension:
+            raise AppError("INVALID_FILE_TYPE", "Ảnh duyệt cần là JPEG, PNG hoặc WebP.", 422)
+        session = MediaService.create_upload_session(
+            moderator_id,
+            RequestUploadUrlInput(
+                filename=f"stylist-catalog{extension}", media_type="image",
+                mime_type=mime_type, size_bytes=len(content), visibility="public",
+            ),
+            roles=("admin",),
+        )
+        try:
+            r2_client.put_object(session.bucket, session.object_key, content, mime_type)
+            if not r2_client.is_configured:
+                token = MediaRepository.claim(session.media_id, "pending", "uploading")
+                if not MediaRepository.release(session.media_id, token, "uploaded"):
+                    raise AppError("INVALID_UPLOAD_STATE", "Không thể hoàn tất ảnh duyệt.", 409)
+            return MediaService.complete_upload(
+                session.media_id, moderator_id, CompleteUploadRequest()
+            )
+        except Exception:
+            try:
+                MediaService.delete_media(session.media_id, moderator_id)
+            except Exception:
+                pass
+            raise
+
     @staticmethod
     def create_upload_session(owner_id, req, roles=()):
         r2_client.require_available()
@@ -272,7 +332,10 @@ class MediaService:
     @staticmethod
     def delete_media(media_id, user_id):
         media = MediaService._owned(media_id, user_id)
-        if not MediaRepository.mark_media_deleting(media_id):
+        marked = MediaRepository.mark_media_deleting_if_unused(media_id, user_id)
+        if marked != "marked":
+            if marked == "in_use":
+                raise AppError("MEDIA_IN_USE", "Ảnh đang được dùng bởi lượt thử đồ đang chạy. Hãy thử xóa lại sau.", 409)
             raise AppError("MEDIA_BUSY", "File đang được xử lý; thử lại sau", 409)
         objects = MediaRepository.objects(media_id)
         # Legacy rows may have been inserted by import scripts after migration.
@@ -302,6 +365,51 @@ class MediaService:
                 "STORAGE_DELETE_FAILED", "Chưa xóa xong file; hệ thống sẽ thử lại", 503
             )
         MediaRepository.mark_media_deleted(media_id)
+
+    @staticmethod
+    def list_ai_media(owner_id, limit=30, offset=0):
+        """Page all AI media explicitly referenced by this owner's generation receipts."""
+        candidates = {}
+        batch_size = 500
+        job_offset = 0
+        while True:
+            jobs = MediaRepository.list_recent_ai_jobs(owner_id, limit=batch_size, offset=job_offset)
+            if not jobs:
+                break
+            references = {}
+            for job in jobs:
+                try:
+                    inputs = json.loads(job["input_params"]) if isinstance(job.get("input_params"), str) else (job.get("input_params") or {})
+                    result = json.loads(job["result_data"]) if isinstance(job.get("result_data"), str) else (job.get("result_data") or {})
+                except (TypeError, ValueError):
+                    continue
+                if not isinstance(inputs, dict) or not isinstance(result, dict):
+                    continue
+                for purpose, media_id in (
+                    ("result", result.get("result_media_id")),
+                    ("person", inputs.get("user_image_id")),
+                    ("outfit", inputs.get("outfit_image_id")),
+                ):
+                    if isinstance(media_id, str) and media_id:
+                        references.setdefault(media_id, set()).add(purpose)
+
+            for media in MediaRepository.get_owned_ai_images(references, owner_id):
+                media_id = media["id"]
+                entry = candidates.setdefault(media_id, {
+                    "purposes": set(),
+                    "status": media["status"],
+                    "created_at": str(media["created_at"]),
+                })
+                entry["purposes"].update(references[media_id])
+
+            job_offset += len(jobs)
+            if len(jobs) < batch_size:
+                break
+
+        ordered = sorted(candidates.items(), key=lambda item: (item[1]["created_at"], item[0]), reverse=True)
+        page = [AIMediaResponse(media_id=media_id, purposes=sorted(entry["purposes"]), status=entry["status"], created_at=entry["created_at"])
+                for media_id, entry in ordered[offset:offset + limit]]
+        return page
 
     @staticmethod
     def cleanup(limit=100, dry_run=False):

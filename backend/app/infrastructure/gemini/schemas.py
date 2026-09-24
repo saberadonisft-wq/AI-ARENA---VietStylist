@@ -18,6 +18,10 @@ class ModelOutfit(BaseModel):
     items: list[ModelItem] = Field(min_length=1, max_length=16)
 
 
+class ModelRecommendations(BaseModel):
+    outfits: list[ModelOutfit] = Field(min_length=1, max_length=2)
+
+
 def parse_recommendations(value):
     if not isinstance(value, list) or not 1 <= len(value) <= 2:
         raise ValueError("Expected 1-2 recommendations")

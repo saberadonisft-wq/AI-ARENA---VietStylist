@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends
+from app.core.security import AuthenticatedUser, require_current_user
 from app.core.rate_limit import ai_rate_limit
 from app.modules.recommendations.schemas import (
     ContextRecommendationRequest,
@@ -15,7 +16,10 @@ router = APIRouter(
 
 
 @router.post("/context", response_model=RecommendationResponse)
-async def get_context_recommendations(req: ContextRecommendationRequest):
+async def get_context_recommendations(
+    req: ContextRecommendationRequest,
+    user: AuthenticatedUser = Depends(require_current_user),
+):
     """
     Gợi ý phối đồ thông minh kết hợp điều kiện thời tiết địa phương và sự kiện (F06).
     """
@@ -23,7 +27,10 @@ async def get_context_recommendations(req: ContextRecommendationRequest):
 
 
 @router.post("/ai", response_model=RecommendationResponse)
-async def get_ai_recommendations(req: AIRecommendationRequest):
+async def get_ai_recommendations(
+    req: AIRecommendationRequest,
+    user: AuthenticatedUser = Depends(require_current_user),
+):
     """
     Trợ lý ảo Gemini gợi ý phối đồ theo yêu cầu ngôn ngữ tự nhiên, tôn trọng các món đã khóa (F11).
     """

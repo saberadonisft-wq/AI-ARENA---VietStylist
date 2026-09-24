@@ -62,6 +62,10 @@ class ItemSummaryResponse(BaseModel):
     era: Optional[str] = None
     is_published: bool = True
     metadata: Dict[str, Any] = {}
+    color_change_supported: bool = False
+    color_change_reason: Optional[str] = None
+    color_algorithm_version: Optional[str] = None
+    image_version: Optional[str] = None
     variants: List[ItemVariantResponse] = []
     default_layer: Optional[AssetLayerResponse] = None
 
@@ -97,3 +101,11 @@ class StarterOutfitResponse(BaseModel):
     occasion_id: str
     avatar_id: str
     items: List[StarterOutfitItem]
+
+
+class ColorPreviewResponse(BaseModel):
+    supported: bool
+    image_url: Optional[str] = None
+    reason: Optional[str] = None
+    algorithm_version: Optional[str] = None
+    source_version: Optional[str] = None
