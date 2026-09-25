@@ -2,5 +2,6 @@
   "email": "abcabc@example.com",
   "password": "abcabc",
   "display_name": "abcabc",
-  "role": "user"
+  "role": "user",
+  "localhost": "http://localhost:3000"
 }
