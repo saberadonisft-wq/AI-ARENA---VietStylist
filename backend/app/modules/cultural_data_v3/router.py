@@ -276,9 +276,13 @@ async def create_generation_job(req: SynthesizeRequest, user: AuthenticatedUser 
 
 
 @router.get("/generation/jobs/{job_id}", response_model=GenerationJobResponse)
-async def get_generation_job(job_id: str, user: AuthenticatedUser = Depends(require_current_user)):
-    from app.modules.cultural_data_v3.services.generation_jobs import get_job
-    return await run_in_threadpool(get_job, job_id, user.user_id)
+async def get_generation_job(
+    job_id: str,
+    wait_seconds: int = Query(0, ge=0, le=10, description="Wait up to this many seconds for a running job to finish."),
+    user: AuthenticatedUser = Depends(require_current_user),
+):
+    from app.modules.cultural_data_v3.services.generation_jobs import poll_job
+    return await poll_job(job_id, user.user_id, wait_seconds)
 
 
 async def _generate_image(req: SynthesizeRequest, user: AuthenticatedUser):
@@ -309,12 +313,11 @@ async def _generate_image(req: SynthesizeRequest, user: AuthenticatedUser):
         raise AppError("OUTFIT_EMPTY", "Bộ phối chưa có trang phục.", 422)
     if len(req.legacy_item_ids) != len(set(req.legacy_item_ids)):
         raise AppError("DUPLICATE_OUTFIT_ITEMS", "Bộ phối có trang phục trùng.", 422)
-    published_items = []
-    for item_id in req.legacy_item_ids:
-        item = await run_in_threadpool(CatalogRepository.get_item_by_id, item_id)
-        if not item:
-            raise AppError("ITEM_NOT_FOUND", "Trang phục chưa được xuất bản hoặc không còn tồn tại.", 404)
-        published_items.append(item)
+    published_items = await run_in_threadpool(
+        CatalogRepository.get_published_items_by_ids, req.legacy_item_ids,
+    )
+    if len(published_items) != len(req.legacy_item_ids):
+        raise AppError("ITEM_NOT_FOUND", "Trang phục chưa được xuất bản hoặc không còn tồn tại.", 404)
 
     grounding = (
         await run_in_threadpool(build_grounding, req.outfit)

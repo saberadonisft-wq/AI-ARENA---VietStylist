@@ -84,7 +84,7 @@ class Settings(BaseSettings):
 
     # Gemini
     GEMINI_API_KEY: str = ""
-    GEMINI_MODEL_TEXT: str = "gemini-3.6-flash"
+    GEMINI_MODEL_TEXT: str = "gemini-3.8-flash"
     GEMINI_MODEL_IMAGE: str = "gemini-2.5-flash-image"
     GEMINI_TRY_ON_ENABLED: bool = False
 

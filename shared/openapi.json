@@ -15580,6 +15580,20 @@
             }
           },
           {
+            "name": "wait_seconds",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 10,
+              "minimum": 0,
+              "description": "Wait up to this many seconds for a running job to finish.",
+              "default": 0,
+              "title": "Wait Seconds"
+            },
+            "description": "Wait up to this many seconds for a running job to finish."
+          },
+          {
             "name": "authorization",
             "in": "header",
             "required": false,

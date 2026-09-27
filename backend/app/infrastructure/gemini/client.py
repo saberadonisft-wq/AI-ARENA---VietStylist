@@ -2,12 +2,30 @@ import anyio
 from app.infrastructure.gemini.schemas import ModelRecommendations, parse_recommendations
 import json
 import logging
+from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 from typing import Any, Dict, List, Optional
 import httpx
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 _provider_slots = anyio.CapacityLimiter(4)
+_TEXT_MODEL_CHAIN = (
+    "gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash",
+)
+_RECOMMENDATION_TIMEOUT = 30.0
+
+
+def _retry_after_seconds(response: httpx.Response) -> float:
+    value = response.headers.get("Retry-After", "")
+    try:
+        return max(0.0, float(value))
+    except ValueError:
+        try:
+            retry_at = parsedate_to_datetime(value)
+            return max(0.0, (retry_at - datetime.now(timezone.utc)).total_seconds())
+        except (ValueError, TypeError, OverflowError):
+            return 0.0
 
 
 class GeminiClient:
@@ -16,6 +34,13 @@ class GeminiClient:
         self.text_model = settings.GEMINI_MODEL_TEXT
         self.image_model = settings.GEMINI_MODEL_IMAGE
         self.is_configured = bool(self.api_key)
+
+    @property
+    def text_models(self) -> tuple[str, ...]:
+        # Start at the configured version; never upgrade or replace a custom model.
+        if self.text_model in _TEXT_MODEL_CHAIN:
+            return _TEXT_MODEL_CHAIN[_TEXT_MODEL_CHAIN.index(self.text_model):]
+        return (self.text_model,)
 
     async def get_styling_recommendations(
         self,
@@ -63,7 +88,6 @@ class GeminiClient:
             "available_items": items_summary,
         }
 
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.text_model}:generateContent"
         payload = {
             "contents": [
                 {
@@ -92,53 +116,73 @@ class GeminiClient:
             from app.core.http_client import get_shared_async_client
 
             client = get_shared_async_client(timeout=25.0)
-            with anyio.fail_after(30):
-                resp = await client.post(
-                    url,
-                    headers={"X-goog-api-key": self.api_key},
-                    json=payload,
-                )
-            if resp.status_code == 200:
-                data = resp.json()
-                candidates = data.get("candidates", [])
-                if candidates:
-                    text_response = "".join(
-                        part.get("text", "")
-                        for part in candidates[0].get("content", {}).get("parts", [])
-                        if not part.get("thought")
-                    )
-                    parsed = json.loads(text_response)
-                    if not isinstance(parsed, dict):
-                        raise ValueError("Expected an outfit object")
-                    recs = parsed.get(
-                        "outfits",
-                        parsed.get(
-                            "recommendations",
-                            [parsed] if isinstance(parsed, dict) else [],
-                        ),
-                    )
-                    if isinstance(recs, list) and len(recs) > 0:
-                        return {
-                            "source": "gemini",
-                            "model": self.text_model,
-                            "recommendations": parse_recommendations(recs),
-                        }
-                    else:
-                        logger.warning(
-                            "Gemini output structure invalid (empty recommendations), activating fallback"
-                        )
-            if resp.status_code != 200:
-                reason = {
-                    400: "Cấu hình yêu cầu Gemini chưa hợp lệ",
-                    401: "Khóa API Gemini không được chấp nhận",
-                    403: "Khóa API chưa có quyền dùng Gemini",
-                    404: "Model Gemini được cấu hình hiện không khả dụng",
-                    429: "Gemini đã chạm hạn mức sử dụng",
-                }.get(resp.status_code, "Gemini tạm thời không khả dụng")
-                notice = f"{reason}. Đây là gợi ý dự phòng từ danh mục, chưa phân tích đầy đủ yêu cầu của bạn."
-            logger.warning(
-                f"Gemini API returned status {resp.status_code}, activating fallback"
-            )
+            models = self.text_models
+            with anyio.fail_after(_RECOMMENDATION_TIMEOUT) as deadline:
+                for index, model in enumerate(models):
+                    remaining = deadline.deadline - anyio.current_time()
+                    # Give the selected model its normal timeout. Dividing the
+                    # budget by fallback count prematurely cancels valid answers.
+                    # All attempts and Retry-After still share the 30s deadline.
+                    attempt_timeout = min(25.0, remaining)
+                    try:
+                        with anyio.fail_after(attempt_timeout):
+                            resp = await client.post(
+                                f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
+                                headers={"X-goog-api-key": self.api_key},
+                                json=payload,
+                            )
+                        if resp.status_code == 200:
+                            data = resp.json()
+                            candidates = data.get("candidates", [])
+                            # A blocked answer must not be retried with another model.
+                            if data.get("promptFeedback", {}).get("blockReason") or any(
+                                candidate.get("finishReason") in {
+                                    "SAFETY", "RECITATION", "BLOCKLIST", "PROHIBITED_CONTENT", "SPII",
+                                } for candidate in candidates
+                            ):
+                                break
+                            if not candidates:
+                                raise ValueError("Expected a candidate")
+                            text_response = "".join(
+                                part.get("text", "")
+                                for part in candidates[0].get("content", {}).get("parts", [])
+                                if not part.get("thought")
+                            )
+                            parsed = json.loads(text_response)
+                            if not isinstance(parsed, dict):
+                                raise ValueError("Expected an outfit object")
+                            recs = parsed.get("outfits", parsed.get("recommendations", [parsed]))
+                            return {
+                                "source": "gemini",
+                                "model": model,
+                                "recommendations": parse_recommendations(recs),
+                            }
+                        reason = {
+                            400: "Cấu hình yêu cầu Gemini chưa hợp lệ",
+                            401: "Khóa API Gemini không được chấp nhận",
+                            403: "Khóa API chưa có quyền dùng Gemini",
+                            404: "Model Gemini được cấu hình hiện không khả dụng",
+                            429: "Gemini đã chạm hạn mức sử dụng",
+                        }.get(resp.status_code, "Gemini tạm thời không khả dụng")
+                        notice = f"{reason}. Đây là gợi ý dự phòng từ danh mục, chưa phân tích đầy đủ yêu cầu của bạn."
+                        logger.warning("Gemini model %s returned status %s", model, resp.status_code)
+                        if resp.status_code not in {404, 408, 429, 500, 502, 503, 504}:
+                            break
+                        if index < len(models) - 1:
+                            delay = _retry_after_seconds(resp)
+                            if delay >= deadline.deadline - anyio.current_time():
+                                break
+                            if delay:
+                                await anyio.sleep(delay)
+                    except (TimeoutError, httpx.TimeoutException):
+                        notice = "Gemini phản hồi quá chậm. Đây là gợi ý dự phòng từ danh mục; bạn có thể thử lại."
+                        logger.warning("Gemini model %s timed out", model)
+                    except httpx.RequestError:
+                        notice = "Không kết nối được Gemini. Đây là gợi ý dự phòng từ danh mục."
+                        logger.warning("Gemini model %s connection failed", model)
+                    except (ValueError, TypeError, AttributeError):
+                        notice = "Gemini trả kết quả chưa hợp lệ. Đây là gợi ý dự phòng từ danh mục."
+                        logger.warning("Gemini model %s returned invalid recommendations", model)
         except Exception as e:
             if isinstance(e, (TimeoutError, httpx.TimeoutException)):
                 notice = "Gemini phản hồi quá chậm. Đây là gợi ý dự phòng từ danh mục; bạn có thể thử lại."

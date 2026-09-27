@@ -61,6 +61,20 @@ class CatalogRepository:
         return Database.fetch_one("SELECT * FROM items WHERE id = ?", (item_id,))
 
     @staticmethod
+    def get_published_items_by_ids(item_ids: List[str], *, conn=None) -> List[Dict[str, Any]]:
+        """Fetch one published set, retaining the caller's prompt order."""
+        identifiers = list(dict.fromkeys(item_ids))
+        if not identifiers:
+            return []
+        placeholders = ",".join("?" for _ in identifiers)
+        rows = Database.fetch_all(
+            f"SELECT * FROM items WHERE is_published=1 AND id IN ({placeholders})",
+            tuple(identifiers), conn=conn,
+        )
+        by_id = {row["id"]: row for row in rows}
+        return [by_id[identifier] for identifier in item_ids if identifier in by_id]
+
+    @staticmethod
     def get_variants_by_item_id(item_id: str) -> List[Dict[str, Any]]:
         return Database.fetch_all("SELECT * FROM item_variants WHERE item_id = ? ORDER BY is_default DESC", (item_id,))
 
