@@ -1,5 +1,7 @@
 "use client";
 
+import "@/features/studio/studio-workspace.css";
+
 import dynamic from "next/dynamic";
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
@@ -30,6 +32,7 @@ import ExportModal from "@/features/studio/ExportModal";
 import StarterOutfitModal from "@/features/studio/StarterOutfitModal";
 import GeminiTryOnModal from "@/features/studio/GeminiTryOnModal";
 import AuthModal from "@/components/AuthModal";
+import ToastContainer, { type ToastItem } from "@/components/ui/Toast";
 import {
   Skeleton,
   GarmentItemSkeleton,
@@ -86,6 +89,7 @@ export default function StudioPage() {
   const document = studio.history.present;
   const snapshot = document.snapshot;
   const canvasRef = useRef<Canvas2DHandle | null>(null);
+  const catalogListRef = useRef<HTMLDivElement | null>(null);
 
   // Dữ liệu danh mục từ CatalogProvider dùng chung
   const {
@@ -142,6 +146,13 @@ export default function StudioPage() {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [pendingAccountAction, setPendingAccountAction] = useState<"save" | "save-new" | "export" | "try-on" | "recommendations" | null>(null);
   const [actionNotice, setActionNotice] = useState<string | null>(null);
+  const [guestNoticeDismissed, setGuestNoticeDismissed] = useState(false);
+  const [dismissedRecoveryList, setDismissedRecoveryList] = useState<string | null>(null);
+  useEffect(() => {
+    if (!studio.hydrated || isLoggedIn || guestNoticeDismissed) return;
+    const timer = window.setTimeout(() => setGuestNoticeDismissed(true), 8000);
+    return () => window.clearTimeout(timer);
+  }, [studio.hydrated, isLoggedIn, guestNoticeDismissed]);
   const [starterState, setStarterState] = useState<"loading" | "available" | "empty" | "error">("loading");
   const [requestedCatalogItemId, setRequestedCatalogItemId] = useState<string | null>(null);
   const [pendingCatalogReplacement, setPendingCatalogReplacement] = useState<CatalogItem | null>(null);
@@ -397,6 +408,7 @@ export default function StudioPage() {
   // Chọn món từ catalog
   const handleSelectItem = (item: CatalogItem) => {
     if (lockedSlots.has(item.slot)) return;
+    setActiveSlot(item.slot);
     setMobilePanel("properties");
 
     const defaultVar = item.variants[0];
@@ -409,6 +421,9 @@ export default function StudioPage() {
       colorHex: defaultVar?.hex_color,
     });
     pushHistory(newItems);
+    if (window.matchMedia("(max-width: 1023px)").matches) {
+      requestAnimationFrame(() => window.document.getElementById("studio-board")?.scrollIntoView({ block: "start" }));
+    }
   };
 
   const addRequestedCatalogItem = () => {
@@ -649,9 +664,49 @@ export default function StudioPage() {
 
   if (!studio.hydrated) return <div role="status" className="p-8">Đang khôi phục bộ phối…</div>;
 
+  const notifications: ToastItem[] = [];
+  const recoveryListKey = JSON.stringify(studio.recoveryDrafts.map(entry => entry.key));
+  if (saveSuccessMessage) notifications.push({
+    id: "save-success", type: "success", message: saveSuccessMessage,
+    dismissLabel: "Đóng thông báo thành công",
+  });
+  if (studio.recoveryDrafts.length > 0 && dismissedRecoveryList !== recoveryListKey) notifications.push({
+    id: "recovery", title: "Bản khôi phục trên thiết bị",
+    message: "Các bản phối trước vẫn được giữ trên thiết bị. Chọn bản bạn muốn khôi phục.",
+    dismissLabel: "Đóng thông báo bản khôi phục",
+    actions: <ul className="w-full space-y-3">
+      {studio.recoveryDrafts.map(entry => <li key={entry.key} className="space-y-2 border-t border-stone-100 pt-3">
+        <p className="break-words text-sm font-medium text-stone-900">{entry.draft.title}</p>
+        <p className="text-xs text-stone-600">{entry.draft.snapshot.items.length} món · {{ recovery: "Bản trước khi tạo mới", "account-choice": "Bản còn lại sau khi chọn nháp", "tab-recovery": "Bản từ tab khác", conflict: "Bản trước xung đột phiên bản" }[entry.kind]}</p>
+        <button type="button" disabled={isSaving} aria-label={`Khôi phục ${entry.draft.title}`} onClick={() => studio.restoreRecoveryDraft(entry.key)} className="min-h-11 rounded-lg border border-stone-300 bg-white px-3 text-sm font-semibold text-stone-800 hover:bg-stone-100 disabled:opacity-50">Khôi phục</button>
+      </li>)}
+    </ul>,
+  });
+  if (draftNotice) notifications.push({
+    id: "draft", type: "success", title: "Đã mở lại bản nháp",
+    message: `“${draftNotice.title}” · ${draftNotice.snapshot?.items?.length || 0} món. Bạn có thể tiếp tục chỉnh sửa; tạo bản trống sẽ giữ bản này trong mục khôi phục.`,
+    dismissLabel: "Đóng thông báo bản nháp",
+    actions: <>
+      <button type="button" onClick={studio.dismissDraft} className="min-h-11 flex-1 whitespace-nowrap rounded-lg bg-heritage-red px-3 text-xs font-semibold text-white hover:bg-heritage-red-dark">Tiếp tục bản nháp</button>
+      <button type="button" onClick={studio.startFreshDraft} className="min-h-11 flex-1 whitespace-nowrap rounded-lg border border-stone-300 bg-white px-3 text-xs font-medium text-stone-700 hover:bg-stone-50">Tạo bản phối trống</button>
+    </>,
+  });
+  if (!isLoggedIn && !guestNoticeDismissed) notifications.push({
+    id: "guest", title: "Bạn đang dùng chế độ khách",
+    message: "Bạn có thể phối đồ và lưu nháp trên thiết bị. Đăng nhập để lưu vào Tủ đồ, xuất ảnh, tạo Lookbook hoặc thử đồ AI.",
+    dismissLabel: "Đóng thông báo chế độ khách",
+  });
+  if (actionNotice) notifications.push({ id: "action", message: actionNotice, type: "info" });
+
   return (
-    <div className="w-full max-w-[1720px] mx-auto px-3 sm:px-6 lg:px-8 py-6 space-y-6 overflow-x-clip">
-      {!isLoggedIn && <div role="status" className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">Bạn có thể phối đồ và lưu nháp trên thiết bị. Đăng nhập để lưu vào Tủ đồ, xuất ảnh, tạo Lookbook hoặc thử đồ AI.</div>}
+    <div className="studio-workspace w-full mx-auto px-3 sm:px-5 py-4 space-y-4">
+      <ToastContainer toasts={notifications} onDismiss={id => {
+        if (id === "draft") studio.dismissDraft();
+        else if (id === "guest") setGuestNoticeDismissed(true);
+        else if (id === "action") setActionNotice(null);
+        else if (id === "save-success") studio.dismissMessage();
+        else if (id === "recovery") setDismissedRecoveryList(recoveryListKey);
+      }} />
       {studio.accountDraftChoice && <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 p-4" role="dialog" aria-modal="true" aria-labelledby="account-draft-choice-title" aria-describedby="account-draft-choice-description">
         <section className="w-full max-w-lg space-y-4 rounded-2xl bg-white p-5 shadow-2xl">
           <div>
@@ -671,7 +726,6 @@ export default function StudioPage() {
           {studio.error && <p role="alert" className="text-sm text-red-700">{studio.error}</p>}
         </section>
       </div>}
-      {actionNotice && <div role="status" className="flex items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"><span>{actionNotice}</span><button type="button" onClick={() => setActionNotice(null)} aria-label="Đóng thông báo" className="rounded p-1 hover:bg-amber-100"><X className="h-4 w-4" /></button></div>}
       {requestedCatalogItem && <div role="status" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-heritage-red/20 bg-white p-4 text-sm"><span>Đã mở <strong>{requestedCatalogItem.name}</strong>. Thêm món này vào vị trí {requestedCatalogItem.slot} trong bản phối?</span><div className="flex gap-2"><button type="button" disabled={lockedSlots.has(requestedCatalogItem.slot)} onClick={addRequestedCatalogItem} className="rounded-lg bg-heritage-red px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">{lockedSlots.has(requestedCatalogItem.slot) ? "Mở khóa vị trí trước" : "Thêm vào bản phối"}</button><button type="button" onClick={() => setRequestedCatalogItemId(null)} className="rounded-lg border border-stone-300 px-3 py-2 text-xs font-semibold">Để sau</button></div></div>}
       {studio.isManaging && <div role="status" className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">Bạn đang chỉnh sửa bộ phối với quyền quản trị. Khi lưu, thay đổi được áp dụng vào bộ phối của chủ sở hữu.</div>}
       {studio.error && <div role="alert" aria-label="Lưu bộ phối" className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm">
@@ -681,7 +735,6 @@ export default function StudioPage() {
           <button onClick={() => studio.save(true)} disabled={isSaving} className="underline">Lưu thành bộ mới</button>
         </div>}
       </div>}
-      {/* Banner thông báo khôi phục bản nháp */}
       {studio.requestedOutfit && !studio.conflict && <div role="status" className="rounded-xl border border-stone-200 bg-white p-4 text-sm">
         <p>Bạn đang có bản nháp chưa lưu. Liên kết vừa mở yêu cầu tải bộ phối trên máy chủ.</p>
         <div className="mt-3 flex gap-3">
@@ -689,61 +742,16 @@ export default function StudioPage() {
           <button onClick={studio.keepLocal} className="underline">Tiếp tục bản nháp</button>
         </div>
       </div>}
-      {draftNotice && (
-        <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200/90 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3 shadow-xs">
-          <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 rounded-full bg-amber-200/60 flex items-center justify-center text-amber-800 shrink-0">
-              <Sparkles className="w-4 h-4" />
-            </div>
-            <div>
-              <h4 className="text-xs font-bold text-amber-900">
-                Đã mở lại bản nháp từ thiết bị: &quot;{draftNotice.title}&quot;
-              </h4>
-              <p className="text-[11px] text-amber-700">
-                Gồm {draftNotice.snapshot?.items?.length || 0} món. Tiếp tục chỉnh sửa bản này hoặc tạo bản phối trống; bản nháp hiện tại sẽ được giữ trong mục khôi phục.
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center space-x-2">
-            <button
-              onClick={studio.dismissDraft}
-              className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold rounded-lg transition-colors shadow-xs"
-            >
-              Tiếp tục bản nháp
-            </button>
-            <button
-              onClick={studio.startFreshDraft}
-              className="px-3 py-1.5 bg-white border border-stone-200 hover:bg-stone-50 text-stone-600 text-xs font-medium rounded-lg transition-colors"
-            >
-              Tạo bản phối trống
-            </button>
-          </div>
-        </div>
-      )}
-      {studio.recoveryDrafts.length > 0 && <section aria-labelledby="studio-recovery-title" className="rounded-xl border border-stone-200 bg-white p-4">
-        <div className="mb-3">
-          <h2 id="studio-recovery-title" className="font-semibold text-stone-900">Bản khôi phục trên thiết bị</h2>
-          <p className="mt-1 text-xs text-stone-600">Các bản phối được giữ lại khi bạn chọn bản khác hoặc khôi phục từ tab khác. Chỉ tài khoản hiện tại trên thiết bị này mới đọc được nháp của tài khoản.</p>
-        </div>
-        <ul className="space-y-2">
-          {studio.recoveryDrafts.map(entry => <li key={entry.key} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-stone-100 bg-stone-50 px-3 py-2">
-            <div className="min-w-0">
-              <p className="truncate text-sm font-medium text-stone-800">{entry.draft.title}</p>
-              <p className="text-xs text-stone-600">{entry.draft.snapshot.items.length} món · {{ recovery: "Bản trước khi tạo mới", "account-choice": "Bản còn lại sau khi chọn nháp", "tab-recovery": "Bản từ tab khác", conflict: "Bản trước xung đột phiên bản" }[entry.kind]}</p>
-            </div>
-            <button type="button" disabled={isSaving} aria-label={`Khôi phục ${entry.draft.title}`} onClick={() => studio.restoreRecoveryDraft(entry.key)} className="min-h-11 rounded-lg border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-stone-800 hover:bg-stone-100 disabled:opacity-50">Khôi phục</button>
-          </li>)}
-        </ul>
-      </section>}
 
       {/* Top Toolbar: Tên bộ phối, Chế độ, Undo/Redo, Nút Lưu & Xuất */}
-      <div className="bg-white rounded-2xl border border-stone-200/80 p-4 shadow-xs flex flex-wrap items-center justify-between gap-3">
-        <div className="flex min-w-0 flex-wrap items-center gap-2 sm:gap-3">
+      <div className="studio-toolbar bg-white rounded-xl border border-stone-200 p-3 flex flex-wrap items-center justify-between gap-3">
+        <div className="studio-document flex min-w-0 flex-wrap items-center gap-2 sm:gap-3">
           <input
             type="text"
+            aria-label="Tên bản phối"
             value={outfitTitle}
             onChange={(e) => setOutfitTitle(e.target.value)}
-            className="min-w-0 w-full max-w-full sm:w-auto font-serif font-bold text-xl sm:text-2xl text-stone-900 bg-transparent border-b border-transparent hover:border-stone-300 focus:border-heritage-red focus:outline-none px-1 py-0.5 tracking-tight"
+            className="studio-title min-w-0 w-full max-w-full sm:w-48 font-serif font-bold text-xl text-stone-900 bg-transparent border-b border-transparent hover:border-stone-300 focus:border-heritage-red focus:outline-none px-1 py-0.5 tracking-tight"
           />
 
           {/* Segmented control: Truyền thống vs Remix */}
@@ -772,7 +780,12 @@ export default function StudioPage() {
         </div>
 
         {/* Nút thao tác nhanh: Undo, Redo, Mở đầu, So sánh, Thử đồ, Lưu, Xuất */}
-        <div className="flex items-center flex-wrap gap-2">
+        <div className="studio-actions flex items-center flex-wrap gap-2">
+          {studio.recoveryDrafts.length > 0 && <button type="button" onClick={() => setDismissedRecoveryList(null)}
+            aria-label="Xem bản khôi phục trên thiết bị"
+            className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-xs font-semibold text-stone-700 hover:bg-stone-50">
+            Bản khôi phục ({studio.recoveryDrafts.length})
+          </button>}
           {/* Undo / Redo & Phím tắt */}
           <div className="flex items-center space-x-1.5">
             <div className="flex items-center bg-stone-100 rounded-lg p-0.5 border border-stone-200">
@@ -794,7 +807,7 @@ export default function StudioPage() {
               </button>
             </div>
             <span
-              className="hidden xl:inline-block text-[10px] text-stone-400 font-mono bg-stone-50 border border-stone-200 px-2 py-1 rounded-md"
+              className="sr-only"
               title="Phím tắt: Ctrl+Z (Undo), Ctrl+Y (Redo), 1-6 (Đổi slot trang phục), Esc (Đóng bảng)"
             >
               ⌨️ Ctrl+Z / 1-6
@@ -873,12 +886,6 @@ export default function StudioPage() {
         </div>
       </div>
 
-      {saveSuccessMessage && (
-        <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-xl flex items-center space-x-2">
-          <Check className="w-4 h-4 text-emerald-600" />
-          <span>{saveSuccessMessage}</span>
-        </div>
-      )}
 
       {studio.externalDraft && <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-sky-200 bg-sky-50 p-4 text-sm text-sky-950">
         <span>Tab khác đã cập nhật bản nháp này. Bản đang mở được giữ nguyên cho đến khi bạn chọn.</span>
@@ -894,14 +901,14 @@ export default function StudioPage() {
       </div>}
 
       {/* Main Studio 3-Column Layout: Trái (Danh mục & Sự kiện) | Giữa (Canvas 2D) | Phải (Màu sắc, Cảnh báo văn hóa, Thời tiết) */}
-      <div role="tablist" aria-label="Bảng Studio trên điện thoại" className="grid grid-cols-3 gap-1 rounded-xl border border-stone-200 bg-white p-1 lg:hidden">
-        {([{ id: "catalog", label: "Chọn trang phục" }, { id: "properties", label: "Món đang chọn" }, { id: "tools", label: "Công cụ" }] as const).map(tab => <button key={tab.id} type="button" role="tab" aria-selected={mobilePanel === tab.id} onClick={() => setMobilePanel(tab.id)} className={`rounded-lg px-2 py-2 text-xs font-semibold ${mobilePanel === tab.id ? "bg-stone-900 text-white" : "text-stone-600 hover:bg-stone-100"}`}>{tab.label}</button>)}
-      </div>
-      <div className="grid min-w-0 grid-cols-1 gap-3 sm:gap-6 lg:grid-cols-12 items-start">
+      <div className="studio-panels grid min-w-0 grid-cols-1 gap-3 items-start">
+        <div role="tablist" aria-label="Bảng Studio trên điện thoại" className="sticky top-16 z-30 order-2 grid grid-cols-3 gap-2 rounded-xl border border-stone-200 bg-white p-1 shadow-sm lg:hidden">
+          {([{ id: "catalog", label: "Chọn trang phục" }, { id: "properties", label: "Món đang chọn" }, { id: "tools", label: "Công cụ" }] as const).map(tab => <button key={tab.id} type="button" role="tab" aria-selected={mobilePanel === tab.id} onClick={() => setMobilePanel(tab.id)} className={`min-h-11 rounded-lg px-2 py-2 text-xs font-semibold touch-manipulation ${mobilePanel === tab.id ? "bg-stone-900 text-white" : "text-stone-600 hover:bg-stone-100"}`}>{tab.label}</button>)}
+        </div>
         {/* CỘT TRÁI (3 cols): Bối cảnh sự kiện & Kho đồ */}
-        <div className={`${mobilePanel === "catalog" ? "" : "hidden"} order-2 min-w-0 space-y-4 lg:order-1 lg:col-span-3 xl:col-span-3 lg:block`}>
+        <div aria-label="Kho trang phục và hoàn cảnh" role="region" tabIndex={0} className={`studio-rail studio-library ${mobilePanel === "catalog" ? "" : "hidden"} order-3 min-w-0 space-y-3 lg:order-1 lg:block`}>
           {/* Lọc Sự Kiện & Bối Cảnh (F01) */}
-          <div className="bg-white p-4 rounded-2xl border border-stone-200/80 shadow-xs space-y-3">
+          <div className="studio-occasions bg-white p-4 rounded-xl border border-stone-200 space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-stone-500 uppercase tracking-wider">
                 Hoàn cảnh sử dụng
@@ -938,14 +945,14 @@ export default function StudioPage() {
           </div>
 
           {/* Lọc Nhóm Áo & Slot */}
-          <div className="bg-white p-4 rounded-2xl border border-stone-200/80 shadow-xs space-y-3">
+          <div className="studio-catalog bg-white p-4 rounded-xl border border-stone-200 space-y-3">
             {/* Tiêu đề mục phân loại */}
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-stone-700 uppercase tracking-wider">
-                Phân loại trang phục
+                Kho trang phục
               </span>
               <span className="text-xs text-stone-400 font-medium">
-                {filteredCatalogItems.length} món
+                {filteredCatalogItems.length} món có sẵn
               </span>
             </div>
 
@@ -966,7 +973,7 @@ export default function StudioPage() {
             </label>
 
             {/* Tabs Slot sắp xếp lưới 3 cột x 2 hàng đều đặn, khóa slot tinh gọn */}
-            <div className="grid grid-cols-3 gap-1.5">
+            <div className="studio-slot-grid grid grid-cols-3 gap-1.5">
               {[
                 { slot: "outerwear", label: "Áo ngoài" },
                 { slot: "undergarment", label: "Áo lót trong" },
@@ -982,7 +989,7 @@ export default function StudioPage() {
                     key={s.slot}
                     type="button"
                     onClick={() => setActiveSlot(s.slot)}
-                    className={`group relative px-2.5 py-2 rounded-xl text-xs font-semibold text-center transition-all border select-none ${
+                    className={`group relative min-h-11 px-2.5 py-2 rounded-xl text-xs font-semibold text-center transition-all border select-none ${
                       isSelected
                         ? "bg-stone-900 text-white border-stone-900 shadow-xs"
                         : "bg-stone-50 text-stone-700 border-stone-200/80 hover:bg-stone-100 hover:border-stone-300"
@@ -995,7 +1002,7 @@ export default function StudioPage() {
                         e.stopPropagation();
                         toggleLockSlot(s.slot);
                       }}
-                      className={`absolute top-1 right-1 p-0.5 rounded cursor-pointer transition-all ${
+                      className={`absolute top-1 right-1 hidden lg:block p-0.5 rounded cursor-pointer transition-all ${
                         isLocked
                           ? "text-amber-500 opacity-100 bg-amber-50 rounded-full"
                           : "opacity-0 group-hover:opacity-40 hover:!opacity-100 text-current"
@@ -1010,7 +1017,7 @@ export default function StudioPage() {
             </div>
 
             {/* Structural closure data is recorded for checks/prompts; it never flips the source image. */}
-            <div className="space-y-2 rounded-xl border border-stone-200/80 bg-stone-50/80 px-3 py-2 text-xs">
+            <div className="studio-closure space-y-2 rounded-xl border border-stone-200/80 bg-stone-50/80 px-3 py-2 text-xs">
               <div className="flex items-center justify-between gap-2">
               <div className="flex items-center space-x-1.5">
                 <Compass className="w-3.5 h-3.5 text-heritage-red shrink-0" />
@@ -1055,7 +1062,7 @@ export default function StudioPage() {
                 ))}
               </div>
             ) : (
-              <div className="space-y-2 max-h-[480px] xl:max-h-[560px] overflow-y-auto pr-1 overscroll-contain">
+              <div ref={catalogListRef} tabIndex={-1} role="region" aria-label="Danh sách trang phục" className="studio-garment-list space-y-2">
                 {filteredCatalogItems.length === 0 && (
                   <div className="rounded-lg border border-dashed border-stone-300 p-4 text-center text-xs text-stone-500">
                     Chưa có trang phục trong nhóm và lớp đang chọn.
@@ -1064,10 +1071,14 @@ export default function StudioPage() {
                 {filteredCatalogItems.map((item) => {
                   const isEquipped = equippedItems.some((it) => it.itemId === item.id);
                   return (
-                    <div
+                    <button
+                      type="button"
                       key={item.id}
+                      aria-label={`Chọn ${item.name}`}
+                      aria-pressed={isEquipped}
+                      disabled={lockedSlots.has(item.slot)}
                       onClick={() => handleSelectItem(item)}
-                      className={`p-2.5 rounded-xl border flex items-center space-x-3 cursor-pointer transition-colors duration-150 ${
+                      className={`w-full text-left p-2.5 rounded-xl border flex items-center space-x-3 cursor-pointer disabled:cursor-not-allowed disabled:opacity-60 transition-colors duration-150 ${
                         isEquipped
                           ? "border-heritage-red bg-heritage-red/5 ring-1.5 ring-heritage-red shadow-xs"
                           : "border-stone-200 hover:border-stone-400 bg-white hover:bg-[#FAF8F5]"
@@ -1109,7 +1120,7 @@ export default function StudioPage() {
                           </span>
                         )}
                         <div className="flex items-center space-x-2 text-xs text-stone-500">
-                          <span>Thời {item.era || "Nguyễn"}</span>
+                          <span className="line-clamp-2">Thời {item.era || "Nguyễn"}</span>
                           {item.variants.length > 0 && (
                             <div className="flex items-center space-x-1">
                               <span>•</span>
@@ -1133,7 +1144,7 @@ export default function StudioPage() {
                           <Check className="w-3.5 h-3.5" />
                         </div>
                       )}
-                    </div>
+                    </button>
                   );
                 })}
               </div>
@@ -1142,23 +1153,23 @@ export default function StudioPage() {
         </div>
 
         {/* CỘT GIỮA (6 cols): Vùng Artboard Canvas 2D (F03) - Trọng tâm thiết kế */}
-        <div className="order-1 min-w-0 space-y-3 lg:order-2 lg:col-span-6 xl:col-span-6">
+        <div id="studio-board" className="studio-center order-1 min-w-0 scroll-mt-20 space-y-3 lg:order-2">
           {/* Thanh công cụ Artboard: Chế độ Flat-lay, Nền, Tỉ lệ */}
-          <div className="bg-white p-2.5 rounded-2xl border border-stone-200 shadow-xs space-y-2">
-            <div className="flex items-center justify-between">
+          <div className="studio-board-toolbar bg-white p-3 rounded-xl border border-stone-200 space-y-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               {/* Tiêu đề Bảng phối Flat-lay OOTD */}
               <div className="flex items-center space-x-2">
                 <div className="w-6 h-6 rounded-lg bg-heritage-red/10 text-heritage-red flex items-center justify-center">
                   <Layers className="w-3.5 h-3.5" />
                 </div>
-                <span className="text-sm font-bold text-stone-900 tracking-tight">Bảng Phối Đồ Flat-lay (OOTD)</span>
+                <span className="text-sm font-bold text-stone-900 tracking-tight">Bảng phối</span>
               </div>
 
               {/* Tỉ lệ khung hình */}
               <div className="flex items-center space-x-1 text-xs">
                 <button
                   onClick={() => setDisplayRatio("9:16")}
-                  className={`px-2.5 py-1 rounded-lg font-mono font-semibold text-xs transition-all ${
+                  className={`min-h-11 min-w-11 px-2.5 py-1 rounded-lg font-mono font-semibold text-xs transition-all ${
                     displayRatio === "9:16" ? "bg-stone-900 text-white shadow-xs" : "bg-stone-100 text-stone-600 hover:bg-stone-200"
                   }`}
                   title="Tỉ lệ dọc (Story / TikTok / Reels)"
@@ -1167,7 +1178,7 @@ export default function StudioPage() {
                 </button>
                 <button
                   onClick={() => setDisplayRatio("1:1")}
-                  className={`px-2.5 py-1 rounded-lg font-mono font-semibold text-xs transition-all ${
+                  className={`min-h-11 min-w-11 px-2.5 py-1 rounded-lg font-mono font-semibold text-xs transition-all ${
                     displayRatio === "1:1" ? "bg-stone-900 text-white shadow-xs" : "bg-stone-100 text-stone-600 hover:bg-stone-200"
                   }`}
                   title="Tỉ lệ vuông (Instagram / Feed)"
@@ -1178,12 +1189,12 @@ export default function StudioPage() {
             </div>
 
             {/* Tùy chọn nền & Nút đặt lại vị trí */}
-            <div className="flex items-center justify-between pt-1 border-t border-stone-100 text-xs text-stone-500">
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-stone-100 text-xs text-stone-500">
               <div className="flex items-center space-x-1.5">
                 <span className="font-medium text-stone-600">Nền:</span>
                 <button
                   onClick={() => setCanvasBackgroundTheme("white")}
-                  className={`px-2.5 py-1 rounded-md text-xs font-medium border transition-colors ${
+                  className={`min-h-11 px-2.5 py-1 rounded-md text-xs font-medium border transition-colors ${
                     canvasBackgroundTheme === "white"
                       ? "bg-stone-900 text-white border-stone-900 shadow-xs"
                       : "bg-white text-stone-700 border-stone-200 hover:bg-stone-50"
@@ -1193,7 +1204,7 @@ export default function StudioPage() {
                 </button>
                 <button
                   onClick={() => setCanvasBackgroundTheme("dopaper")}
-                  className={`px-2.5 py-1 rounded-md text-xs font-medium border transition-colors ${
+                  className={`min-h-11 px-2.5 py-1 rounded-md text-xs font-medium border transition-colors ${
                     canvasBackgroundTheme === "dopaper"
                       ? "bg-heritage-red text-white border-heritage-red shadow-xs"
                       : "bg-[#FAF8F5] text-stone-700 border-stone-200 hover:bg-stone-100"
@@ -1205,7 +1216,8 @@ export default function StudioPage() {
 
               <button
                 onClick={() => canvasRef.current?.resetAllTransforms()}
-                className="inline-flex items-center space-x-1.5 text-xs font-semibold text-stone-600 hover:text-heritage-red transition-colors"
+                aria-label="Căn lại vị trí ban đầu"
+                className="inline-flex min-h-11 items-center space-x-1.5 text-xs font-semibold text-stone-600 hover:text-heritage-red transition-colors"
                 title="Khôi phục toàn bộ trang phục về vị trí sắp xếp OOTD ban đầu"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
@@ -1225,6 +1237,18 @@ export default function StudioPage() {
             backgroundTheme={canvasBackgroundTheme}
             selectedSlot={activeSlot}
             onSelectItem={(slot) => setActiveSlot(slot)}
+            onRemoveItem={(slot) => {
+              if (lockedSlots.has(slot)) return;
+              pushHistory(equippedItems.filter(item => item.slot !== slot));
+            }}
+            onBrowseCatalog={() => {
+              setMobilePanel("catalog");
+              requestAnimationFrame(() => {
+                catalogListRef.current?.focus({ preventScroll: true });
+                catalogListRef.current?.scrollIntoView({ block: "center" });
+              });
+            }}
+            onToggleLock={toggleLockSlot}
             lockedSlots={[...lockedSlots]}
             onColorLoadFailure={handleColorLoadFailure}
             onTransformsCommit={(changes) => studio.dispatch({ type: "commit", update: doc => ({ ...doc, snapshot: { ...doc.snapshot, items: doc.snapshot.items.map(item => item.slot in changes ? { ...item, transform: changes[item.slot] } : item) } }) })}
@@ -1232,7 +1256,7 @@ export default function StudioPage() {
           />
 
           {/* Trợ lý Gemini gợi ý nhanh */}
-          <section aria-label="Gợi ý phối đồ" className="bg-white p-3.5 rounded-2xl border border-stone-200 shadow-xs space-y-2">
+          <section aria-label="Gợi ý phối đồ" className="bg-white p-4 rounded-xl border border-stone-200 space-y-3">
             <div className="flex items-center space-x-1.5 text-xs font-semibold text-stone-900">
               <Sparkles className="w-3.5 h-3.5 text-heritage-red" />
               <span>Gợi ý phối đồ</span>
@@ -1246,12 +1270,12 @@ export default function StudioPage() {
                 value={aiPrompt}
                 onChange={(e) => setAiPrompt(e.target.value)}
                 placeholder="Ví dụ: Phối áo ngũ thân chụp kỷ yếu thanh lịch..."
-                className="min-w-0 flex-1 text-xs px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:border-heritage-red"
+                className="min-h-11 min-w-0 flex-1 text-sm px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:border-heritage-red"
               />
               <button
                 type="submit"
                 disabled={isAiLoading || isApplyingRecommendation || !aiPrompt.trim()}
-                className="px-3.5 py-2 bg-heritage-red text-white rounded-lg text-xs font-semibold hover:bg-heritage-red-dark transition-all disabled:opacity-50"
+                className="min-h-11 shrink-0 px-4 py-2 bg-heritage-red text-white rounded-lg text-xs font-semibold hover:bg-heritage-red-dark transition-all disabled:opacity-50"
               >
                 {isAiLoading ? "Đang tìm…" : "Gợi ý"}
               </button>
@@ -1271,47 +1295,12 @@ export default function StudioPage() {
               <div className="flex gap-2"><button type="button" disabled={isApplyingRecommendation} onClick={applyPendingRecommendation} className="rounded-lg bg-heritage-red px-3 py-1.5 font-semibold text-white">{isApplyingRecommendation ? "Đang áp dụng…" : "Áp dụng gợi ý"}</button><button type="button" disabled={isApplyingRecommendation} onClick={() => setPendingRecommendation(null)} className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 font-semibold">Bỏ qua</button></div>
             </div>}
           </section>
+
+
         </div>
 
         {/* CỘT PHẢI (3 cols): Swatch Màu (F02), Cảnh báo văn hóa (F10), Hài hòa màu (F07), Thời tiết (F06) */}
-        <div className="order-3 min-w-0 space-y-4 lg:col-span-3 xl:col-span-3">
-          {/* Cảnh báo Quy Chuẩn Văn Hóa (F10) */}
-          <div className={mobilePanel === "tools" ? "" : "hidden lg:block"}>{process.env.NEXT_PUBLIC_STUDIO_V3 === "true" ? <StudioComposerPanel snapshot={snapshot} onSettingsChange={culturalSettings => studio.dispatch({ type: "commit", update: doc => ({ ...doc, snapshot: { ...doc.snapshot, culturalSettings } }) })} /> : <CulturalCheckBadge
-            checkData={culturalCheck}
-            status={culturalCheckStatus}
-            error={culturalCheckError}
-            onRetry={() => setCulturalCheckRetry(value => value + 1)}
-            onApplyFix={handleApplyCulturalFix}
-          />}</div>
-
-          {/* Bảng phối màu Ngũ Hành 1 chạm (Tối ưu trải nghiệm F02/F07) */}
-          <div className={`${mobilePanel === "tools" ? "" : "hidden lg:block"} bg-white p-4 rounded-2xl border border-stone-200/80 shadow-xs space-y-2.5`}>
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-stone-500 uppercase tracking-wider flex items-center space-x-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-heritage-gold" />
-                <span>Phối Màu Ngũ Hành 1 Chạm</span>
-              </span>
-              <span className="text-xs text-stone-400 font-medium">Tương sinh</span>
-            </div>
-            <div className="grid grid-cols-5 gap-1.5">
-              {NGU_HANH_PALETTES.map((pal) => (
-                <button
-                  key={pal.name}
-                  disabled={isApplyingColor}
-                  onClick={() => void applyNguHanhPalette(pal)}
-                  className={`p-2 rounded-xl border text-center transition-all hover:scale-105 disabled:opacity-60 ${pal.badge}`}
-                  title={`${pal.name} (${pal.desc}) - chỉ đổi màu khi ảnh giữ được chi tiết`}
-                >
-                  <div
-                    className="w-4 h-4 rounded-full mx-auto mb-1 border border-black/10 shadow-xs"
-                    style={{ backgroundColor: pal.colors.outerwear }}
-                  ></div>
-                  <div className="text-xs font-bold">{pal.name}</div>
-                </button>
-              ))}
-            </div>
-          </div>
-
+        <div aria-label="Thuộc tính và gợi ý" role="region" tabIndex={0} className="studio-rail studio-inspector order-4 min-w-0 space-y-3 lg:order-3">
           {/* Bộ chọn Biến thể màu sắc & Chất liệu cho món đang chọn (F02) */}
           <div className={mobilePanel === "properties" ? "" : "hidden lg:block"}>{isInitialLoading ? (
             <div className="bg-white p-4 rounded-2xl border border-stone-200/80 shadow-xs space-y-3">
@@ -1352,6 +1341,15 @@ export default function StudioPage() {
             </div>
           )}</div>
 
+          {/* Cảnh báo Quy Chuẩn Văn Hóa (F10) */}
+          <div className={mobilePanel === "tools" ? "" : "hidden lg:block"}>{process.env.NEXT_PUBLIC_STUDIO_V3 === "true" ? <StudioComposerPanel snapshot={snapshot} onSettingsChange={culturalSettings => studio.dispatch({ type: "commit", update: doc => ({ ...doc, snapshot: { ...doc.snapshot, culturalSettings } }) })} /> : <CulturalCheckBadge
+            checkData={culturalCheck}
+            status={culturalCheckStatus}
+            error={culturalCheckError}
+            onRetry={() => setCulturalCheckRetry(value => value + 1)}
+            onApplyFix={handleApplyCulturalFix}
+          />}</div>
+
           {/* Phân tích Hài hòa Màu sắc & Độ tương phản (F07) */}
           <div className={mobilePanel === "properties" ? "" : "hidden lg:block"}><ColorAnalysisPanel
             equippedColors={currentColorsForAnalysis}
@@ -1369,8 +1367,39 @@ export default function StudioPage() {
                 setActionNotice(applied ? `Đã áp dụng gợi ý màu ${sug.color_name}.` : "Bản phối vừa được chỉnh ở nơi khác; gợi ý chưa được áp dụng.");
               } catch (error: any) { setActionNotice(error?.message || "Không kiểm tra được ảnh đổi màu."); }
             }}
-          />
+          /></div>
 
+          {/* Bảng phối màu Ngũ Hành 1 chạm (Tối ưu trải nghiệm F02/F07) */}
+          <div className={`${mobilePanel === "tools" ? "" : "hidden lg:block"} bg-white p-4 rounded-2xl border border-stone-200/80 shadow-xs space-y-2.5`}>
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-stone-500 uppercase tracking-wider flex items-center space-x-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-heritage-gold" />
+                <span>Phối màu ngũ hành</span>
+              </span>
+              <span className="shrink-0 text-xs text-stone-500">1 chạm</span>
+            </div>
+            <div className="grid grid-cols-5 gap-1.5">
+              {NGU_HANH_PALETTES.map((pal) => (
+                <button
+                  key={pal.name}
+                  disabled={isApplyingColor}
+                  onClick={() => void applyNguHanhPalette(pal)}
+                  className={`p-2 rounded-xl border text-center transition-all hover:scale-105 disabled:opacity-60 ${pal.badge}`}
+                  title={`${pal.name} (${pal.desc}) - chỉ đổi màu khi ảnh giữ được chi tiết`}
+                >
+                  <div
+                    className="w-4 h-4 rounded-full mx-auto mb-1 border border-black/10 shadow-xs"
+                    style={{ backgroundColor: pal.colors.outerwear }}
+                  ></div>
+                  <div className="text-xs font-bold">{pal.name}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+
+
+          <div className={mobilePanel === "properties" ? "" : "hidden lg:block"}>
           {/* Dự báo Thời tiết & Lời khuyên bối cảnh (F06) */}
           <WeatherWidget
             onApplyWeatherSuggestion={handleWeatherSuggestion}

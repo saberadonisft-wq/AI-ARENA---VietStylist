@@ -9,6 +9,85 @@ const STALE_DOCUMENT = { ...structuredClone(INITIAL_DOCUMENT), snapshot: { ...st
   "outerwear", "undergarment", "bottom", "headwear", "accessory_front", "footwear",
 ].map(slot => ({ slot, itemId: `removed-${slot}`, variantId: `removed-variant-${slot}`, assetVersion: 1, colorHex: "#123456" })) } };
 
+for (const viewport of [{ width: 1024, height: 768 }, { width: 1366, height: 768 }, { width: 1920, height: 1080 }]) {
+  test(`desktop Studio scrolls the whole page with expanded tools at ${viewport.width}`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    await mockApi(page);
+    await page.route("http://127.0.0.1:4100/api/catalog/occasions", route => route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify(Array.from({ length: 20 }, (_, i) => ({ id: `occasion-${i}`, name: `Hoàn cảnh ${i + 1}`, season: "all" }))),
+    }));
+    await page.goto("/studio");
+    await page.getByText("Trang phục 0", { exact: true }).click();
+    await expect(page.locator("#content-outerwear image")).toBeVisible();
+    const original = (await readDraft(page)).snapshot.items;
+    const board = page.getByTestId("outfit-artboard");
+    for (const ratio of ["1:1", "9:16"] as const) {
+      await page.getByRole("button", { name: ratio, exact: true }).click();
+      const bounds = (await board.boundingBox())!;
+      expect(bounds.width / bounds.height).toBeCloseTo(ratio === "1:1" ? 1 : 9 / 16, 2);
+      expect(bounds.height).toBeGreaterThan(160);
+      const controls = (await page.getByRole("region", { name: "Điều chỉnh trang phục" }).boundingBox())!;
+      expect(bounds.y + bounds.height).toBeLessThan(controls.y);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth && document.documentElement.scrollHeight > innerHeight)).toBe(true);
+    }
+    const library = page.getByRole("region", { name: "Kho trang phục và hoàn cảnh", exact: true });
+    await page.evaluate(() => scrollTo(0, 0));
+    const before = (await board.boundingBox())!;
+    const libraryBounds = (await library.boundingBox())!;
+    await page.mouse.move(libraryBounds.x + libraryBounds.width / 2, 350);
+    await page.mouse.wheel(0, 500);
+    await expect.poll(() => page.evaluate(() => scrollY)).toBeGreaterThan(0);
+    expect(await library.evaluate(element => element.scrollTop)).toBe(0);
+    expect((await board.boundingBox())!.y).toBeLessThan(before.y);
+    const inspector = page.getByRole("region", { name: "Thuộc tính và gợi ý", exact: true });
+    expect(await inspector.evaluate(element => element.scrollHeight <= element.clientHeight + 1)).toBe(true);
+    await page.locator("footer").scrollIntoViewIfNeeded();
+    await expect(page.locator("footer")).toBeInViewport();
+    expect((await readDraft(page)).snapshot.items).toEqual(original);
+    await page.screenshot({ path: test.info().outputPath("desktop-workbench.png") });
+  });
+}
+
+test("Studio workbench remains usable across mobile widths and landscape", async ({ page }) => {
+  await mockApi(page);
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.goto("/studio");
+  await page.getByText("Trang phục 0", { exact: true }).click();
+  for (const [width, height] of [[320, 812], [375, 812], [414, 896], [768, 1024], [844, 390]]) {
+    await page.setViewportSize({ width, height });
+    await page.getByTestId("outfit-artboard").scrollIntoViewIfNeeded();
+    await expect(page.locator("#content-outerwear image")).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    const box = (await page.getByTestId("outfit-artboard").boundingBox())!;
+    expect(box.width / box.height).toBeCloseTo(9 / 16, 2);
+    await page.screenshot({ path: test.info().outputPath(`mobile-${width}.png`) });
+  }
+});
+
+for (const width of [375, 1536]) {
+  test(`empty Studio guides garment selection at viewport ${width}`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await mockApi(page);
+    await page.goto("/studio");
+    const board = page.getByTestId("outfit-artboard");
+    await expect(board.getByText("Bảng phối đang trống", { exact: true })).toBeVisible();
+    await expect(page.locator("#flatlay-outfit-board > g")).toHaveCount(0);
+    if (width < 1024) await page.getByRole("tab", { name: "Công cụ", exact: true }).click();
+    await board.getByRole("button", { name: "Chọn trang phục", exact: true }).click();
+    const catalog = page.getByRole("region", { name: "Danh sách trang phục", exact: true });
+    await expect(catalog).toBeFocused();
+    await expect(catalog).toBeInViewport();
+    await catalog.getByText("Trang phục 0", { exact: true }).click();
+    await expect(board.getByText("Bảng phối đang trống", { exact: true })).toHaveCount(0);
+    await expect(page.locator("#content-outerwear image")).toBeVisible();
+    await expect.poll(() => page.evaluate(key => JSON.parse(localStorage.getItem(key) || "null")?.snapshot.items.length, DRAFT_KEY)).toBe(1);
+    await page.reload();
+    await expect(page.locator("#content-outerwear image")).toBeVisible();
+    await expect(board.getByText("Bảng phối đang trống", { exact: true })).toHaveCount(0);
+  });
+}
+
 test("history restores the first edit and discards redo after a new edit", () => {
   const initial = { past: [], present: structuredClone(INITIAL_DOCUMENT), future: [] };
   const changed = studioReducer(initial, { type: "commit", update: document => ({ ...document, title: "Changed" }) });
@@ -98,8 +177,8 @@ test("mobile Studio keeps the outfit board above its panels and opens properties
   const propertiesTab = tabs.getByRole("tab", { name: "Món đang chọn" });
   await expect(tabs).toBeVisible();
   await expect(catalogTab).toHaveAttribute("aria-selected", "true");
-  const board = page.getByText("Bảng Phối Đồ Flat-lay (OOTD)", { exact: true });
-  const catalogHeading = page.getByText("Phân loại trang phục", { exact: true });
+  const board = page.getByText("Bảng phối", { exact: true });
+  const catalogHeading = page.getByText("Kho trang phục", { exact: true });
   await expect(board).toBeVisible();
   expect((await board.boundingBox())!.y).toBeLessThan((await catalogHeading.boundingBox())!.y);
 
@@ -165,6 +244,96 @@ test("refresh preserves draft, first change can undo, and saving updates one out
   await page.reload();
   await page.getByRole("button", { name: "Tiếp tục bản nháp", exact: true }).click();
   await expect(title).toHaveValue("Chưa lưu lên máy chủ");
+});
+
+for (const width of [375, 1536]) {
+  test(`remove garment control respects locks and supports undo at viewport ${width}`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await mockApi(page);
+    await page.goto("/studio");
+    await page.getByText("Trang phục 0", { exact: true }).click();
+    const controls = page.getByRole("region", { name: "Điều chỉnh trang phục" });
+    await controls.getByRole("button", { name: "Xoay phải 15 độ", exact: true }).click();
+    await expect.poll(async () => (await readDraft(page))?.snapshot.items[0].transform?.rotation).toBe(15);
+    const original = (await readDraft(page)).snapshot.items;
+    const remove = page.getByRole("button", { name: "Xóa trang phục khỏi bảng", exact: true });
+    await controls.getByRole("button", { name: "Khóa món đang chọn", exact: true }).click();
+    await expect(remove).toBeDisabled();
+    await controls.getByRole("button", { name: "Mở khóa món đang chọn", exact: true }).click();
+    await expect(remove).toBeEnabled();
+    await remove.click();
+    await expect(page.locator("#content-outerwear")).toHaveCount(0);
+    await expect(page.getByText("Bảng phối đang trống", { exact: true })).toBeVisible();
+    await expect.poll(async () => (await readDraft(page))?.snapshot.items).toEqual([]);
+    await page.getByTitle("Hoàn tác (Ctrl+Z)").click();
+    await expect(page.locator("#content-outerwear image")).toBeVisible();
+    await expect.poll(async () => (await readDraft(page))?.snapshot.items).toEqual(original);
+    await remove.focus();
+    await page.keyboard.press("Enter");
+    await expect.poll(async () => (await readDraft(page))?.snapshot.items).toEqual([]);
+    await page.reload();
+    await expect(page.locator("#content-outerwear")).toHaveCount(0);
+    await expect(page.getByText("Bảng phối đang trống", { exact: true })).toBeVisible();
+  });
+}
+
+test("board zoom preserves the outfit and exported pixels while dragging uses zoomed coordinates", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await mockApi(page);
+  await loginForGeneration(page);
+  await page.goto("/studio");
+  await page.getByText("Trang phục 0", { exact: true }).click();
+  await page.getByRole("button", { name: "1:1", exact: true }).click();
+  const original = (await readDraft(page)).snapshot.items;
+  const board = page.getByTestId("outfit-artboard");
+  const viewport = page.getByRole("region", { name: "Vùng xem bảng phối", exact: true });
+  const zoomIn = page.getByRole("button", { name: "Phóng to bảng phối", exact: true });
+  const exportImage = async () => {
+    await page.getByRole("button", { name: "Xuất ảnh", exact: true }).click();
+    await page.getByRole("button", { name: "Vuông (Instagram / Post)" }).click();
+    const image = page.getByAltText("Bản phối xuất");
+    await expect(image).toBeVisible();
+    const src = await image.getAttribute("src");
+    await page.getByRole("heading", { name: "Xuất ảnh bản phối", exact: true }).locator("../..").getByRole("button").click();
+    return src;
+  };
+  const exportedBefore = await exportImage();
+  const fit = (await board.boundingBox())!;
+  for (let i = 0; i < 4; i++) await zoomIn.click();
+  await expect(page.getByLabel("Mức thu phóng bảng phối", { exact: true })).toHaveText("200%");
+  const zoomed = (await board.boundingBox())!;
+  expect(zoomed.width).toBeCloseTo(fit.width * 2, 0);
+  expect(zoomed.height).toBeCloseTo(fit.height * 2, 0);
+  expect((await readDraft(page)).snapshot.items).toEqual(original);
+  expect(await exportImage()).toBe(exportedBefore);
+  const image = page.locator("#content-outerwear image");
+  await image.scrollIntoViewIfNeeded();
+  const box = (await image.boundingBox())!;
+  const svgScale = await page.locator('svg:has(> #flatlay-outfit-board)').evaluate((svg: SVGSVGElement) => svg.getScreenCTM()!.a);
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width / 2 + 40, box.y + box.height / 2 + 20, { steps: 5 });
+  await page.mouse.up();
+  await expect.poll(async () => (await readDraft(page)).snapshot.items[0].transform?.dx).toBeCloseTo(40 / svgScale, 0);
+  await page.getByTitle("Hoàn tác (Ctrl+Z)").click();
+  await expect.poll(async () => (await readDraft(page)).snapshot.items).toEqual(original);
+  const pageScroll = await page.evaluate(() => scrollY);
+  await viewport.evaluate(element => { element.scrollLeft = element.scrollWidth; element.scrollTop = element.scrollHeight; });
+  expect(await viewport.evaluate(element => element.scrollTop)).toBeGreaterThan(0);
+  expect(await page.evaluate(() => scrollY)).toBe(pageScroll);
+  await page.getByRole("button", { name: "Vừa khung", exact: true }).click();
+  await expect(page.getByLabel("Mức thu phóng bảng phối", { exact: true })).toHaveText("100%");
+  expect((await board.boundingBox())!.width).toBeCloseTo(fit.width, 0);
+  expect(await viewport.evaluate(element => [element.scrollLeft, element.scrollTop])).toEqual([0, 0]);
+  for (let i = 0; i < 12; i++) await zoomIn.click();
+  await expect(zoomIn).toBeDisabled();
+  await expect(page.getByLabel("Mức thu phóng bảng phối", { exact: true })).toHaveText("400%");
+  await page.getByRole("button", { name: "Vừa khung", exact: true }).click();
+  const zoomOut = page.getByRole("button", { name: "Thu nhỏ bảng phối", exact: true });
+  await zoomOut.click();
+  await zoomOut.click();
+  await expect(zoomOut).toBeDisabled();
+  await expect(page.getByLabel("Mức thu phóng bảng phối", { exact: true })).toHaveText("50%");
 });
 
 test("canvas drag persists, undo restores it, and export includes garment image", async ({ page }) => {
@@ -278,6 +447,8 @@ test("pending save waits for a choice when both guest and account drafts exist",
   await page.setViewportSize({ width: 320, height: 640 });
   await seedConflictingGuestAndAccountDrafts(page, accountId);
   await page.goto("/studio");
+  await page.getByRole("button", { name: "Đóng thông báo bản nháp" }).click();
+  await page.getByRole("button", { name: "Đóng thông báo chế độ khách" }).click();
   await signInFromPendingStudioAction(page, accountId);
 
   const choice = page.getByRole("dialog", { name: "Chọn bản phối cần tiếp tục" });
@@ -458,7 +629,6 @@ for (const withPerson of [false, true]) {
     await seedDraft(page, TEST_DOCUMENT, "generation-user");
     const uploads: Array<{ filename: string; bytes: Buffer }> = [];
     let synthesis: any;
-    let nextId = 0;
     await page.route("**/test-upload/*", route => {
       uploads.push({ filename: route.request().url(), bytes: route.request().postDataBuffer() || Buffer.alloc(0) });
       return route.fulfill({ status: 200, body: "ok" });
@@ -471,7 +641,7 @@ for (const withPerson of [false, true]) {
     }) }));
     await page.route("http://127.0.0.1:4100/api/media/**", route => {
       if (route.request().method() === "POST" && new URL(route.request().url()).pathname === "/api/media/uploads") {
-        const id = `media-${++nextId}`;
+        const id = route.request().postDataJSON().filename === "studio-outfit.png" ? "media-1" : "media-2";
         return route.fulfill({ contentType: "application/json", body: JSON.stringify({ media_id: id, upload_url: `http://127.0.0.1:3100/test-upload/${id}`, method: "PUT", storage_type: "r2" }) });
       }
       return route.fulfill({ contentType: "application/json", body: "{}" });
@@ -508,13 +678,85 @@ for (const withPerson of [false, true]) {
     await expect(dialog.getByRole("alert")).toContainText(withPerson ? "Gemini đang quá tải" : "Kiểm tra quota");
     await expect(dialog.getByRole("alert")).toBeInViewport();
     expect(uploads).toHaveLength(withPerson ? 2 : 1);
-    expect(uploads[0].bytes.subarray(0, 8).toString("hex")).toBe("89504e470d0a1a0a");
+    expect(uploads.find(upload => upload.filename.endsWith("/media-1"))?.bytes.subarray(0, 8).toString("hex")).toBe("89504e470d0a1a0a");
     expect(synthesis.outfit_image_id).toBe("media-1");
     expect(synthesis.user_image_id).toBe(withPerson ? "media-2" : null);
     expect(synthesis.legacy_item_ids).toEqual([TEST_GARMENT.itemId]);
     expect(synthesis.outfit.selections).toHaveLength(withPerson ? 1 : 0);
     if (!withPerson) await expect(dialog.getByText(/chưa có thẩm định V3/)).toBeVisible();
     await expect(dialog.getByRole("button", { name: "Tải ảnh bản phối" })).toBeEnabled();
+  });
+}
+
+for (const failUpload of [false, true]) {
+  test(`parallel try-on uploads preserve image roles and ${failUpload ? "show errors without submitting a partial job" : "long poll the same job until its image is ready"}`, async ({ page }) => {
+    await mockApi(page);
+    await loginForGeneration(page);
+    await seedDraft(page, TEST_DOCUMENT, "generation-user");
+    const uploaded = new Map<string, Buffer>();
+    const completed = new Set<string>();
+    let releaseUploads!: () => void;
+    let releasePoll!: () => void;
+    const uploadGate = new Promise<void>(resolve => { releaseUploads = resolve; });
+    const pollGate = new Promise<void>(resolve => { releasePoll = resolve; });
+    let submissions = 0, polls = 0;
+    await page.route("**/api/media/**", route => {
+      const path = new URL(route.request().url()).pathname;
+      if (path.endsWith("/uploads")) {
+        const id = route.request().postDataJSON().filename === "studio-outfit.png" ? "board" : "person";
+        return route.fulfill({ json: { media_id: id, upload_url: `http://127.0.0.1:3100/parallel-upload/${id}`, method: "PUT", storage_type: "r2" } });
+      }
+      if (path.endsWith("/complete")) completed.add(path.split("/").at(-2)!);
+      return route.fulfill({ json: path.endsWith("/access") ? { access_url: "/fixture.png" } : {} });
+    });
+    await page.route("**/parallel-upload/*", async route => {
+      const id = new URL(route.request().url()).pathname.split("/").at(-1)!;
+      uploaded.set(id, route.request().postDataBuffer()!);
+      await uploadGate;
+      if (failUpload && id === "person") return; // Sibling must be aborted on board failure.
+      await route.fulfill({ status: failUpload ? 503 : 200, body: "upload response" });
+    });
+    await page.route("**/api/v3/generation/jobs**", async route => {
+      if (route.request().method() === "POST") {
+        submissions++;
+        expect(completed).toEqual(new Set(["board", "person"]));
+        expect(route.request().postDataJSON()).toMatchObject({ outfit_image_id: "board", user_image_id: "person" });
+        return route.fulfill({ status: 202, json: { job_id: "parallel-job", status: "running", result: null, error: null } });
+      }
+      polls++;
+      expect(new URL(route.request().url()).searchParams.get("wait_seconds")).toBe("10");
+      await pollGate;
+      return route.fulfill({ json: { job_id: "parallel-job", status: "completed", result: { result_media_id: "parallel-result" }, error: null } });
+    });
+    await page.goto("/studio");
+    await page.getByRole("button", { name: "Thử đồ AI" }).click();
+    const dialog = page.getByRole("dialog", { name: "Thử đồ bằng Gemini" });
+    const personPath = "public/images/heritage/thumb_nguyen_ao_tac.jpg";
+    await dialog.locator("input[type=file]").setInputFiles(personPath);
+    await dialog.getByRole("button", { name: "Tạo ảnh thử đồ" }).click();
+    try {
+      // Neither upload completes until both have arrived: serial code fails here.
+      await expect.poll(() => uploaded.size).toBe(2);
+      expect(submissions).toBe(0);
+      expect(uploaded.get("person")).toEqual(readFileSync(personPath));
+      expect(uploaded.get("board")?.subarray(0, 8).toString("hex")).toBe("89504e470d0a1a0a");
+      releaseUploads();
+      if (failUpload) {
+        await expect(dialog.getByRole("alert")).toContainText("Không thể tải ảnh lên kho media");
+        await expect(dialog.getByRole("button", { name: "Tạo ảnh thử đồ" })).toBeEnabled();
+        expect(submissions).toBe(0);
+      } else {
+        await expect.poll(() => polls).toBe(1);
+        expect(submissions).toBe(1);
+        releasePoll();
+        await expect(dialog.getByAltText("Kết quả thử đồ Gemini")).toBeVisible();
+        expect(submissions).toBe(1);
+        expect(polls).toBe(1);
+      }
+    } finally {
+      releaseUploads();
+      releasePoll();
+    }
   });
 }
 

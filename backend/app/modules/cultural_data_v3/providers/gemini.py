@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import base64
 import binascii
+import asyncio
 import re
 
 import anyio
@@ -49,20 +50,17 @@ class GeminiGenerationProvider:
 
         try:
             parts = [{"text": self._combined_prompt(request)}]
-            if request.outfit_image_id:
-                outfit_bytes, outfit_mime = await anyio.to_thread.run_sync(
-                    MediaService.read_owned_image, request.outfit_image_id, self.owner_id
-                )
-                parts.append(
-                    {"inlineData": {
-                        "mimeType": outfit_mime,
-                        "data": base64.b64encode(outfit_bytes).decode("ascii"),
-                    }}
-                )
-            if request.user_image_id:
-                image_bytes, mime_type = await anyio.to_thread.run_sync(
-                    MediaService.read_owned_image, request.user_image_id, self.owner_id
-                )
+            # Read independent inputs together, then construct exactly the same
+            # ordered parts: outfit first, optional person second. Drain both
+            # reads on failure; never invoke the provider with a partial input.
+            images = await asyncio.gather(*(
+                anyio.to_thread.run_sync(MediaService.read_owned_image, media_id, self.owner_id)
+                for media_id in (request.outfit_image_id, request.user_image_id) if media_id
+            ), return_exceptions=True)
+            for image in images:
+                if isinstance(image, BaseException):
+                    raise image
+                image_bytes, mime_type = image
                 parts.append(
                     {
                         "inlineData": {

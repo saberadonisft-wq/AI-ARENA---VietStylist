@@ -184,3 +184,69 @@ async def test_http_submit_returns_before_provider_and_poll_recovers_result(monk
         assert result.json()["status"] == "completed"
         assert result.json()["result"]["result_media_id"] == "private-result"
         assert calls == 1
+
+
+async def test_long_poll_wakes_on_completion_and_does_not_cancel_paid_job():
+    user = AuthenticatedUser("dev-user-test-1")
+    ready_media("board", user.user_id)
+    gate = asyncio.Event()
+
+    async def delayed(req, owner):
+        await gate.wait()
+        return await generated(req, owner)
+
+    receipt = await jobs.submit(request(), user, delayed)
+    producer = jobs._tasks[receipt.job_id]
+    try:
+        # A bounded wait returns a running receipt without cancelling work.
+        pending = await jobs.poll_job(receipt.job_id, user.user_id, 0.02)
+        assert pending.status == "running"
+        assert not producer.done()
+        disconnected = asyncio.create_task(jobs.poll_job(receipt.job_id, user.user_id, 10))
+        await asyncio.sleep(0.03)
+        disconnected.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await disconnected
+        assert not producer.done()
+        waiter = asyncio.create_task(jobs.poll_job(receipt.job_id, user.user_id, 10))
+        await asyncio.sleep(0.03)
+        gate.set()
+        completed = await asyncio.wait_for(waiter, timeout=1)
+        assert completed.status == "completed"
+        assert completed.result.result_media_id == "private-result"
+    finally:
+        gate.set()
+        await jobs.wait_for_job(receipt.job_id, user.user_id)
+
+
+async def test_long_poll_authorizes_before_waiting_and_observes_other_process(monkeypatch):
+    ready_media("board", "dev-user-test-1")
+    identifier, _ = jobs._reserve(request(), "dev-user-test-1")
+    with pytest.raises(AppError) as forbidden:
+        await jobs.poll_job(identifier, "another-user", 10)
+    assert forbidden.value.code == "GENERATION_JOB_NOT_FOUND"
+
+    async def other_process():
+        await asyncio.sleep(0.01)
+        result = await generated(None, None)
+        Database.execute("UPDATE ai_jobs SET status='succeeded',result_data=? WHERE id=?", (result.model_dump_json(), identifier))
+
+    publisher = asyncio.create_task(other_process())
+    result = await jobs.poll_job(identifier, "dev-user-test-1", 0.05)
+    await publisher
+    assert result.status == "completed"
+
+
+def test_long_poll_http_parameter_is_bounded():
+    from fastapi.testclient import TestClient
+    from app.main import app
+    from conftest import auth_header
+    ready_media("board", "dev-user-test-1")
+    identifier, _ = jobs._reserve(request(), "dev-user-test-1")
+    headers = {"Authorization": auth_header("dev-user-test-1")}
+    with TestClient(app) as client:
+        for invalid in (-1, 11):
+            response = client.get(f"/api/v3/generation/jobs/{identifier}?wait_seconds={invalid}", headers=headers)
+            assert response.status_code == 422
+        response = client.get(f"/api/v3/generation/jobs/{identifier}?wait_seconds=0", headers=headers)
+        assert response.status_code == 200 and response.json()["status"] == "running"

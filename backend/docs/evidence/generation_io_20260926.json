@@ -1,0 +1,78 @@
+{
+  "baseline_ref": "5921da2e0df1331b4bcb63112b6bc122d1442e3c",
+  "iterations_per_asset": 3,
+  "simulated_storage_rtt_ms": 40,
+  "storage": [
+    {
+      "asset": "ly_tran_le_giao_linh.jpg",
+      "input_bytes": 259943,
+      "median_ms": {
+        "before": 302.28,
+        "after": 124.54
+      },
+      "storage_operations": {
+        "before": {
+          "put": 2,
+          "head": 1,
+          "get": 2,
+          "delete": 1
+        },
+        "after": {
+          "put": 1,
+          "get": 1
+        }
+      },
+      "output_bytes_identical": true,
+      "output_sha256": "fec38ca0a03ff0c72fcbeaf9bcdc023e0c8a4e3b57759acae896c643812405fa"
+    },
+    {
+      "asset": "ly_tran_le_nguyen_vien_linh.jpg",
+      "input_bytes": 308747,
+      "median_ms": {
+        "before": 300.9,
+        "after": 127.75
+      },
+      "storage_operations": {
+        "before": {
+          "put": 2,
+          "head": 1,
+          "get": 2,
+          "delete": 1
+        },
+        "after": {
+          "put": 1,
+          "get": 1
+        }
+      },
+      "output_bytes_identical": true,
+      "output_sha256": "76ed3b88fe3339d3dcf01406bde38eb11e5f33dbb138628e22bbd09bc99cc087"
+    },
+    {
+      "asset": "nguyen_ao_tac.jpg",
+      "input_bytes": 368514,
+      "median_ms": {
+        "before": 330.5,
+        "after": 125.17
+      },
+      "storage_operations": {
+        "before": {
+          "put": 2,
+          "head": 1,
+          "get": 2,
+          "delete": 1
+        },
+        "after": {
+          "put": 1,
+          "get": 1
+        }
+      },
+      "output_bytes_identical": true,
+      "output_sha256": "54edc74c44b6fd9fc9a5972d523181c3d9935e9c7fc380b00f4706e531df1304"
+    }
+  ],
+  "warm_cache_with_200ms_unrelated_lock_ms": {
+    "before": 221.19,
+    "after": 0.25
+  },
+  "scope": "Controlled local I/O only; not real R2 or Gemini end-to-end latency. Same encoded output bytes on the listed images."
+}

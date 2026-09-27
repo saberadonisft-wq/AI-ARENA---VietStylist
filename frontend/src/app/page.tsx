@@ -825,7 +825,7 @@ export default function WelcomePage() {
       </section>
 
       {/* 6. CLOSING CTA BANNER SECTION WITH CINEMATIC MOTION */}
-      <section className="py-16 sm:py-24 bg-gradient-to-r from-[#801F1F] via-stone-950 to-[#801F1F] text-white text-center relative overflow-hidden">
+      <section className="py-16 sm:py-24 bg-gradient-to-r from-heritage-red-dark via-stone-950 to-heritage-red-dark text-white text-center relative overflow-hidden">
         {/* Animated Radial Golden Glow */}
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(214,158,46,0.22),transparent_70%)] animate-pulse-glow pointer-events-none" />
 

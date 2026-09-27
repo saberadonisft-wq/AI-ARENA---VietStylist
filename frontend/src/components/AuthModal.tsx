@@ -50,6 +50,21 @@ export default function AuthModal({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const dialogRef = useRef<HTMLDialogElement>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const dialog = dialogRef.current;
+    const previousFocus = document.activeElement as HTMLElement | null;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    dialog?.showModal();
+    return () => {
+      dialog?.close();
+      document.body.style.overflow = previousOverflow;
+      if (previousFocus?.isConnected) previousFocus.focus({ preventScroll: true });
+    };
+  }, [isOpen]);
 
   // Google Identity Services (GSI)
   const googleBtnContainerRef = useRef<HTMLDivElement>(null);
@@ -100,7 +115,7 @@ export default function AuthModal({
       if (googleBtnContainerRef.current) {
         googleBtnContainerRef.current.innerHTML = "";
         const parentWidth = googleBtnContainerRef.current.parentElement?.clientWidth || 360;
-        const targetWidth = Math.min(Math.max(parentWidth, 240), 380);
+        const targetWidth = Math.min(parentWidth, 380);
         google.accounts.id.renderButton(googleBtnContainerRef.current, {
           theme: "outline",
           size: "large",
@@ -221,28 +236,41 @@ export default function AuthModal({
   const isBusy = isSubmitting || authContextLoading;
 
   return (
-    <div role="dialog" aria-modal="true" aria-label="Đăng nhập hoặc tạo tài khoản" className="fixed inset-0 z-[100] bg-stone-900/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200">
-      <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl border border-stone-200 overflow-hidden flex flex-col max-h-[92vh]">
+    <dialog ref={dialogRef} aria-modal="true" aria-label="Đăng nhập hoặc tạo tài khoản"
+      onCancel={event => { event.preventDefault(); if (!isBusy) handleClose(); }}
+      onKeyDown={event => {
+        if (event.key !== "Tab") return;
+        const controls = Array.from(event.currentTarget.querySelectorAll<HTMLElement>(
+          'button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), a[href], iframe, [tabindex="0"]'
+        )).filter(element => element.getClientRects().length > 0);
+        const first = controls[0];
+        const last = controls[controls.length - 1];
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault(); last?.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault(); first?.focus();
+        }
+      }}
+      className="fixed inset-0 m-auto h-dvh max-h-none w-full max-w-none bg-transparent p-3 text-stone-900 backdrop:bg-stone-900/60 backdrop:backdrop-blur-sm sm:p-4">
+      <div className="mx-auto flex h-full max-w-lg items-center justify-center">
+      <div className="bg-white w-full rounded-2xl shadow-2xl border border-stone-200 overflow-hidden flex flex-col max-h-full">
         {/* Header Modal */}
-        <div className="bg-stone-50/90 border-b border-stone-200 px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center space-x-2">
+        <div className="shrink-0 bg-stone-50/90 border-b border-stone-200 px-4 py-3 sm:px-6 flex items-center justify-between gap-3">
+          <div className="min-w-0">
             <Logo size="sm" />
-            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-heritage-red/10 text-heritage-red border border-heritage-red/20">
-              Xác thực & Phân quyền RBAC
-            </span>
           </div>
           <button
             type="button"
             onClick={() => handleClose()}
             disabled={isBusy}
             aria-label="Đóng cửa sổ đăng nhập"
-            className="p-1.5 rounded-lg text-stone-400 hover:text-stone-700 hover:bg-stone-200/60 transition-colors"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-stone-600 hover:text-stone-700 hover:bg-stone-200/60 transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <div className="p-6 overflow-y-auto space-y-5">
+        <div className="min-h-0 p-4 sm:p-6 overflow-y-auto overscroll-contain space-y-5">
           {/* Notification banners */}
           {errorMsg && (
             <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl flex items-start space-x-2">
@@ -438,10 +466,11 @@ export default function AuthModal({
         </div>
 
         {/* Footer info */}
-        <div className="bg-stone-50 px-6 py-3 border-t border-stone-200 text-[11px] text-stone-600 text-center">
+        <div className="shrink-0 bg-stone-50 px-4 py-3 border-t border-stone-200 text-xs text-stone-600 text-center">
           Đăng nhập để lưu và quản lý bộ phối của bạn.
         </div>
       </div>
-    </div>
+      </div>
+    </dialog>
   );
 }

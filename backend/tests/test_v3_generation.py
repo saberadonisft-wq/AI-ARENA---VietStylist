@@ -364,7 +364,7 @@ async def test_gemini_provider_stores_a_real_private_image(monkeypatch, png_byte
     assert "test-only-key" not in captured["url"]
     assert captured["headers"]["X-goog-api-key"] == "test-only-key"
     assert captured["payload"]["generationConfig"]["responseModalities"] == ["Image"]
-    assert requested == [("board-1", "dev-user-test-1"), ("person-1", "dev-user-test-1")]
+    assert sorted(requested) == [("board-1", "dev-user-test-1"), ("person-1", "dev-user-test-1")]
     parts = captured["payload"]["contents"][0]["parts"]
     assert len(parts) == 3
     assert [base64.b64decode(part["inlineData"]["data"]) for part in parts[1:]] == [png_bytes, png_bytes]

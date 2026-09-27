@@ -25,7 +25,7 @@ def test_qmark_binding_preserves_sql_literals_and_comments():
     assert postgres.bind_query(query) == "SELECT %s, '?', '100%%', \"?\" -- ? comment\n/* ? */ WHERE name LIKE %s"
 
 
-def test_postgres_runtime_rollback_only(monkeypatch):
+def test_postgres_runtime_rollback_only(monkeypatch, png_bytes):
     url = os.environ.get("TEST_POSTGRES_URL")
     if not url:
         pytest.skip("Set TEST_POSTGRES_URL for rollback-only PostgreSQL verification")
@@ -99,7 +99,10 @@ def test_postgres_runtime_rollback_only(monkeypatch):
                 assert client.post('/api/admin/items', headers=admin_headers, json=item).status_code == 200
                 assert client.put('/api/admin/items/probe_item', headers=admin_headers, json={**item,"name":"Edited item"}).status_code == 200
                 assert client.get('/api/admin/items', headers=admin_headers).json()['total'] == 1
+                from app.modules.catalog.repository import CatalogRepository
+                assert [row['id'] for row in CatalogRepository.get_published_items_by_ids(['probe_item'])] == ['probe_item']
                 assert client.delete('/api/admin/items/probe_item', headers=admin_headers).status_code == 200
+                assert CatalogRepository.get_published_items_by_ids(['probe_item']) == []
 
                 for _ in range(2):
                     weather = client.get('/api/weather?city_key=hanoi')
@@ -109,6 +112,13 @@ def test_postgres_runtime_rollback_only(monkeypatch):
                 from app.modules.media.repository import MediaRepository
                 MediaRepository.create_pending_media("pg_media", "private", "probe", "image", "image/png", owner, "private", 100, upload_expires_at=9999999999)
                 assert MediaRepository.get_media_by_id("pg_media")["visibility"] == "private"
+
+                from app.modules.media.service import MediaService
+                image = MediaService.ingest_generated_image(owner, png_bytes, "image/png")
+                stored = MediaRepository.get_media_by_id(image.id)
+                assert stored['status'] == 'ready' and stored['staging_key'] is None
+                assert len(MediaRepository.objects(image.id)) == 1
+                assert MediaService.probe_image(stored)
 
                 from app.modules.try_on.repository import TryOnRepository
                 TryOnRepository.create_job("pg_job", owner, "try_on", "hash", "pg-key", "mock", "{}")

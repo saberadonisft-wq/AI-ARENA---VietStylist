@@ -152,6 +152,26 @@ export const v3Api = {
     return session.media_id;
   },
 
+  async uploadTryOnImages(outfit: File, person: File | null, signal?: AbortSignal): Promise<[string, string | null]> {
+    const uploads = new AbortController();
+    const abort = () => uploads.abort();
+    if (signal?.aborted) abort();
+    else signal?.addEventListener("abort", abort, { once: true });
+    try {
+      return await Promise.all([
+        v3Api.uploadPrivateImage(outfit, uploads.signal),
+        person ? v3Api.uploadPrivateImage(person, uploads.signal) : Promise.resolve(null),
+      ]);
+    } catch (error) {
+      // Stop the sibling upload without hiding the original failure or
+      // cancelling the modal's operation before it can render that error.
+      uploads.abort();
+      throw error;
+    } finally {
+      signal?.removeEventListener("abort", abort);
+    }
+  },
+
   async getGenerationStatus(): Promise<{ enabled: boolean }> {
     return apiFetch<{ enabled: boolean }>("/api/v3/generation/status");
   },
@@ -159,7 +179,10 @@ export const v3Api = {
   startGeneration: (request: GenerationRequest, signal?: AbortSignal) => apiFetch<GenerationJob>("/api/v3/generation/jobs", {
     method: "POST", body: JSON.stringify(request), signal,
   }),
-  getGenerationJob: (jobId: string, signal?: AbortSignal) => apiFetch<GenerationJob>(`/api/v3/generation/jobs/${encodeURIComponent(jobId)}`, { signal }),
+  getGenerationJob: (jobId: string, signal?: AbortSignal, waitSeconds = 0) => apiFetch<GenerationJob>(
+    `/api/v3/generation/jobs/${encodeURIComponent(jobId)}${waitSeconds ? `?wait_seconds=${waitSeconds}` : ""}`,
+    { signal, timeoutMs: 20000 },
+  ),
 
   async synthesize(outfit: OutfitSpecV2, legacyItemIds: string[], outfitImageId: string, userImageId: string | null, modelId: string): Promise<SynthesisResult> {
     return apiFetch<SynthesisResult>("/api/v3/generation/synthesize", {

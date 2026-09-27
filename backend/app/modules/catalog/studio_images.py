@@ -76,7 +76,12 @@ def _store_cached_image(directory: Path, target: Path, data: bytes) -> None:
     directory.mkdir(parents=True, exist_ok=True)
     cached = sorted(directory.glob("*.png"), key=lambda path: path.stat().st_mtime)
     for obsolete in cached[:-127]:
-        obsolete.unlink(missing_ok=True)
+        try:
+            obsolete.unlink(missing_ok=True)
+        except PermissionError:
+            # Windows readers can briefly prevent deletion. Leave this entry
+            # for the next eviction rather than failing a different image.
+            continue
     with tempfile.NamedTemporaryFile(dir=directory, suffix=".tmp", delete=False) as handle:
         temporary = Path(handle.name)
         handle.write(data)
@@ -188,12 +193,22 @@ def get_studio_image(item_id: str, color_hex: str | None = None,
     base_target = directory / f"{source_key}.png"
     color_hash = hashlib.sha256(f"{_RECOLOR_VERSION}:{source_key}:{color_hex.upper()}".encode()).hexdigest() if color_hex else None
     target = directory / f"{color_hash or source_key}.png"
-    # Re-check publication on every request, including cache hits.
-    if not _processing.acquire(timeout=60):
-        raise AppError("CUTOUT_BUSY", "Đang xử lý ảnh, vui lòng thử lại.", 503)
+    # Publication/version checks above also apply to cache hits. Atomic cache
+    # replacement lets readers bypass unrelated inference; eviction is a miss.
+    acquired = False
     try:
-        if target.is_file():
+        try:
             return target.read_bytes()
+        except FileNotFoundError:
+            pass
+        acquired = _processing.acquire(timeout=60)
+        if not acquired:
+            raise AppError("CUTOUT_BUSY", "Đang xử lý ảnh, vui lòng thử lại.", 503)
+        # A previous producer may have filled the cache while we waited.
+        try:
+            return target.read_bytes()
+        except FileNotFoundError:
+            pass
         if color_hex and base_target.is_file():
             base = base_target.read_bytes()
         else:
@@ -212,4 +227,5 @@ def get_studio_image(item_id: str, color_hex: str | None = None,
         logger.warning("Studio cutout failed: %s", type(exc).__name__)
         raise AppError("CUTOUT_UNAVAILABLE", "Chưa thể tách nền ảnh. Vui lòng thử lại.", 503) from exc
     finally:
-        _processing.release()
+        if acquired:
+            _processing.release()

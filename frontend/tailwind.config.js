@@ -10,8 +10,9 @@ module.exports = {
     extend: {
       colors: {
         heritage: {
-          red: "#9B2C2C",
-          "red-dark": "#742A2A",
+          red: "#B83232",
+          "red-dark": "#922828",
+          "red-light": "#C83B3B",
           gold: "#D69E2E",
           "gold-light": "#ECC94B",
           indigo: "#1A365D",

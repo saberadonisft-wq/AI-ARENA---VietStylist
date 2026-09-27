@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef, useImperativeHandle, forwardRef, useState, useEffect } from "react";
+import React, { useRef, useImperativeHandle, forwardRef, useState, useEffect, useLayoutEffect } from "react";
 import { Avatar, AssetLayer, SnapshotItem, CatalogItem } from "@/lib/types/api";
 import { API_ORIGIN } from "@/lib/api/client";
 import {
@@ -9,7 +9,12 @@ import {
   ZoomIn,
   ZoomOut,
   RefreshCw,
-  Move,
+  ArrowUp,
+  ArrowDown,
+  ArrowLeft,
+  ArrowRight,
+  Lock,
+  Unlock,
   X,
 } from "lucide-react";
 
@@ -35,6 +40,9 @@ export interface Canvas2DProps {
   backgroundTheme?: "white" | "dopaper";
   selectedSlot?: string | null;
   onSelectItem?: (slot: string) => void;
+  onRemoveItem?: (slot: string) => void;
+  onBrowseCatalog?: () => void;
+  onToggleLock?: (slot: string) => void;
   lockedSlots?: string[];
   onTransformsCommit?: (changes: Record<string, ItemTransform | undefined>) => void;
   onColorLoadFailure?: (itemId: string, colorHex: string) => void;
@@ -320,11 +328,14 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
       layers,
       equippedItems,
       catalogItems = [],
+      onBrowseCatalog,
       aspectRatio = "9:16",
       viewMode = "flatlay",
       backgroundTheme = "white",
       selectedSlot: externalSelectedSlot,
       onSelectItem,
+      onRemoveItem,
+      onToggleLock,
       lockedSlots = [],
       onTransformsCommit,
       onColorLoadFailure,
@@ -333,6 +344,38 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
     ref
   ) => {
     const containerRef = useRef<HTMLDivElement | null>(null);
+    const viewportRef = useRef<HTMLDivElement | null>(null);
+    const zoomAnchorRef = useRef({ x: 0.5, y: 0.5 });
+    const [boardZoom, setBoardZoom] = useState(1);
+    const changeBoardZoom = (next: number) => {
+      if (dragSessionRef.current) return;
+      const viewport = viewportRef.current;
+      const board = containerRef.current;
+      if (viewport && board) {
+        const viewportRect = viewport.getBoundingClientRect();
+        const boardRect = board.getBoundingClientRect();
+        zoomAnchorRef.current = {
+          x: (viewportRect.left + viewport.clientWidth / 2 - boardRect.left) / boardRect.width,
+          y: (viewportRect.top + viewport.clientHeight / 2 - boardRect.top) / boardRect.height,
+        };
+      }
+      setBoardZoom(Math.min(4, Math.max(0.5, next)));
+    };
+    useLayoutEffect(() => {
+      const viewport = viewportRef.current;
+      const board = containerRef.current;
+      if (!viewport || !board) return;
+      if (boardZoom <= 1) {
+        viewport.scrollTo(0, 0);
+        return;
+      }
+      const viewportRect = viewport.getBoundingClientRect();
+      const boardRect = board.getBoundingClientRect();
+      viewport.scrollBy(
+        boardRect.left + zoomAnchorRef.current.x * boardRect.width - viewportRect.left - viewport.clientWidth / 2,
+        boardRect.top + zoomAnchorRef.current.y * boardRect.height - viewportRect.top - viewport.clientHeight / 2,
+      );
+    }, [boardZoom, aspectRatio]);
     const svgRef = useRef<SVGSVGElement | null>(null);
     const [imageSizes, setImageSizes] = useState<Record<string, { url: string; width: number; height: number }>>({});
     const [imageErrors, setImageErrors] = useState<Record<string, string>>({});
@@ -425,13 +468,40 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
     useEffect(() => { setTransforms({}); }, [equippedItems]);
 
     // Trạng thái kéo chuột đang diễn ra
-    const [dragSession, setDragSession] = useState<{
+    type DragSession = {
       type: "move" | "resize" | "rotate";
       slot: string;
+      pointerId: number;
+      startClientX: number;
+      startClientY: number;
+      threshold: number;
+      moved: boolean;
       startSvgX: number;
       startSvgY: number;
       initialTransform: ItemTransform;
-    } | null>(null);
+    };
+    const [dragSession, renderDragSession] = useState<DragSession | null>(null);
+    const dragSessionRef = useRef<DragSession | null>(null);
+    const setDragSession = (session: DragSession | null) => {
+      dragSessionRef.current = session;
+      renderDragSession(session);
+    };
+
+    useEffect(() => {
+      const artboard = svgRef.current;
+      if (!artboard) return;
+      // SVG descendants do not consistently suppress browser scrolling with CSS
+      // alone. React's touch listeners are passive, so use a scoped native listener.
+      // Blank space still permits page scrolling and browser pinch zoom.
+      const preventGarmentScroll = (event: TouchEvent) => {
+        const target = event.target;
+        if (event.cancelable && (dragSessionRef.current || (target instanceof Element && target.closest('[data-studio-drag="true"]')))) {
+          event.preventDefault();
+        }
+      };
+      artboard.addEventListener("touchstart", preventGarmentScroll, { passive: false });
+      return () => artboard.removeEventListener("touchstart", preventGarmentScroll);
+    }, []);
 
     // Trạng thái ẩn khung chọn khi xuất ảnh
     const [isExporting, setIsExporting] = useState(false);
@@ -474,59 +544,22 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
       return { x: point.x, y: point.y };
     };
 
-    // Bắt đầu kéo di chuyển
-    const handlePointerDownMove = (e: React.PointerEvent, slot: string) => {
-      if (lockedSlots.includes(slot)) return;
+    // Capture on the stable artboard, not a handle that can disappear on selection.
+    // One pointer owns the gesture; a second finger must not move or finish it.
+    const startGesture = (e: React.PointerEvent, slot: string, type: DragSession["type"]) => {
       e.stopPropagation();
-      e.currentTarget.setPointerCapture(e.pointerId);
+      if (dragSessionRef.current || !e.isPrimary || e.button !== 0) return;
       setActiveSlot(slot);
       onSelectItem?.(slot);
-
-      const pt = getSvgCoordinates(e);
-      const currentEq = equippedItems.find((it) => it.slot === slot);
-      if (!currentEq) return;
-
-      setDragSession({
-        type: "move",
-        slot,
-        startSvgX: pt.x,
-        startSvgY: pt.y,
-        initialTransform: { ...getTransform(currentEq) },
-      });
-    };
-
-    // Bắt đầu kéo tay cầm co dãn (Resize)
-    const handlePointerDownResize = (e: React.PointerEvent, slot: string) => {
       if (lockedSlots.includes(slot)) return;
-      e.stopPropagation();
-      e.currentTarget.setPointerCapture(e.pointerId);
-
       const pt = getSvgCoordinates(e);
       const currentEq = equippedItems.find((it) => it.slot === slot);
-      if (!currentEq) return;
-
+      if (!currentEq || !svgRef.current) return;
+      svgRef.current.setPointerCapture(e.pointerId);
       setDragSession({
-        type: "resize",
-        slot,
-        startSvgX: pt.x,
-        startSvgY: pt.y,
-        initialTransform: { ...getTransform(currentEq) },
-      });
-    };
-
-    // Bắt đầu kéo tay cầm xoay (Rotate)
-    const handlePointerDownRotate = (e: React.PointerEvent, slot: string) => {
-      if (lockedSlots.includes(slot)) return;
-      e.stopPropagation();
-      e.currentTarget.setPointerCapture(e.pointerId);
-
-      const pt = getSvgCoordinates(e);
-      const currentEq = equippedItems.find((it) => it.slot === slot);
-      if (!currentEq) return;
-
-      setDragSession({
-        type: "rotate",
-        slot,
+        type, slot, pointerId: e.pointerId,
+        startClientX: e.clientX, startClientY: e.clientY,
+        threshold: e.pointerType === "touch" ? 6 : 3, moved: false,
         startSvgX: pt.x,
         startSvgY: pt.y,
         initialTransform: { ...getTransform(currentEq) },
@@ -535,7 +568,10 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
 
     // Xử lý di chuyển chuột khi đang kéo
     const handlePointerMove = (e: React.PointerEvent) => {
-      if (!dragSession) return;
+      const dragSession = dragSessionRef.current;
+      if (!dragSession || e.pointerId !== dragSession.pointerId) return;
+      if (!dragSession.moved && Math.hypot(e.clientX - dragSession.startClientX, e.clientY - dragSession.startClientY) < dragSession.threshold) return;
+      dragSession.moved = true;
       e.preventDefault();
 
       const pt = getSvgCoordinates(e);
@@ -595,21 +631,27 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
       }
     };
 
-    const handlePointerUp = () => {
-      const changes = transformsRef.current;
-      if (Object.keys(changes).length) {
-        onTransformsCommit?.(changes);
-        if (onTransformsCommit) setTransforms({});
-      }
+    const finishGesture = (e?: { pointerId: number }, cancelled = false) => {
+      const session = dragSessionRef.current;
+      if (!session || (e && e.pointerId !== session.pointerId)) return;
       setDragSession(null);
+      const changes = transformsRef.current;
+      if (!cancelled && session.moved && Object.keys(changes).length) {
+        onTransformsCommit?.(changes);
+      }
+      if (cancelled || onTransformsCommit) setTransforms({});
+      if (svgRef.current?.hasPointerCapture(session.pointerId)) svgRef.current.releasePointerCapture(session.pointerId);
     };
 
     useEffect(() => {
-      const handleGlobalPointerUp = () => {
-        if (dragSession) handlePointerUp();
-      };
+      const handleGlobalPointerUp = (event: PointerEvent) => finishGesture(event);
+      const handleBlur = () => finishGesture(undefined, true);
       window.addEventListener("pointerup", handleGlobalPointerUp);
-      return () => window.removeEventListener("pointerup", handleGlobalPointerUp);
+      window.addEventListener("blur", handleBlur);
+      return () => {
+        window.removeEventListener("pointerup", handleGlobalPointerUp);
+        window.removeEventListener("blur", handleBlur);
+      };
     }, [dragSession, onTransformsCommit]);
 
     const resetSlotTransform = (slot: string) => {
@@ -761,6 +803,11 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
       return catalogItems.find((ci) => ci.id === itemId);
     };
 
+    const removeItem = (slot: string) => {
+      if (lockedSlots.includes(slot) || dragSessionRef.current) return;
+      onRemoveItem?.(slot);
+    };
+
     // Render từng món trang phục
     const renderInteractiveItem = (eq: SnapshotItem) => {
       const dbItem = getItemInfo(eq.itemId);
@@ -793,8 +840,10 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
             {/* Lớp chứa nội dung trang phục: Kéo để di chuyển, Nhấp để chọn */}
             <g
               id={`content-${eq.slot}`}
-              className="cursor-move select-none"
-              onPointerDown={(e) => handlePointerDownMove(e, eq.slot)}
+              data-studio-drag={!lockedSlots.includes(eq.slot)}
+              className={`${lockedSlots.includes(eq.slot) ? "cursor-pointer" : "cursor-move"} select-none [&_*]:[touch-action:inherit]`}
+              style={{ touchAction: lockedSlots.includes(eq.slot) ? "auto" : "none" }}
+              onPointerDown={(e) => startGesture(e, eq.slot, "move")}
             >
               {/* 1. Ảnh thật bóc tách (Cloudflare R2 / Public) */}
               {garmentImageUrl ? (
@@ -858,15 +907,13 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
             width={w + 12}
             height={h + 12}
             rx={6}
-            fill="rgba(155, 44, 44, 0.04)"
-            stroke="#9B2C2C"
             strokeWidth={2}
             strokeDasharray="6 4"
-            className="pointer-events-none"
+            className="pointer-events-none fill-heritage-red/[0.04] stroke-heritage-red"
           />
 
           {/* 2. Nhãn tên món đồ */}
-          <g transform={`translate(${cx}, ${y - 18})`} className="pointer-events-none">
+          <g transform={`translate(${cx}, ${y - 18})`} className="hidden lg:block pointer-events-none">
             <rect
               x={-75}
               y={-12}
@@ -898,9 +945,11 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
           ].map((corner) => (
             <g
               key={corner.id}
+              data-studio-drag={!lockedSlots.includes(eq.slot)}
               transform={`translate(${corner.cx}, ${corner.cy})`}
-              className={`${corner.cursor} group`}
-              onPointerDown={(e) => handlePointerDownResize(e, eq.slot)}
+              className={`${corner.cursor} group hidden lg:block`}
+              style={{ touchAction: "none" }}
+              onPointerDown={(e) => startGesture(e, eq.slot, "resize")}
               onDoubleClick={(e) => {
                 e.stopPropagation();
                 // Nhấn đúp vào góc để trở về cỡ gốc 100%
@@ -926,34 +975,34 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
                 cy={0}
                 r={6.5}
                 fill="#FFFFFF"
-                stroke="#9B2C2C"
                 strokeWidth={2.2}
                 filter="url(#flatlayDropShadow)"
-                className="transition-transform group-hover:scale-125"
+                className="stroke-heritage-red transition-transform group-hover:scale-125"
               />
               <title>Kéo góc để phóng to/thu nhỏ (Nhấn đúp để về 100%)</title>
             </g>
           ))}
 
           {/* 4. Nút xoay duy nhất: Nhấn giữ và kéo chuột để xoay ảnh */}
-          <g>
+          <g className="hidden lg:block">
             {/* Đường gióng đứt nét nối từ viền đến nút xoay */}
             <line
               x1={cx}
               y1={stemStartY}
               x2={cx}
               y2={stemEndY}
-              stroke="#9B2C2C"
               strokeWidth={1.8}
               strokeDasharray="3 3"
-              className="pointer-events-none"
+              className="pointer-events-none stroke-heritage-red"
             />
 
             {/* Cụm nút tròn xoay ảnh */}
             <g
               transform={`translate(${cx}, ${rotateBtnY})`}
-              className="cursor-grab active:cursor-grabbing group hover:scale-115 transition-transform"
-              onPointerDown={(e) => handlePointerDownRotate(e, eq.slot)}
+              data-studio-drag={!lockedSlots.includes(eq.slot)}
+              className="hidden lg:block cursor-grab active:cursor-grabbing group"
+              style={{ touchAction: "none" }}
+              onPointerDown={(e) => startGesture(e, eq.slot, "rotate")}
               onDoubleClick={(e) => {
                 e.stopPropagation();
                 // Nhấn đúp để trở về góc 0°
@@ -979,7 +1028,7 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
                 cy={0}
                 r={15}
                 fill="#FFFFFF"
-                stroke="#9B2C2C"
+                className="stroke-heritage-red"
                 strokeWidth={2.2}
                 filter="url(#flatlayDropShadow)"
               />
@@ -987,31 +1036,78 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
               <path
                 d="M-5 -2 A5.5 5.5 0 1 1 5 -2 M5 -5.5 L5 -1 L1.5 -2.5"
                 fill="none"
-                stroke="#9B2C2C"
+                className="stroke-heritage-red"
                 strokeWidth={1.8}
                 strokeLinecap="round"
                 strokeLinejoin="round"
               />
               <title>Nhấn giữ và kéo để xoay ảnh (Nhấn đúp để về 0°)</title>
             </g>
+            {onRemoveItem && (
+              <g
+                transform={`translate(${cx + 48}, ${rotateBtnY})`}
+                role="button"
+                aria-label="Xóa trang phục khỏi bảng"
+                aria-disabled={lockedSlots.includes(eq.slot)}
+                tabIndex={lockedSlots.includes(eq.slot) ? -1 : 0}
+                className={lockedSlots.includes(eq.slot) ? "cursor-not-allowed opacity-40" : "cursor-pointer"}
+                onPointerDown={(event) => event.stopPropagation()}
+                onClick={(event) => { event.stopPropagation(); removeItem(eq.slot); }}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    removeItem(eq.slot);
+                  }
+                }}
+              >
+                <circle r={22} fill="transparent" />
+                <circle r={15} fill="#FFFFFF" className="stroke-heritage-red" strokeWidth={2.2} filter="url(#flatlayDropShadow)" />
+                <path d="M-5 -5 L5 5 M5 -5 L-5 5" className="stroke-heritage-red" strokeWidth={2} strokeLinecap="round" />
+                <title>{lockedSlots.includes(eq.slot) ? "Mở khóa trang phục để xóa" : "Xóa trang phục khỏi bảng"}</title>
+              </g>
+            )}
           </g>
         </g>
       );
     };
 
     const selectedEq = equippedItems.find((it) => it.slot === activeSlot);
-    const selectedItemInfo = selectedEq ? getItemInfo(selectedEq.itemId) : null;
     const selectedTransform = selectedEq ? getTransform(selectedEq) : null;
+    const selectedLocked = !!selectedEq && lockedSlots.includes(selectedEq.slot);
+    const adjustSelected = (patch: Partial<ItemTransform>) => {
+      if (!selectedEq || !selectedTransform || selectedLocked || dragSessionRef.current) return;
+      const next = { ...selectedTransform, ...patch };
+      if (onTransformsCommit) onTransformsCommit({ [selectedEq.slot]: next });
+      else setTransforms(previous => ({ ...previous, [selectedEq.slot]: next }));
+    };
+    const controlButton = "flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-lg border border-stone-200 bg-white px-2 text-sm font-medium text-stone-800 hover:bg-stone-100 active:bg-stone-200 disabled:opacity-40 touch-manipulation";
 
     return (
+      <div className={`studio-canvas min-w-0 space-y-2 ${className}`}>
+      <div className="studio-artboard-stage" style={{
+        "--studio-artboard-ratio": aspectRatio === "1:1" ? 1 : 9 / 16,
+        "--studio-board-zoom": boardZoom,
+      } as React.CSSProperties}>
+      <div role="group" aria-label="Thu phóng bảng phối" className="studio-board-zoom">
+        <button type="button" aria-label="Thu nhỏ bảng phối" disabled={boardZoom <= 0.5 || !!dragSession}
+          onClick={() => changeBoardZoom(boardZoom - 0.25)}><ZoomOut size={16} /></button>
+        <output aria-label="Mức thu phóng bảng phối" aria-live="polite">{Math.round(boardZoom * 100)}%</output>
+        <button type="button" aria-label="Phóng to bảng phối" disabled={boardZoom >= 4 || !!dragSession}
+          onClick={() => changeBoardZoom(boardZoom + 0.25)}><ZoomIn size={16} /></button>
+        <button type="button" disabled={!!dragSession} onClick={() => changeBoardZoom(1)} className="studio-board-fit">Vừa khung</button>
+      </div>
+      <div ref={viewportRef} className="studio-artboard-viewport" data-zoomed={boardZoom > 1}
+        role="region" aria-label="Vùng xem bảng phối" tabIndex={0}>
+      <div className="studio-artboard-surface">
       <div
         ref={containerRef}
-        className={`relative flex flex-col items-center justify-center rounded-2xl overflow-hidden border border-stone-300 shadow-sm select-none transition-colors duration-300 ${
+        data-testid="outfit-artboard"
+        className={`studio-artboard relative mx-auto flex max-h-[60svh] flex-col items-center justify-center rounded-lg overflow-hidden border border-stone-300 shadow-sm select-none transition-colors duration-300 ${
           backgroundTheme === "white" ? "bg-white" : "bg-[#FAF8F5]"
-        } ${className}`}
+        }`}
         style={{
           aspectRatio: aspectRatio === "1:1" ? "1 / 1" : "9 / 16",
-          maxHeight: "82vh",
           cursor:
             dragSession?.type === "rotate"
               ? "grabbing"
@@ -1022,8 +1118,9 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
               : "default",
         }}
         onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        onPointerCancel={handlePointerUp}
+        onPointerUp={(event) => finishGesture(event)}
+        onPointerCancel={(event) => finishGesture(event, true)}
+        onLostPointerCapture={(event) => finishGesture(event, true)}
       >
         {/* Nền giấy dó nếu bật theme dopaper */}
         {backgroundTheme === "dopaper" && (
@@ -1035,9 +1132,10 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
           ref={svgRef}
           viewBox="0 0 800 1200"
           className="w-full h-full object-contain relative z-10"
+          style={{ touchAction: boardZoom > 1 ? "pan-x pan-y pinch-zoom" : "pan-y pinch-zoom" }}
           xmlns="http://www.w3.org/2000/svg"
-          onPointerDown={() => {
-            if (!dragSession) setActiveSlot(null);
+          onPointerDown={(event) => {
+            if (!dragSessionRef.current && event.target === event.currentTarget) setActiveSlot(null);
           }}
         >
           <defs>
@@ -1099,6 +1197,18 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
           )}
         </svg>
 
+        {viewMode === "flatlay" && equippedItems.length === 0 && (
+          <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 px-6 text-center">
+            <p className="font-serif text-lg font-semibold text-stone-900">Bảng phối đang trống</p>
+            <p className="max-w-xs text-sm leading-relaxed text-stone-600">Chọn một món trong danh sách trang phục để thêm vào bảng phối.</p>
+            {onBrowseCatalog && (
+              <button type="button" onClick={onBrowseCatalog} className="min-h-11 rounded-lg bg-stone-900 px-4 py-2 text-sm font-semibold text-white hover:bg-stone-700">
+                Chọn trang phục
+              </button>
+            )}
+          </div>
+        )}
+
         {equippedItems.some(item => {
           const url = imageUrlFor(getItemInfo(item.itemId), item.colorHex, item.colorSourceVersion, item.colorAlgorithmVersion);
           return Boolean(url && imageErrors[item.itemId] === url);
@@ -1109,31 +1219,54 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
           </div>
         )}
 
-        {viewMode === "flatlay" && selectedEq && selectedTransform && !lockedSlots.includes(selectedEq.slot) && (
-          <div className="absolute left-3 top-3 z-20 flex items-center gap-2 rounded-lg border border-stone-200 bg-white/95 p-1.5 text-sm shadow">
-            <button type="button" aria-label="Thu nhỏ trang phục" className="rounded p-1.5 hover:bg-stone-100"
-              onClick={() => onTransformsCommit?.({ [selectedEq.slot]: { ...selectedTransform, scale: Math.max(0.05, Math.round((selectedTransform.scale / 1.25) * 100) / 100) } })}>
-              <ZoomOut size={18} />
-            </button>
-            <span aria-label="Mức phóng trang phục" className="min-w-12 text-center tabular-nums">{Math.round(selectedTransform.scale * 100)}%</span>
-            <button type="button" aria-label="Phóng to trang phục" className="rounded p-1.5 hover:bg-stone-100"
-              onClick={() => onTransformsCommit?.({ [selectedEq.slot]: { ...selectedTransform, scale: Math.min(20, Math.round((selectedTransform.scale * 1.25) * 100) / 100) } })}>
-              <ZoomIn size={18} />
-            </button>
-          </div>
-        )}
-
         {/* Hướng dẫn tương tác */}
-        <div className="absolute bottom-3 left-3 z-20 flex items-center space-x-1.5 bg-stone-900/75 backdrop-blur-md text-white text-[10px] px-2.5 py-1 rounded-lg font-sans pointer-events-none shadow-xs">
-          <Move className="w-3 h-3 text-emerald-400" />
-          <span>Kéo để di chuyển • Kéo 4 góc để phóng to/thu nhỏ • Giữ nút tròn để xoay</span>
-        </div>
-
-        {/* Huy hiệu chế độ */}
-        <div className="absolute bottom-3 right-3 z-20 flex items-center space-x-1.5 bg-stone-900/80 backdrop-blur-md text-white text-[10px] px-2.5 py-1 rounded-lg font-mono shadow-xs pointer-events-none">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-          <span>{viewMode === "flatlay" ? "Bảng Phối Flat-Lay" : "Người Mẫu 2D"}</span>
-        </div>
+      </div>
+      </div>
+      </div>
+      </div>
+      {viewMode === "flatlay" && equippedItems.length > 0 && (
+        <section aria-label="Điều chỉnh trang phục" className="studio-transform-controls space-y-2 rounded-xl border border-stone-200 bg-white p-3">
+          <div className="studio-selection-row flex items-center gap-2">
+            <select aria-label="Trang phục đang điều chỉnh" value={selectedEq?.slot || ""}
+              onChange={event => { setActiveSlot(event.target.value); onSelectItem?.(event.target.value); }}
+              className="min-h-11 min-w-0 flex-1 rounded-lg border border-stone-300 bg-white px-2 text-base">
+              <option value="" disabled>Chọn món để điều chỉnh</option>
+              {equippedItems.map(item => <option key={item.slot} value={item.slot}>{getItemInfo(item.itemId)?.name || getItemGeometry(item).label}{lockedSlots.includes(item.slot) ? " · Đã khóa" : ""}</option>)}
+            </select>
+            {onToggleLock && <button type="button" disabled={!selectedEq} className={controlButton}
+              aria-label={selectedLocked ? "Mở khóa món đang chọn" : "Khóa món đang chọn"} aria-pressed={selectedLocked}
+              onClick={() => selectedEq && onToggleLock(selectedEq.slot)}>{selectedLocked ? <Lock size={18} /> : <Unlock size={18} />}</button>}
+            {onRemoveItem && <button type="button" disabled={!selectedEq || selectedLocked || !!dragSession}
+              className={`${controlButton} lg:hidden`} aria-label="Xóa trang phục khỏi bảng"
+              onClick={() => selectedEq && removeItem(selectedEq.slot)}><X size={18} /></button>}
+          </div>
+          <p data-locked={selectedLocked} className="studio-gesture-hint text-xs leading-relaxed text-stone-600">{selectedLocked ? "Món này đã khóa. Mở khóa để di chuyển, đổi cỡ hoặc xoay." : <><span className="lg:hidden">Kéo một ngón trên món đồ để di chuyển. Vuốt vùng trống để cuộn trang.</span><span className="hidden lg:inline">Kéo để di chuyển · Kéo góc để đổi cỡ · Giữ nút tròn để xoay</span></>}</p>
+          <fieldset disabled={!selectedEq || selectedLocked || !!dragSession} className="studio-transform-fields space-y-2">
+            <legend className="sr-only">Vị trí, kích thước và góc xoay</legend>
+            <div className="studio-transform-values grid grid-cols-2 gap-3">
+              <div className="studio-transform-cluster grid grid-cols-[44px_1fr_44px] items-center gap-1">
+                <button type="button" className={controlButton} aria-label="Thu nhỏ trang phục" onClick={() => adjustSelected({ scale: Math.max(0.05, Math.round((selectedTransform!.scale / 1.25) * 100) / 100) })}><ZoomOut size={18} /></button>
+                <span aria-label="Mức phóng trang phục" className="text-center text-xs tabular-nums">{selectedTransform ? `${Math.round(selectedTransform.scale * 100)}%` : "—"}</span>
+                <button type="button" className={controlButton} aria-label="Phóng to trang phục" onClick={() => adjustSelected({ scale: Math.min(20, Math.round((selectedTransform!.scale * 1.25) * 100) / 100) })}><ZoomIn size={18} /></button>
+              </div>
+              <div className="studio-transform-cluster grid grid-cols-[44px_1fr_44px] items-center gap-1">
+                <button type="button" className={controlButton} aria-label="Xoay trái 15 độ" onClick={() => adjustSelected({ rotation: (selectedTransform!.rotation - 15) % 360 })}><RotateCcw size={18} /></button>
+                <span aria-label="Góc xoay trang phục" className="text-center text-xs tabular-nums">{selectedTransform ? `${selectedTransform.rotation}°` : "—"}</span>
+                <button type="button" className={controlButton} aria-label="Xoay phải 15 độ" onClick={() => adjustSelected({ rotation: (selectedTransform!.rotation + 15) % 360 })}><RotateCw size={18} /></button>
+              </div>
+            </div>
+            <div className="studio-position-actions flex flex-wrap items-center gap-2">
+              <div role="group" aria-label="Dịch chuyển từng bước" className="flex gap-2">
+                <button type="button" className={controlButton} aria-label="Dịch trái" onClick={() => adjustSelected({ dx: selectedTransform!.dx - 10 })}><ArrowLeft size={18} /></button>
+                <button type="button" className={controlButton} aria-label="Dịch lên" onClick={() => adjustSelected({ dy: selectedTransform!.dy - 10 })}><ArrowUp size={18} /></button>
+                <button type="button" className={controlButton} aria-label="Dịch xuống" onClick={() => adjustSelected({ dy: selectedTransform!.dy + 10 })}><ArrowDown size={18} /></button>
+                <button type="button" className={controlButton} aria-label="Dịch phải" onClick={() => adjustSelected({ dx: selectedTransform!.dx + 10 })}><ArrowRight size={18} /></button>
+              </div>
+              <button type="button" className={`${controlButton} ml-auto`} aria-label="Đặt lại món đang chọn" onClick={() => selectedEq && resetSlotTransform(selectedEq.slot)}><RefreshCw size={16} /><span>Đặt lại</span></button>
+            </div>
+          </fieldset>
+        </section>
+      )}
       </div>
     );
   }

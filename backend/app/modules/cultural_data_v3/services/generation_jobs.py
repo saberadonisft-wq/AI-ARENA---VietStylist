@@ -12,6 +12,7 @@ from app.core.config import settings
 from app.core.database import Database, db_transaction
 from app.core.errors import AppError
 from app.core.rate_limit import consume
+from app.modules.catalog.repository import CatalogRepository
 from app.modules.cultural_data_v3.schemas import GenerationJobResponse, SynthesizeResponse
 from app.modules.cultural_data_v3.services.generation import canonical_hash
 
@@ -76,13 +77,9 @@ def _reserve(req, owner_id, require_provider=False):
         # Resolve public catalog references before accepting a billable job. This
         # keeps unavailable or unpublished garments from becoming asynchronous
         # media errors just because image inputs were checked first.
-        for item_id in payload.get("legacy_item_ids") or []:
-            item = Database.fetch_one(
-                "SELECT id FROM items WHERE id=? AND is_published=1",
-                (item_id,), conn=conn,
-            )
-            if not item:
-                raise AppError("ITEM_NOT_FOUND", "Trang phục chưa được xuất bản hoặc không còn tồn tại.", 404)
+        item_ids = payload.get("legacy_item_ids") or []
+        if len(CatalogRepository.get_published_items_by_ids(item_ids, conn=conn)) != len(item_ids):
+            raise AppError("ITEM_NOT_FOUND", "Trang phục chưa được xuất bản hoặc không còn tồn tại.", 404)
 
         # Reserve the job and its input images under the same write transaction
         # used by media deletion. A delete that wins first marks the image before
@@ -159,6 +156,31 @@ async def wait_for_job(identifier, owner_id):
     if not receipt.result:
         raise AppError("GENERATION_IN_PROGRESS", "Ảnh đang được tạo. Hãy kiểm tra trạng thái tác vụ.", 409, {"job_id": identifier})
     return receipt.result
+
+
+async def poll_job(identifier, owner_id, wait_seconds=0):
+    """Wait for a receipt, never cancel or replay its paid generation.
+
+    Local jobs wake their readers immediately. For another API process, read
+    the durable receipt at bounded intervals without holding a DB connection.
+    """
+    receipt = await run_in_threadpool(get_job, identifier, owner_id)
+    if receipt.status != "running" or wait_seconds <= 0:
+        return receipt
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + min(wait_seconds, 10)
+    while receipt.status == "running":
+        remaining = deadline - loop.time()
+        if remaining <= 0:
+            break
+        task = _tasks.get(identifier)
+        if task is not None:
+            # asyncio.wait leaves the producer running on timeout/disconnect.
+            await asyncio.wait({task}, timeout=remaining)
+            return await run_in_threadpool(get_job, identifier, owner_id)
+        await asyncio.sleep(min(1.0, remaining))
+        receipt = await run_in_threadpool(get_job, identifier, owner_id)
+    return receipt
 
 
 async def shutdown():
