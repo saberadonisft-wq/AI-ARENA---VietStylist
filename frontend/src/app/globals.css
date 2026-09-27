@@ -4,6 +4,7 @@
 
 @layer base {
   html, body {
+    overflow-x: clip;
     scroll-behavior: auto !important;
     overscroll-behavior-y: none;
   }
@@ -28,6 +29,40 @@
     outline: 2px solid #9f1239 !important;
     outline-offset: 2px !important;
     box-shadow: 0 0 0 2px #ffffff, 0 0 0 4px #9f1239 !important;
+  }
+}
+
+/* Keep mobile fields readable and controls usable without precision taps. */
+@media (max-width: 1023px) {
+  button, select, input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="hidden"]) {
+    min-height: 44px;
+  }
+
+  button {
+    min-width: 44px;
+  }
+
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), select, textarea {
+    font-size: 16px !important;
+  }
+
+  footer a {
+    display: inline-flex;
+    min-height: 44px;
+    align-items: center;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .scroll-reveal, .scroll-slide-left, .scroll-slide-right {
+    opacity: 1;
+    transform: none;
   }
 }
 
@@ -274,7 +309,7 @@
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #9B2C2C;
+  background: theme('colors.heritage.red');
 }
 
 /* CSS Paged Media phục vụ in ấn / xuất PDF form giải pháp F12 */

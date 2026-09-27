@@ -398,5 +398,5 @@ export function useStudioDocument(ownerId: string | undefined, authReady: boolea
   const isDirty = identity.current.savedDocument
     ? !sameDocument(current.current.present, identity.current.savedDocument)
     : !sameDocument(current.current.present, INITIAL_DOCUMENT);
-  return { history, isManaging: !!managedId, hydrated: hydrated && authReady && activeOwner.current === ownerId, dispatch, updateSnapshot, startNewDocument, startFreshDraft, draftNotice, dismissDraft: () => setDraftNotice(null), accountDraftChoice, chooseAccountDraft, recoveryDrafts, restoreRecoveryDraft, error, conflict, saving, message, save, loadServerCopy, requestedOutfit, keepLocal: () => setRequestedOutfit(null), externalDraft, acceptExternalDraft, keepCurrentDraft, isDirty, archiveCurrentDraft };
+  return { history, isManaging: !!managedId, hydrated: hydrated && authReady && activeOwner.current === ownerId, dispatch, updateSnapshot, startNewDocument, startFreshDraft, draftNotice, dismissDraft: () => setDraftNotice(null), accountDraftChoice, chooseAccountDraft, recoveryDrafts, restoreRecoveryDraft, error, conflict, saving, message, dismissMessage: () => setMessage(null), save, loadServerCopy, requestedOutfit, keepLocal: () => setRequestedOutfit(null), externalDraft, acceptExternalDraft, keepCurrentDraft, isDirty, archiveCurrentDraft };
 }

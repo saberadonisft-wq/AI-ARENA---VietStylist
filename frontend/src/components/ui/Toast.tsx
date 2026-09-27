@@ -1,11 +1,15 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { CheckCircle2, AlertCircle, Info, AlertTriangle, X } from "lucide-react";
 
 export interface ToastItem {
   id: string;
   message: string;
+  title?: string;
+  actions?: React.ReactNode;
+  dismissLabel?: string;
   type?: "success" | "info" | "warning" | "error";
 }
 
@@ -15,55 +19,56 @@ interface ToastContainerProps {
 }
 
 export const ToastContainer: React.FC<ToastContainerProps> = ({ toasts, onDismiss }) => {
-  if (toasts.length === 0) return null;
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+  if (!mounted || toasts.length === 0) return null;
 
-  return (
+  return createPortal(
     <div
-      aria-live="polite"
-      className="fixed top-4 right-4 z-50 flex flex-col space-y-2 pointer-events-none max-w-sm w-[calc(100vw-2rem)] sm:w-auto"
+      role="region"
+      aria-label="Thông báo"
+      className="pointer-events-none fixed top-[max(4.5rem,env(safe-area-inset-top))] right-[max(1rem,env(safe-area-inset-right))] z-40 flex max-h-[45dvh] w-[calc(100vw-2rem)] max-w-sm flex-col gap-3 overflow-y-auto overscroll-contain p-1 lg:bottom-[max(1rem,env(safe-area-inset-bottom))] lg:top-auto lg:max-h-[55dvh]"
     >
       {toasts.map((toast) => {
         const type = toast.type || "info";
 
-        let bgStyle = "bg-stone-900 text-white border-stone-800";
-        let icon = <Info className="w-4 h-4 text-blue-400 shrink-0" />;
+        let icon = <Info aria-hidden="true" className="h-5 w-5 shrink-0 text-sky-700" />;
 
         if (type === "success") {
-          bgStyle = "bg-stone-900 text-white border-emerald-500/40";
-          icon = <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />;
+          icon = <CheckCircle2 aria-hidden="true" className="h-5 w-5 shrink-0 text-emerald-700" />;
         } else if (type === "warning") {
-          bgStyle = "bg-stone-900 text-white border-amber-500/40";
-          icon = <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />;
+          icon = <AlertTriangle aria-hidden="true" className="h-5 w-5 shrink-0 text-amber-700" />;
         } else if (type === "error") {
-          bgStyle = "bg-stone-900 text-white border-red-500/40";
-          icon = <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />;
+          icon = <AlertCircle aria-hidden="true" className="h-5 w-5 shrink-0 text-rose-700" />;
         }
 
         return (
           <div
             key={toast.id}
-            className={`pointer-events-auto flex items-center justify-between space-x-3 px-3.5 py-2.5 rounded-xl border shadow-xl backdrop-blur-md transition-all transform animate-in fade-in slide-in-from-top-2 duration-200 ${bgStyle}`}
+            className="pointer-events-auto relative shrink-0 rounded-2xl border border-stone-200 bg-white p-4 text-stone-800 shadow-lg"
             role="status"
           >
-            <div className="flex items-center space-x-2.5 min-w-0">
+            <div className="flex min-w-0 items-start gap-2.5 pr-9">
               {icon}
-              <p className="text-xs font-medium leading-snug break-words">
-                {toast.message}
-              </p>
+              <div className="min-w-0 space-y-1">
+                {toast.title && <p className="break-words text-sm font-semibold text-stone-900">{toast.title}</p>}
+                <p className="break-words text-sm leading-relaxed text-stone-600">{toast.message}</p>
+              </div>
             </div>
             <button
+              type="button"
               onClick={() => onDismiss(toast.id)}
-              className="text-stone-400 hover:text-white p-1 rounded-md transition-colors shrink-0"
-              aria-label="Đóng thông báo"
+              className="absolute right-1 top-1 flex h-11 w-11 items-center justify-center rounded-xl text-stone-500 hover:bg-stone-100 hover:text-stone-900"
+              aria-label={toast.dismissLabel || "Đóng thông báo"}
             >
-              <X className="w-3.5 h-3.5" />
+              <X aria-hidden="true" className="h-4 w-4" />
             </button>
+            {toast.actions && <div className="mt-3 flex flex-wrap gap-2">{toast.actions}</div>}
           </div>
         );
       })}
-    </div>
+    </div>, document.body
   );
 };
 
 export default ToastContainer;
-

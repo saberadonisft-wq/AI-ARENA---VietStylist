@@ -124,14 +124,20 @@ export default function GeminiTryOnModal({
     const deadline = Date.now() + 250000;
     while (job.status === "running") {
       if (Date.now() >= deadline) throw new Error("Chưa nhận được kết quả. Chọn Kiểm tra lại kết quả để tiếp tục theo dõi lần tạo này.");
-      await new Promise<void>((resolve, reject) => {
-        const onAbort = () => { clearTimeout(timer); reject(new DOMException("Aborted", "AbortError")); };
-        const timer = setTimeout(() => { signal.removeEventListener("abort", onAbort); resolve(); }, 1500);
-        signal.addEventListener("abort", onAbort, { once: true });
-        if (signal.aborted) onAbort();
-      });
-      job = await v3Api.getGenerationJob(job.job_id, signal);
+      const pollStarted = Date.now();
+      job = await v3Api.getGenerationJob(job.job_id, signal, 10);
       active();
+      // Older servers may ignore long polling. Keep the original request-rate
+      // bound on running receipts without delaying an already finished result.
+      const delay = Math.max(0, 1500 - (Date.now() - pollStarted));
+      if (job.status === "running" && delay) {
+        await new Promise<void>((resolve, reject) => {
+          const onAbort = () => { clearTimeout(timer); reject(new DOMException("Aborted", "AbortError")); };
+          const timer = setTimeout(() => { signal.removeEventListener("abort", onAbort); resolve(); }, delay);
+          signal.addEventListener("abort", onAbort, { once: true });
+          if (signal.aborted) onAbort();
+        });
+      }
     }
     if (job.status === "failed") {
       persistGeneration(null);
@@ -273,8 +279,7 @@ export default function GeminiTryOnModal({
         throw new Error("Ảnh bản phối vượt 10 MB. Hãy chọn ít món hoặc ảnh nhỏ hơn rồi thử lại.");
       }
       const board = new File([boardBlob], "studio-outfit.png", { type: "image/png" });
-      const outfitImageId = await v3Api.uploadPrivateImage(board, controller.signal);
-      const userImageId = photo ? await v3Api.uploadPrivateImage(photo, controller.signal) : null;
+      const [outfitImageId, userImageId] = await v3Api.uploadTryOnImages(board, photo, controller.signal);
       if (controller.signal.aborted) return;
       setStatus("generating");
       const saved: SavedGeneration = { fingerprint, request: {

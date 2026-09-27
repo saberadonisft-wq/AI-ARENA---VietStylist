@@ -36,7 +36,7 @@ export default function SwatchPicker({
               key={v.id}
               disabled={disabled}
               onClick={() => onSelectVariant(v)}
-              className={`group relative flex items-center space-x-2 pl-1 pr-3 py-1 rounded-full border text-left transition-all ${
+              className={`group relative flex min-h-11 min-w-11 items-center space-x-2 pl-2 pr-3 py-1 rounded-full border text-left transition-all ${
                 isSelected
                   ? "border-stone-900 bg-stone-900 text-white shadow-sm"
                   : "border-stone-300 bg-white text-stone-800 hover:border-stone-500"

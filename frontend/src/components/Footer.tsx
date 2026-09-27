@@ -60,7 +60,7 @@ export default function Footer() {
             <ul className="space-y-2 text-xs text-stone-600">
               <li>
                 <Link href="/studio" className="hover:text-heritage-red transition-colors">
-                  Studio Phối đồ 2D (Konva Canvas)
+                  Studio Phối đồ
                 </Link>
               </li>
               <li>

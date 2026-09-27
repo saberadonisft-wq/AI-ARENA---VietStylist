@@ -34,6 +34,7 @@ export default function Navbar() {
   // Tự động tắt trạng thái điều hướng khi route đã thay đổi
   React.useEffect(() => {
     setNavigatingTo(null);
+    setIsMobileMenuOpen(false);
   }, [pathname]);
 
   const navLinks = [
@@ -93,7 +94,7 @@ export default function Navbar() {
             </Link>
 
             {/* Desktop Navigation */}
-            <nav className="hidden md:flex items-center space-x-1 lg:space-x-2">
+            <nav className="hidden xl:flex items-center space-x-1 lg:space-x-2">
               {navLinks.map((item) => {
                 const Icon = item.icon;
                 const isActive = pathname === item.href;
@@ -125,7 +126,7 @@ export default function Navbar() {
             </nav>
 
             {/* User Auth Control */}
-            <div className="hidden md:flex items-center space-x-3 relative">
+            <div className="hidden xl:flex items-center space-x-3 relative">
               {isLoggedIn && (isStylist || isAdmin) && (
                 <Link
                   href="/stylist"
@@ -247,13 +248,14 @@ export default function Navbar() {
             </div>
 
             {/* Mobile menu button */}
-            <div className="md:hidden flex items-center">
+            <div className="xl:hidden flex items-center">
               <button
                 type="button"
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
                 aria-label={isMobileMenuOpen ? "Đóng menu điều hướng" : "Mở menu điều hướng"}
                 aria-expanded={isMobileMenuOpen}
-                className="p-2 rounded-md text-stone-600 hover:text-stone-900 hover:bg-stone-100"
+                aria-controls="mobile-navigation"
+                className="min-h-11 min-w-11 p-2 rounded-md text-stone-600 hover:text-stone-900 hover:bg-stone-100"
               >
                 {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
               </button>
@@ -263,7 +265,7 @@ export default function Navbar() {
 
         {/* Mobile menu dropdown */}
         {isMobileMenuOpen && (
-          <div className="md:hidden border-b border-stone-200 bg-[#FAF8F5] px-4 pt-2 pb-4 space-y-1">
+          <nav id="mobile-navigation" aria-label="Điều hướng trên điện thoại" className="xl:hidden max-h-[calc(100dvh-4rem)] overflow-y-auto overscroll-contain border-b border-stone-200 bg-[#FAF8F5] px-4 pt-2 pb-[max(1rem,env(safe-area-inset-bottom))] space-y-1 [&_a]:min-h-11 [&_button]:min-h-11">
             {navLinks.map((item) => {
               const Icon = item.icon;
               const isActive = pathname === item.href;
@@ -365,7 +367,7 @@ export default function Navbar() {
                 </div>
               )}
             </div>
-          </div>
+          </nav>
         )}
       </header>
 

@@ -1,0 +1,350 @@
+/* Hallmark · workbench · existing VietStylist fonts and heritage palette.
+ * Pre-emit critique: P4 H4 E4 S4 R4 V4. */
+
+.studio-workspace {
+  --studio-gap: 12px;
+  --studio-radius: 12px;
+}
+
+.studio-workspace button {
+  touch-action: manipulation;
+}
+
+.studio-toolbar button {
+  min-height: 36px;
+  white-space: nowrap;
+}
+
+.studio-toolbar .studio-actions > button {
+  justify-content: center;
+}
+
+.studio-artboard-stage {
+  @apply rounded-xl border border-stone-200 bg-stone-100;
+  container-type: size;
+  position: relative;
+  height: min(60svh, 560px);
+  padding: 76px 16px 16px;
+  min-width: 0;
+}
+
+.studio-artboard-stage .studio-artboard {
+  width: calc(min(100cqw, calc(100cqh * var(--studio-artboard-ratio))) * var(--studio-board-zoom, 1));
+  height: calc(min(100cqh, calc(100cqw / var(--studio-artboard-ratio))) * var(--studio-board-zoom, 1));
+  max-height: none;
+  flex: none;
+}
+
+.studio-board-zoom {
+  @apply border border-stone-200 rounded-lg bg-white text-stone-700;
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 4px;
+}
+
+.studio-board-zoom button {
+  @apply rounded-md hover:bg-stone-100 disabled:opacity-40 disabled:cursor-not-allowed;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+}
+
+.studio-board-zoom output {
+  min-width: 42px;
+  font-size: 12px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.studio-board-zoom .studio-board-fit {
+  padding: 0 8px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.studio-artboard-viewport {
+  position: absolute;
+  inset: 60px 0 0;
+  overflow: auto;
+  padding: 16px;
+}
+
+.studio-artboard-viewport[data-zoomed="true"] {
+  overscroll-behavior: contain;
+}
+
+.studio-artboard-surface {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: max-content;
+  min-width: 100%;
+  min-height: 100%;
+}
+
+.studio-library {
+  display: flex;
+  flex-direction: column;
+  gap: var(--studio-gap);
+}
+
+.studio-library.hidden {
+  display: none;
+}
+
+.studio-library > :not([hidden]) ~ :not([hidden]) {
+  margin-top: 0;
+}
+
+.studio-catalog {
+  order: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.studio-occasions {
+  order: 1;
+}
+
+.studio-closure {
+  order: 1;
+}
+
+.studio-garment-list {
+  flex: none;
+}
+
+.studio-inspector > * {
+  min-width: 0;
+}
+
+.studio-inspector .uppercase {
+  letter-spacing: 0;
+}
+
+.studio-inspector button[aria-expanded] {
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.studio-inspector button[aria-expanded] > div:last-child {
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.studio-slot-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.studio-closure > div:first-child {
+  flex-wrap: wrap;
+}
+
+.studio-closure button[aria-pressed] {
+  white-space: nowrap;
+}
+
+.studio-garment-list [title] {
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+@media (max-width: 639px) {
+  .studio-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+  }
+
+  .studio-toolbar button {
+    min-height: 44px;
+  }
+
+  .studio-artboard-stage {
+    padding: 72px 12px 12px;
+  }
+
+  .studio-artboard-viewport {
+    padding: 12px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .studio-artboard-stage {
+    height: clamp(560px, 80vh, 960px);
+  }
+
+  .studio-workspace {
+    max-width: none;
+    padding: 12px 16px;
+  }
+
+  .studio-panels {
+    grid-template-columns: clamp(240px, 20vw, 288px) minmax(0, 1fr) clamp(250px, 21vw, 312px);
+    gap: var(--studio-gap);
+  }
+
+  .studio-library.hidden {
+    display: flex;
+  }
+
+  .studio-rail > * {
+    flex-shrink: 0;
+  }
+
+  .studio-rail > .bg-white,
+  .studio-inspector > div > .bg-white {
+    padding: 14px;
+    border-radius: var(--studio-radius);
+    box-shadow: none;
+  }
+
+  .studio-title {
+    width: 168px;
+  }
+
+  .studio-document {
+    gap: 8px;
+  }
+
+  .studio-actions {
+    gap: 6px;
+  }
+
+  .studio-actions > button {
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+
+  .studio-board-toolbar {
+    padding: 8px 12px;
+  }
+
+  .studio-board-toolbar button {
+    min-height: 32px;
+    white-space: nowrap;
+  }
+
+  .studio-board-toolbar > div:first-child > div:first-child > span {
+    font-size: 12px;
+  }
+
+  .studio-transform-controls {
+    padding: 10px 12px;
+  }
+
+  .studio-transform-controls button,
+  .studio-transform-controls select {
+    min-height: 36px;
+  }
+
+  .studio-transform-controls button {
+    min-width: 36px;
+    padding: 6px;
+  }
+
+  .studio-transform-controls select {
+    font-size: 12px;
+  }
+
+  .studio-gesture-hint {
+    font-size: 11px;
+  }
+
+  .studio-gesture-hint:not([data-locked="true"]) {
+    display: none;
+  }
+
+  .studio-transform-fields {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 12px;
+  }
+
+  .studio-transform-fields > * + * {
+    margin-top: 0;
+  }
+
+  .studio-transform-values {
+    display: flex;
+    gap: 12px;
+  }
+
+  .studio-transform-cluster {
+    grid-template-columns: 36px 30px 36px;
+  }
+
+  .studio-position-actions {
+    flex: 1;
+  }
+
+  .studio-position-actions [role="group"] {
+    gap: 4px;
+  }
+
+  .studio-position-actions > button > span {
+    display: none;
+  }
+}
+
+@media (min-width: 1280px) {
+  .studio-transform-controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .studio-selection-row {
+    flex: 1 1 160px;
+    min-width: 0;
+  }
+
+  .studio-transform-controls > :not([hidden]) ~ :not([hidden]) {
+    margin-top: 0;
+  }
+
+  .studio-transform-fields {
+    flex: 0 1 auto;
+  }
+
+  .studio-board-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .studio-board-toolbar > div {
+    display: contents;
+  }
+
+  .studio-board-toolbar > div:first-child > div:first-child {
+    flex: 1;
+  }
+
+  .studio-board-toolbar > div:first-child > div:first-child > span {
+    max-width: 120px;
+    line-height: 1.4;
+  }
+
+  .studio-board-toolbar > div:last-child > button {
+    width: 32px;
+    justify-content: center;
+  }
+
+  .studio-board-toolbar > div:last-child > button > span {
+    display: none;
+  }
+}

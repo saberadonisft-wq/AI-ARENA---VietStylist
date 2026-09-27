@@ -19,6 +19,12 @@ export default function TrangPhucDetailPage() {
   const [notFound, setNotFound] = useState(false);
   const [imageLoadFailed, setImageLoadFailed] = useState(false);
   const [retry, setRetry] = useState(0);
+  const [libraryHref, setLibraryHref] = useState("/thu-vien");
+
+  useEffect(() => {
+    const returnTo = new URLSearchParams(window.location.search).get("returnTo");
+    setLibraryHref(returnTo && /^\/thu-vien(?:\?|$)/.test(returnTo) ? returnTo : "/thu-vien");
+  }, [slug]);
 
   useEffect(() => {
     if (!slug) return;
@@ -91,7 +97,7 @@ export default function TrangPhucDetailPage() {
         <h2 className="text-xl font-serif font-bold text-stone-900">{loadError ? "Không tải được thông tin trang phục" : notFound ? "Không tìm thấy thông tin trang phục" : "Thông tin trang phục chưa sẵn sàng"}</h2>
         {loadError && <p role="alert" className="text-sm text-rose-800">{loadError}</p>}
         {loadError && <button type="button" onClick={() => setRetry(value => value + 1)} className="rounded-lg border border-stone-300 bg-white px-4 py-2 text-sm font-semibold">Thử tải lại</button>}
-        <Link href="/thu-vien" className="text-xs text-heritage-red font-semibold hover:underline">
+        <Link href={libraryHref} className="inline-flex min-h-11 items-center text-sm text-heritage-red font-semibold hover:underline">
           ← Quay lại Thư viện
         </Link>
       </div>
@@ -102,8 +108,8 @@ export default function TrangPhucDetailPage() {
     <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
       {/* Nút quay lại */}
       <Link
-        href="/thu-vien"
-        className="inline-flex items-center space-x-1.5 text-xs font-semibold text-stone-600 hover:text-heritage-red transition-colors"
+        href={libraryHref}
+        className="inline-flex min-h-11 items-center space-x-1.5 text-sm font-semibold text-stone-600 hover:text-heritage-red transition-colors"
       >
         <ArrowLeft className="w-4 h-4" />
         <span>Quay lại Thư viện Cổ phục</span>
