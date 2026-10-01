@@ -1,9 +1,11 @@
-"""Bound local multipart input before the parser can spool an unbounded body."""
+"""Authorize stylist uploads and bound multipart input before parsing/spooling."""
 
 import uuid
 from starlette.formparsers import MultiPartException
+from starlette.concurrency import run_in_threadpool
 from app.core.config import settings
-from app.core.errors import create_error_response
+from app.core.errors import AppError, create_error_response
+from app.core.security import get_current_user_optional
 
 
 class LocalUploadBodyLimit:
@@ -11,32 +13,46 @@ class LocalUploadBodyLimit:
         self.app = app
 
     async def __call__(self, scope, receive, send):
-        if (
-            scope["type"] != "http"
-            or not scope["path"].startswith("/api/media/local-upload/")
-            or not settings.is_local_media_enabled()
-        ):
+        if scope["type"] != "http" or scope["method"] != "POST":
             return await self.app(scope, receive, send)
-        limit = (
-            settings.MEDIA_VIDEO_MAX_BYTES + 64 * 1024
-        )  # bounded multipart framing allowance
+        stylist_upload = scope["path"].rstrip("/") == "/api/stylist/garment-image"
+        local_upload = scope["path"].startswith("/api/media/local-upload/") and settings.is_local_media_enabled()
+        if not (stylist_upload or local_upload):
+            return await self.app(scope, receive, send)
+        limit = (settings.MEDIA_IMAGE_MAX_BYTES if stylist_upload else settings.MEDIA_VIDEO_MAX_BYTES) + 64 * 1024
         headers = dict(scope.get("headers", []))
+
+        async def respond(error):
+            request_id = scope.get("state", {}).get("request_id", f"req_{uuid.uuid4().hex[:12]}")
+            response = create_error_response(error.code, error.message, error.status_code, request_id, error.details)
+            response.headers["X-Request-ID"] = request_id
+            await response(scope, receive, send)
+
+        if stylist_upload:
+            # FastAPI parses UploadFile before resolving route dependencies.
+            # Check the live account/roles here without consuming the body.
+            try:
+                user = await run_in_threadpool(
+                    get_current_user_optional, credentials=None,
+                    authorization=headers.get(b"authorization", b"").decode("latin-1") or None,
+                )
+                if user is None:
+                    raise AppError("UNAUTHORIZED", "Yêu cầu đăng nhập để upload.", 401)
+                if not user.is_stylist:
+                    raise AppError("FORBIDDEN", "Chỉ stylist hoặc admin được upload trang phục.", 403)
+            except AppError as exc:
+                return await respond(exc)
         try:
             declared = int(headers.get(b"content-length", b"0"))
         except ValueError:
             declared = 0
 
         async def reject():
-            request_id = scope.get("state", {}).get(
-                "request_id", f"req_{uuid.uuid4().hex[:12]}"
-            )
-            response = create_error_response(
+            await respond(AppError(
                 "PAYLOAD_TOO_LARGE",
                 "Request upload vượt giới hạn dung lượng",
                 413,
-                request_id,
-            )
-            await response(scope, receive, send)
+            ))
 
         if declared > limit:
             return await reject()

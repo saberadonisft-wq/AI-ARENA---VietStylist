@@ -6,7 +6,10 @@ class RequestUploadUrlInput(BaseModel):
     filename: str = Field(min_length=1, max_length=255)
     media_type: Literal["image", "video"] = "image"  # image, video
     mime_type: str = "image/png"
-    size_bytes: Optional[int] = Field(default=None, gt=0)
+    size_bytes: Optional[int] = Field(
+        default=None, gt=0,
+        description="Exact file size in bytes; required for R2 uploads and bound into the signed PUT URL.",
+    )
     visibility: Literal["public", "private", "unlisted"] = (
         "private"  # public, private, unlisted
     )

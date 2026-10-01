@@ -16501,7 +16501,7 @@
         "properties": {
           "file": {
             "type": "string",
-            "format": "binary",
+            "contentMediaType": "application/octet-stream",
             "title": "File"
           }
         },
@@ -21014,7 +21014,8 @@
                 "type": "null"
               }
             ],
-            "title": "Size Bytes"
+            "title": "Size Bytes",
+            "description": "Exact file size in bytes; required for R2 uploads and bound into the signed PUT URL."
           },
           "visibility": {
             "type": "string",

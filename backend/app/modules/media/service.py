@@ -107,8 +107,10 @@ class MediaService:
         )
         ttl = settings.MEDIA_UPLOAD_TTL
         if r2_client.is_configured:
+            if req.size_bytes is None:
+                raise AppError("UPLOAD_SIZE_REQUIRED", "Cần khai báo dung lượng chính xác trước khi upload.", 422)
             upload = r2_client.generate_upload_url(
-                staging_bucket, staging_key, req.mime_type, ttl
+                staging_bucket, staging_key, req.mime_type, req.size_bytes, ttl
             )
         else:
             grant = create_media_grant(media_id, "upload", ttl)
@@ -193,6 +195,8 @@ class MediaService:
                 raise AppError(
                     "PAYLOAD_TOO_LARGE", "File vượt giới hạn dung lượng", 413
                 )
+            if r2_client.is_configured and head["size_bytes"] != media["size_bytes"]:
+                raise AppError("UPLOAD_SIZE_MISMATCH", "Dung lượng file không khớp phiên upload.", 422)
             original = r2_client.read_object(
                 media["staging_bucket"],
                 media["staging_key"],

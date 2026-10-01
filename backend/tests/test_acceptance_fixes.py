@@ -30,18 +30,18 @@ OWNER = "dev-user-media-1"
 HEADERS = lambda: {"Authorization": auth_header(OWNER)}
 
 
-def session(visibility="private", headers=None):
+def session(visibility="private", headers=None, size_bytes=None):
     res = client.post(
         "/api/media/uploads",
         headers=headers or HEADERS(),
-        json={"filename": "p.png", "visibility": visibility},
+        json={"filename": "p.png", "visibility": visibility, "size_bytes": size_bytes},
     )
     assert res.status_code == 200, res.text
     return res.json()
 
 
 def upload(png_bytes):
-    s = session()
+    s = session(size_bytes=max(1, len(png_bytes)))
     assert (
         client.post(
             s["upload_url"], files={"file": ("p.png", png_bytes, "image/png")}
@@ -100,7 +100,7 @@ def test_junction_cannot_read_registered_or_unregistered_file(tmp_path):
 
 
 def test_upload_grant_replay_and_immutable_final(png_bytes):
-    s = session()
+    s = session(size_bytes=len(png_bytes))
     endpoint = s["upload_url"].split("?")[0]
     assert (
         client.post(endpoint, files={"file": ("p.png", png_bytes)}).status_code == 422
@@ -495,7 +495,7 @@ def test_fake_r2_promotion_oversize_and_delete_retry(monkeypatch, png_bytes):
     fake = FakeS3()
     monkeypatch.setattr(R2StorageClient, "is_configured", property(lambda self: True))
     monkeypatch.setattr(R2StorageClient, "s3", property(lambda self: fake))
-    s = session()
+    s = session(size_bytes=len(png_bytes))
     assert s["method"] == "PUT" and s["bucket"] == settings.R2_BUCKET_PRIVATE
     fake.objects[(s["bucket"], s["object_key"])] = png_bytes
     result = complete(s)
@@ -512,7 +512,7 @@ def test_fake_r2_promotion_oversize_and_delete_retry(monkeypatch, png_bytes):
     fake.fail_delete = False
     assert MediaService.cleanup()["processed"] == 1
     assert not fake.objects
-    s = session()
+    s = session(size_bytes=len(png_bytes))
     fake.objects[(s["bucket"], s["object_key"])] = png_bytes
     monkeypatch.setattr(
         fake,
