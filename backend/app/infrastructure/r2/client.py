@@ -114,10 +114,12 @@ class R2StorageClient:
             self._readiness = (0, False)
 
     @storage_errors
-    def generate_upload_url(self, bucket, object_key, content_type, expires_in=900):
+    def generate_upload_url(self, bucket, object_key, content_type, size_bytes, expires_in=900):
         self.require_available()
         if not self.is_configured:
             raise ValueError("Local upload requires a media session grant")
+        if not isinstance(size_bytes, int) or isinstance(size_bytes, bool) or size_bytes <= 0:
+            raise ValueError("An exact positive upload size is required")
         return {
             "upload_url": self.s3.generate_presigned_url(
                 "put_object",
@@ -125,6 +127,9 @@ class R2StorageClient:
                     "Bucket": bucket,
                     "Key": object_key,
                     "ContentType": content_type,
+                    # SigV4 binds the HTTP message length, so an oversized PUT
+                    # cannot write to R2 even if the caller never calls complete.
+                    "ContentLength": size_bytes,
                 },
                 ExpiresIn=expires_in,
             ),

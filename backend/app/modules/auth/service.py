@@ -11,7 +11,7 @@ from fastapi import status
 
 from app.core.database import Database, get_db_connection, db_transaction
 from app.core.config import settings
-from app.core.security import create_access_token
+from app.core.security import create_access_token, reject_legacy_google_link
 from app.core.errors import AppError
 from app.modules.auth.schemas import (
     RegisterRequest,
@@ -117,7 +117,7 @@ class AuthService:
         email_or_username = req.email.strip().lower()
 
         account = Database.fetch_one(
-            "SELECT id, email, password_hash, salt, display_name, avatar_url, auth_provider, is_active FROM accounts WHERE email = ?",
+            "SELECT id, email, password_hash, salt, display_name, avatar_url, auth_provider, provider_id, is_active FROM accounts WHERE email = ?",
             (email_or_username,),
         )
 
@@ -134,6 +134,8 @@ class AuthService:
                 message="Email hoặc mật khẩu không chính xác. Vui lòng thử lại.",
                 status_code=status.HTTP_401_UNAUTHORIZED,
             )
+
+        reject_legacy_google_link(account)
 
         if account.get("auth_provider") == "google" and not account.get(
             "password_hash"
@@ -246,12 +248,23 @@ class AuthService:
             display_name = data.get("name") or email.split("@")[0]
             avatar_url = data.get("picture")
 
-            # Kiểm tra tài khoản đã tồn tại theo provider_id hoặc email
+            # Only the verified provider subject identifies a Google account.
+            # A local registration does not prove ownership of its email address;
+            # merging by email would preserve a pre-registrant's password/session.
             existing = Database.fetch_one(
-                "SELECT * FROM accounts WHERE (auth_provider = 'google' AND provider_id = ?) OR email = ?",
-                (google_sub, email),
+                "SELECT * FROM accounts WHERE auth_provider = 'google' AND provider_id = ?",
+                (google_sub,),
                 conn=conn,
             )
+            if not existing and Database.fetch_one(
+                "SELECT id FROM accounts WHERE email = ?", (email,), conn=conn
+            ):
+                raise AppError(
+                    code="GOOGLE_ACCOUNT_LINK_REQUIRED",
+                    message="Email này đã có tài khoản dùng phương thức đăng nhập khác. "
+                    "Hãy dùng phương thức đã đăng ký; hệ thống không tự liên kết tài khoản Google.",
+                    status_code=409,
+                )
 
             if existing:
                 if not existing["is_active"]:

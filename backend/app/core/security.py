@@ -115,6 +115,18 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 bearer_scheme = HTTPBearer(auto_error=False)
 
 
+def reject_legacy_google_link(account):
+    # Older automatic email merges left an unverified local password and all
+    # existing JWTs active. Do not let either credential keep accessing that
+    # shared account until its owner has been verified by an administrator.
+    if account.get("auth_provider") == "local" and account.get("provider_id"):
+        raise AppError(
+            "ACCOUNT_LINK_REVIEW_REQUIRED",
+            "Tài khoản có liên kết Google cũ cần được quản trị viên xác minh trước khi đăng nhập lại.",
+            401,
+        )
+
+
 def get_current_user_optional(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer_scheme),
     authorization: Optional[str] = Header(None),
@@ -150,7 +162,7 @@ def get_current_user_optional(
     role_aggregate = "STRING_AGG(r.role, ',')" if settings.is_postgres() else "GROUP_CONCAT(r.role)"
     account = Database.fetch_one(
         f"""
-        SELECT a.is_active, a.email, {role_aggregate} AS current_roles
+        SELECT a.is_active, a.email, a.auth_provider, a.provider_id, {role_aggregate} AS current_roles
         FROM accounts a LEFT JOIN user_roles r ON r.user_id=a.id
         WHERE a.id=? GROUP BY a.id
     """,
@@ -168,6 +180,7 @@ def get_current_user_optional(
             message="Tài khoản đã bị vô hiệu hóa",
             status_code=status.HTTP_401_UNAUTHORIZED,
         )
+    reject_legacy_google_link(account)
 
     # Lấy vai trò mới nhất trực tiếp từ cơ sở dữ liệu để đảm bảo việc thu hồi quyền (revoke) có hiệu lực ngay
     user_roles = (
