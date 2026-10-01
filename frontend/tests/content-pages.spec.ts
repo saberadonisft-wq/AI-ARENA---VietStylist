@@ -2,11 +2,12 @@ import { expect, test } from "@playwright/test";
 
 test("story loading failure is distinct from an empty category and offers retry", async ({ page }) => {
   let articleReads = 0;
+  let retryEnabled = false;
   await page.route("**/api/**", async route => {
     const path = new URL(route.request().url()).pathname;
     if (path === "/api/heritage/articles") {
       articleReads += 1;
-      return articleReads <= 2
+      return !retryEnabled
         ? route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ error: { code: "SERVICE_UNAVAILABLE", message: "Máy chủ nội dung không khả dụng." } }) })
         : route.fulfill({ json: [] });
     }
@@ -16,9 +17,11 @@ test("story loading failure is distinct from an empty category and offers retry"
   await page.goto("/chuyen-co-phuc");
   await expect(page.locator('p[role="alert"]')).toContainText("Máy chủ nội dung không khả dụng");
   await expect(page.getByText("Không tìm thấy câu chuyện phù hợp")).toHaveCount(0);
+  const readsBeforeRetry = articleReads;
+  retryEnabled = true;
   await page.getByRole("button", { name: "Thử tải lại câu chuyện" }).click();
   await expect(page.getByText("Không tìm thấy câu chuyện phù hợp")).toBeVisible();
-  expect(articleReads).toBeGreaterThanOrEqual(3);
+  expect(articleReads).toBeGreaterThan(readsBeforeRetry);
 });
 
 test("story deletion explains its scope, honors cancellation, and keeps API errors visible", async ({ page }) => {
