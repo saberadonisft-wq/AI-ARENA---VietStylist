@@ -250,6 +250,12 @@ export interface ArticleSourceCitation {
   quote?: string;
 }
 
+export interface StoryImage {
+  media_id: string;
+  url: string;
+  caption: string;
+}
+
 export interface HeritageArticle {
   id: string;
   title: string;
@@ -272,6 +278,7 @@ export interface HeritageArticle {
   likes_count?: number;
   created_at?: string;
   sources?: ArticleSourceCitation[];
+  images?: StoryImage[];
 }
 
 export interface CreateStoryPayload {
@@ -286,6 +293,7 @@ export interface CreateStoryPayload {
   structural_description?: string;
   cover_image_url?: string;
   read_time_minutes?: number;
+  images?: Array<{ media_id: string; caption: string }>;
 }
 
 export interface LookbookEntryDetail {

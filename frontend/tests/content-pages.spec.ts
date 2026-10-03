@@ -49,6 +49,7 @@ test("story deletion explains its scope, honors cancellation, and keeps API erro
     const path = new URL(request.url()).pathname;
     if (path === "/api/auth/me") return route.fulfill({ json: { id: "stylist-1", email: "stylist@example.invalid", display_name: "Stylist Test", roles: ["stylist"] } });
     if (path === "/api/heritage/articles" && request.method() === "GET") return route.fulfill({ json: deleteAttempts > 1 ? [] : [story] });
+    if (path === "/api/heritage/articles/story-1" && request.method() === "GET") return route.fulfill({ json: story });
     if (path === "/api/heritage/articles/story-1" && request.method() === "DELETE") {
       deleteAttempts += 1;
       return deleteAttempts === 1
