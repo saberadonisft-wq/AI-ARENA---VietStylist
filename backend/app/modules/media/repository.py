@@ -1,7 +1,7 @@
 import time
 import uuid
 import json
-from app.core.database import Database, db_transaction, get_db_connection
+from app.core.database import Database, db_transaction
 from app.core.config import settings
 from app.core.errors import AppError
 
@@ -200,7 +200,7 @@ class MediaRepository:
                 }:
                     return "in_use"
         changed = conn.execute(
-            "UPDATE media_assets SET status='deleting',next_reconcile_at=0,operation_token=NULL,lease_until=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=? AND owner_id=? AND (status NOT IN ('processing','uploading') OR lease_until<?)",
+            "UPDATE media_assets SET status='deleting',operation_token=NULL,lease_until=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=? AND owner_id=? AND (status NOT IN ('processing','uploading') OR lease_until<?)",
             (media_id, owner_id, int(time.time())),
         ).rowcount
         return "marked" if changed else "busy"

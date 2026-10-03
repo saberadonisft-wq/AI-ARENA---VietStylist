@@ -206,6 +206,7 @@ class HeritageService:
             media = Database.fetch_one("SELECT * FROM media_assets WHERE id=?", (media_id,), conn=conn)
             if media and media["status"] == "ready" and media["visibility"] == "public":
                 if MediaRepository.mark_media_deleting_if_unused(media_id, media["owner_id"], conn=conn) == "marked":
+                    Database.execute("UPDATE media_assets SET next_reconcile_at=0 WHERE id=?", (media_id,), conn=conn)
                     queued.append((media_id, media["owner_id"]))
         return queued
 
