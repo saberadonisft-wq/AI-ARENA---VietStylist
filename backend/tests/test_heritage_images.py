@@ -60,3 +60,23 @@ def test_rejects_foreign_private_unready_duplicate_and_excess_images(png_bytes):
         Database.execute(f"UPDATE media_assets SET {field}=? WHERE id=?", (original, image["id"]))
     for items in [[item, item], [item] * 13, [{"media_id": "missing"}]]:
         assert client.post("/api/heritage/articles", headers=ADMIN, json=story(items)).status_code == 422
+
+
+def test_edit_permissions_content_category_and_retained_images(png_bytes):
+    Database.execute("UPDATE user_roles SET role='stylist' WHERE user_id=?", ("dev-user-123",))
+    author = {"Authorization": auth_header("dev-user-123")}
+    image = upload_image(png_bytes, author)
+    payload = story([{"media_id": image["id"], "caption": "Nguồn gốc"}])
+    created = client.post("/api/heritage/articles", headers=author, json=payload).json()
+    path = f"/api/heritage/articles/{created['id']}"
+    payload.update(category="Thể loại tự viết", full_content="Toàn bộ nội dung mới đã được chỉnh sửa và lưu lại.")
+    assert client.put(path, headers=author, json=payload).status_code == 200
+    assert client.put(path, headers=ADMIN, json=payload).status_code == 200
+    detail = client.get(path).json()
+    assert detail["full_content"] == payload["full_content"]
+    assert detail["category"] == "Thể loại tự viết"
+    assert detail["images"][0]["media_id"] == image["id"]
+    assert detail["author_id"] == "dev-user-123"
+    assert detail["slug"] == created["slug"]
+    Database.execute("UPDATE user_roles SET role='stylist' WHERE user_id=?", ("dev-user-media-1",))
+    assert client.put(path, headers={"Authorization": auth_header("dev-user-media-1")}, json=payload).status_code == 403

@@ -80,13 +80,15 @@ class HeritageService:
         return result
 
     @staticmethod
-    def create_story(req: CreateStoryRequest, user: Dict[str, Any]) -> Dict[str, Any]:
+    def create_story(req: CreateStoryRequest, user: Dict[str, Any], existing=None) -> Dict[str, Any]:
         images = []
         seen = set()
+        existing_images = existing.get("images", []) if existing else []
+        retained_ids = {image["media_id"] for image in existing_images}
         for image in req.images:
             media = MediaRepository.get_media_by_id(image.media_id)
             if (
-                not media or media["owner_id"] != user.get("id")
+                not media or (media["owner_id"] != user.get("id") and image.media_id not in retained_ids)
                 or media["status"] != "ready" or media["visibility"] != "public"
                 or media["media_type"] != "image"
                 or media["mime_type"] not in {"image/png", "image/jpeg", "image/webp"}
@@ -127,6 +129,9 @@ class HeritageService:
             "likes_count": 0,
         }
 
+        if existing:
+            HeritageRepository.update_story(existing["id"], story_data)
+            return {"status": "updated", "id": existing["id"], "slug": existing["slug"], "title": req.title}
         created_id = HeritageRepository.create_story(story_data)
         return {
             "status": "created",
@@ -136,6 +141,13 @@ class HeritageService:
             "author_name": author_name,
             "category": req.category,
         }
+
+    @staticmethod
+    def update_story(identifier: str, req: CreateStoryRequest, user: Dict[str, Any]) -> Dict[str, Any]:
+        existing = HeritageService.get_article_detail(identifier)
+        if "admin" not in user.get("roles", []) and existing.get("author_id") != user.get("id"):
+            raise AppError("FORBIDDEN", "Bạn không có quyền chỉnh sửa câu chuyện này", 403)
+        return HeritageService.create_story(req, user, existing=existing)
 
     @staticmethod
     def delete_story(story_id: str, user: Dict[str, Any]) -> Dict[str, Any]:

@@ -69,6 +69,16 @@ class HeritageRepository:
         return story_data["id"]
 
     @staticmethod
+    def update_story(story_id: str, data: Dict[str, Any]) -> None:
+        fields = ("title", "short_summary", "full_content", "category", "era", "related_garment_id",
+                  "historical_context", "modern_interpretation", "structural_description", "cover_image_url", "read_time_minutes")
+        Database.execute(
+            "UPDATE heritage_articles SET " + ", ".join(f"{field}=?" for field in fields)
+            + ", images_json=?, version=version+1 WHERE id=?",
+            tuple(data.get(field) for field in fields) + (json.dumps(data["images"], ensure_ascii=False), story_id),
+        )
+
+    @staticmethod
     def delete_story(story_id: str) -> bool:
         count = Database.execute("DELETE FROM heritage_articles WHERE id = ?", (story_id,))
         return count > 0

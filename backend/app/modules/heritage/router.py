@@ -60,6 +60,15 @@ def create_story(
     return HeritageService.create_story(req, user_info)
 
 
+@router.put("/articles/{id_or_slug}")
+def update_story(
+    id_or_slug: str,
+    req: CreateStoryRequest,
+    current_user: AuthenticatedUser = Depends(require_role(["stylist", "admin"])),
+):
+    return HeritageService.update_story(id_or_slug, req, {"id": current_user.user_id, "roles": current_user.roles})
+
+
 @router.delete("/articles/{id_or_slug}")
 def delete_story(
     id_or_slug: str,
