@@ -12,9 +12,11 @@ export interface DraftStoryImage {
   uploaded?: { media_id: string; url: string };
 }
 
-export default function StoryImagePicker({ images, onChange, disabled }: {
+export default function StoryImagePicker({ images, onChange, onSelectCover, coverId, disabled }: {
   images: DraftStoryImage[];
   onChange: (images: DraftStoryImage[]) => void;
+  onSelectCover: (image: DraftStoryImage) => void;
+  coverId?: string;
   disabled: boolean;
 }) {
   const [error, setError] = useState("");
@@ -47,7 +49,7 @@ export default function StoryImagePicker({ images, onChange, disabled }: {
               <textarea value={image.caption} maxLength={500} rows={2} disabled={disabled} onChange={event => onChange(images.map(item => item.id === image.id ? { ...item, caption: event.target.value } : item))} placeholder="Ví dụ: Áo Nhật Bình, tư liệu bảo tàng..." className="mt-1 w-full rounded-lg border border-stone-300 p-2 text-xs" />
             </label>
             <div className="flex items-center justify-between gap-2">
-              <button type="button" disabled={disabled || index === 0} onClick={() => onChange([image, ...images.filter(item => item.id !== image.id)])} className="min-h-11 rounded-lg px-2 text-xs font-semibold text-heritage-red disabled:text-stone-500">{index === 0 ? "Ảnh đầu / bìa mặc định" : "Dùng làm ảnh bìa"}</button>
+              <button type="button" disabled={disabled || image.id === coverId} onClick={() => onSelectCover(image)} className="min-h-11 rounded-lg px-2 text-xs font-semibold text-heritage-red disabled:text-stone-500">{image.id === coverId ? "Ảnh bìa đã chọn" : "Dùng làm ảnh bìa"}</button>
               <button type="button" aria-label={`Bỏ ảnh ${index + 1}`} disabled={disabled} onClick={() => onChange(images.filter(item => item.id !== image.id))} className="flex min-h-11 min-w-11 items-center justify-center rounded-lg text-stone-500 hover:bg-red-50 hover:text-red-700"><Trash2 className="h-4 w-4" /></button>
             </div>
           </div>

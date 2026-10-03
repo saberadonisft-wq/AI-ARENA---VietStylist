@@ -193,8 +193,8 @@ export const api = {
       method: "POST",
       body: JSON.stringify(payload),
     }),
-  updateHeritageArticle: (id: string, payload: CreateStoryPayload) =>
-    apiFetch<{ id: string }>(`/api/heritage/articles/${encodeURIComponent(id)}`, { method: "PUT", body: JSON.stringify(payload) }),
+  updateHeritageArticle: (id: string, payload: CreateStoryPayload & { expected_version: number }) =>
+    apiFetch<{ id: string; version: number; media_cleanup_pending?: number }>(`/api/heritage/articles/${encodeURIComponent(id)}`, { method: "PUT", body: JSON.stringify(payload) }),
   deleteHeritageArticle: (slugOrId: string) =>
     apiFetch<any>(`/api/heritage/articles/${slugOrId}`, {
       method: "DELETE",
