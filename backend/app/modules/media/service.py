@@ -341,7 +341,7 @@ class MediaService:
         marked = MediaRepository.mark_media_deleting_if_unused(media_id, user_id)
         if marked != "marked":
             if marked == "in_use":
-                raise AppError("MEDIA_IN_USE", "Ảnh đang được dùng bởi lượt thử đồ đang chạy. Hãy thử xóa lại sau.", 409)
+                raise AppError("MEDIA_IN_USE", "Ảnh còn được sử dụng bởi bài viết, thư viện hoặc lượt thử đồ. Không thể xóa lúc này.", 409)
             raise AppError("MEDIA_BUSY", "File đang được xử lý; thử lại sau", 409)
         objects = MediaRepository.objects(media_id)
         # Legacy rows may have been inserted by import scripts after migration.

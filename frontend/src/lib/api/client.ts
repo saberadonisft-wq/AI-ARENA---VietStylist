@@ -151,6 +151,34 @@ export const api = {
   getStarterOutfits: () => apiFetch<StarterOutfit[]>("/api/catalog/starter-outfits"),
 
   // Heritage & Stylist Blog Stories
+  uploadStoryImage: async (file: File) => {
+    const session = await apiFetch<{ media_id: string; upload_url: string; method: string; storage_type: string }>("/api/heritage/images/uploads", {
+      method: "POST",
+      body: JSON.stringify({ filename: file.name, mime_type: file.type, size_bytes: file.size }),
+    });
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 60000);
+    try {
+      const body = session.storage_type === "local" ? new FormData() : file;
+      if (body instanceof FormData) body.append("file", file);
+      const response = await fetch(session.upload_url, {
+        method: session.method, body, signal: controller.signal,
+        headers: body instanceof FormData ? undefined : { "Content-Type": file.type },
+      });
+      if (!response.ok) throw new Error(`Không tải được ảnh “${file.name}”. Hãy thử lại.`);
+      const media = await apiFetch<{ id: string; public_url: string; status: string }>(`/api/media/${encodeURIComponent(session.media_id)}/complete`, {
+        method: "POST", body: "{}", timeoutMs: 30000,
+      });
+      if (media.status !== "ready" || !media.public_url) throw new Error("Ảnh chưa sẵn sàng để xuất bản.");
+      return { media_id: media.id, url: media.public_url };
+    } catch (error) {
+      await api.deleteMedia(session.media_id).catch(() => {});
+      if (controller.signal.aborted) throw new Error(`Tải ảnh “${file.name}” quá thời gian. Hãy thử lại.`);
+      throw error;
+    } finally {
+      clearTimeout(timer);
+    }
+  },
   getHeritageArticles: (filters?: { era?: string; category?: string; search?: string }) => {
     const params = new URLSearchParams();
     if (filters?.era && filters.era !== "all") params.append("era", filters.era);
@@ -165,6 +193,8 @@ export const api = {
       method: "POST",
       body: JSON.stringify(payload),
     }),
+  updateHeritageArticle: (id: string, payload: CreateStoryPayload & { expected_version: number }) =>
+    apiFetch<{ id: string; version: number; media_cleanup_pending?: number }>(`/api/heritage/articles/${encodeURIComponent(id)}`, { method: "PUT", body: JSON.stringify(payload) }),
   deleteHeritageArticle: (slugOrId: string) =>
     apiFetch<any>(`/api/heritage/articles/${slugOrId}`, {
       method: "DELETE",

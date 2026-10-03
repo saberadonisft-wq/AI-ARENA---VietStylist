@@ -1,7 +1,7 @@
 import time
 import uuid
 import json
-from app.core.database import Database, db_transaction, get_db_connection
+from app.core.database import Database, db_transaction
 from app.core.config import settings
 from app.core.errors import AppError
 
@@ -149,31 +149,61 @@ class MediaRepository:
         )
 
     @staticmethod
-    def mark_media_deleting_if_unused(media_id, owner_id):
+    def mark_media_deleting_if_unused(media_id, owner_id, conn=None):
         """Serialize deletion with image-generation reservation before changing status."""
-        with get_db_connection() as conn:
-            with conn:
-                conn.execute("BEGIN IMMEDIATE")
-                jobs = conn.execute(
-                    "SELECT input_params,result_data FROM ai_jobs WHERE owner_id=? AND task_type='v3_generation' AND status='running' ORDER BY created_at DESC",
-                    (owner_id,),
-                ).fetchall()
-                for job in jobs:
-                    for raw in (job["input_params"], job["result_data"]):
-                        try:
-                            payload = json.loads(raw) if isinstance(raw, str) else (raw or {})
-                        except (TypeError, ValueError):
-                            continue
-                        if media_id in {
-                            payload.get("user_image_id"), payload.get("outfit_image_id"),
-                            payload.get("result_media_id"),
-                        }:
-                            return "in_use"
-                changed = conn.execute(
-                    "UPDATE media_assets SET status='deleting',operation_token=NULL,lease_until=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=? AND owner_id=? AND (status NOT IN ('processing','uploading') OR lease_until<?)",
-                    (media_id, owner_id, int(time.time())),
-                ).rowcount
-                return "marked" if changed else "busy"
+        if conn is not None:
+            return MediaRepository._mark_unused(conn, media_id, owner_id)
+        with db_transaction() as connection:
+            return MediaRepository._mark_unused(connection, media_id, owner_id)
+
+    @staticmethod
+    def _mark_unused(conn, media_id, owner_id):
+        media = conn.execute("SELECT public_url FROM media_assets WHERE id=?", (media_id,)).fetchone()
+        url = media["public_url"] if media else None
+        # Existing gallery JSON is the canonical link, including legacy
+        # articles. Covers can also reuse a managed URL without a gallery.
+        if conn.execute(
+            "SELECT 1 FROM heritage_articles WHERE images_json LIKE ? OR cover_image_url=? LIMIT 1",
+            ("%" + media_id + "%", url),
+        ).fetchone():
+            return "in_use"
+        for table in ("asset_layers", "render_profiles_v3"):
+            if conn.execute(f"SELECT 1 FROM {table} WHERE media_asset_id=? LIMIT 1", (media_id,)).fetchone():
+                return "in_use"
+        if url:
+            for table, column in (("accounts", "avatar_url"), ("profiles", "avatar_url"),
+                                  ("avatars", "base_image_url"), ("lookbooks", "cover_image_url"),
+                                  ("outfit_versions", "preview_image_url")):
+                if conn.execute(f"SELECT 1 FROM {table} WHERE {column}=? LIMIT 1", (url,)).fetchone():
+                    return "in_use"
+            # Conservative matching is deliberate: retaining a possible
+            # catalog reference is preferable to deleting its image.
+            if conn.execute("SELECT 1 FROM items WHERE metadata LIKE ? OR metadata LIKE ? LIMIT 1",
+                            ("%" + media_id + "%", "%" + url + "%")).fetchone():
+                return "in_use"
+        if conn.execute("SELECT 1 FROM generation_profiles_v3 WHERE reference_media_ids_json LIKE ? LIMIT 1",
+                        ("%" + media_id + "%",)).fetchone():
+            return "in_use"
+        jobs = conn.execute(
+            "SELECT input_params,result_data FROM ai_jobs WHERE owner_id=? AND task_type='v3_generation' AND status='running' ORDER BY created_at DESC",
+            (owner_id,),
+        ).fetchall()
+        for job in jobs:
+            for raw in (job["input_params"], job["result_data"]):
+                try:
+                    payload = json.loads(raw) if isinstance(raw, str) else (raw or {})
+                except (TypeError, ValueError):
+                    continue
+                if media_id in {
+                    payload.get("user_image_id"), payload.get("outfit_image_id"),
+                    payload.get("result_media_id"),
+                }:
+                    return "in_use"
+        changed = conn.execute(
+            "UPDATE media_assets SET status='deleting',operation_token=NULL,lease_until=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=? AND owner_id=? AND (status NOT IN ('processing','uploading') OR lease_until<?)",
+            (media_id, owner_id, int(time.time())),
+        ).rowcount
+        return "marked" if changed else "busy"
 
     @staticmethod
     def list_recent_ai_jobs(owner_id, limit=500, offset=0):

@@ -4,9 +4,11 @@ import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth/context";
-import { api } from "@/lib/api/client";
+import { api, ApiError } from "@/lib/api/client";
 import { HeritageArticle, CatalogItem } from "@/lib/types/api";
 import AuthModal from "@/components/AuthModal";
+import StoryImagePicker, { DraftStoryImage } from "@/features/heritage/StoryImagePicker";
+import { validateStoryText, uploadStoryDraftImages } from "@/features/heritage/storyDraft";
 import { useConfirmDialog } from "@/components/ui/ConfirmDialog";
 import {
   BookOpen,
@@ -54,6 +56,19 @@ export default function ChuyenCoPhucPage() {
 
   // Modal states
   const [selectedArticle, setSelectedArticle] = useState<HeritageArticle | null>(null);
+  const detailGeneration = useRef(0);
+  const [isLoadingDetail, setIsLoadingDetail] = useState(false);
+  const [detailError, setDetailError] = useState<string | null>(null);
+  const [editingArticle, setEditingArticle] = useState<HeritageArticle | null>(null);
+  const [storyImages, setStoryImages] = useState<DraftStoryImage[]>([]);
+  const imageRefs = useRef<DraftStoryImage[]>([]);
+  const [uploadProgress, setUploadProgress] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [hasVersionConflict, setHasVersionConflict] = useState(false);
+  const [latestRevision, setLatestRevision] = useState<HeritageArticle | null>(null);
+  const formRef = useRef<HTMLFormElement>(null);
+  const errorRef = useRef<HTMLDivElement>(null);
+  const submittingRef = useRef(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
 
@@ -70,6 +85,52 @@ export default function ChuyenCoPhucPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
+  useEffect(() => { if (actionError) errorRef.current?.scrollIntoView({ block: "nearest" }); }, [actionError]);
+
+  const changeImages = (images: DraftStoryImage[]) => {
+    for (const previous of imageRefs.current) {
+      if (!images.some(image => image.id === previous.id) && previous.preview.startsWith("blob:")) URL.revokeObjectURL(previous.preview);
+    }
+    imageRefs.current = images;
+    setStoryImages(images);
+  };
+  useEffect(() => () => { imageRefs.current.forEach(image => { if (image.preview.startsWith("blob:")) URL.revokeObjectURL(image.preview); }); }, []);
+
+  const openArticle = async (article: HeritageArticle) => {
+    const generation = ++detailGeneration.current;
+    setSelectedArticle(article);
+    setArticleActionError(null);
+    setDetailError(null);
+    setIsLoadingDetail(true);
+    try {
+      const detail = await api.getHeritageArticle(article.id);
+      if (generation === detailGeneration.current) setSelectedArticle(detail);
+    } catch (error: any) {
+      if (generation === detailGeneration.current) setDetailError(error?.message || "Không tải được nội dung câu chuyện.");
+    } finally {
+      if (generation === detailGeneration.current) setIsLoadingDetail(false);
+    }
+  };
+
+  const openEditor = (article: HeritageArticle | null) => {
+    setFieldErrors({});
+    setHasVersionConflict(false);
+    setLatestRevision(null);
+    setEditingArticle(article);
+    setNewTitle(article?.title || "");
+    setNewSummary(article?.short_summary || "");
+    setNewFullContent(article?.full_content || "");
+    setNewCategory(article?.category || "Điển tích Hoàng cung");
+    setNewEra(article?.era || "Triều Nguyễn");
+    setNewRelatedGarment(article?.related_garment_id || "");
+    setNewHistoricalContext(article?.historical_context || "");
+    setNewModernInterpretation(article?.modern_interpretation || "");
+    setNewCoverImage(article?.cover_image_url || "");
+    changeImages((article?.images || []).map((image, index) => ({ id: image.media_id, preview: image.url, uploaded: image, caption: image.caption, name: `Ảnh tư liệu ${index + 1}` })));
+    setActionError(null);
+    setActionSuccess(null);
+    setShowCreateModal(true);
+  };
 
   const eras = [
     { id: "all", label: "Tất cả Triều đại" },
@@ -124,17 +185,24 @@ export default function ChuyenCoPhucPage() {
 
   const handleCreateStory = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submittingRef.current || hasVersionConflict) return;
     setActionError(null);
     setActionSuccess(null);
 
-    if (!newTitle.trim() || !newSummary.trim() || !newFullContent.trim()) {
-      setActionError("Vui lòng điền đầy đủ Tiêu đề, Tóm tắt và Nội dung câu chuyện.");
+    const errors = validateStoryText(newTitle, newSummary, newFullContent, newCoverImage);
+    setFieldErrors(errors);
+    if (Object.keys(errors).length) {
+      setActionError("Hãy kiểm tra các ô được đánh dấu bên dưới trước khi tải ảnh.");
+      requestAnimationFrame(() => formRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus());
       return;
     }
 
+    submittingRef.current = true;
     setIsSubmitting(true);
     try {
-      await api.createHeritageArticle({
+      const uploadedImages = await uploadStoryDraftImages(storyImages, changeImages, setUploadProgress);
+      setUploadProgress("");
+      const payload = {
         title: newTitle.trim(),
         short_summary: newSummary.trim(),
         full_content: newFullContent.trim(),
@@ -144,24 +212,37 @@ export default function ChuyenCoPhucPage() {
         historical_context: newHistoricalContext.trim() || undefined,
         modern_interpretation: newModernInterpretation.trim() || undefined,
         cover_image_url: newCoverImage.trim() || undefined,
-      });
+        structural_description: editingArticle?.structural_description,
+        images: uploadedImages.map(image => ({ media_id: image.uploaded!.media_id, caption: image.caption.trim() })),
+      };
+      const result = editingArticle
+        ? await api.updateHeritageArticle(editingArticle.id, { ...payload, expected_version: editingArticle.version })
+        : await api.createHeritageArticle(payload);
 
-      setActionSuccess("Đã xuất bản câu chuyện thành công lên Góc Stylist!");
-      setTimeout(() => {
-        setShowCreateModal(false);
-        // Reset form
-        setNewTitle("");
-        setNewSummary("");
-        setNewFullContent("");
-        setNewHistoricalContext("");
-        setNewModernInterpretation("");
-        setNewCoverImage("");
-        setActionSuccess(null);
-        fetchArticles();
-      }, 1000);
+      setShowCreateModal(false);
+      changeImages([]);
+      setArticleActionNotice((editingArticle ? "Đã lưu chỉnh sửa câu chuyện." : "Đã xuất bản câu chuyện thành công!") + (result.media_cleanup_pending ? " Một số ảnh thừa đang chờ hệ thống xóa lại." : ""));
+      void fetchArticles();
+      void openArticle({ ...payload, id: result.id, slug: editingArticle?.slug || "", status: "published", version: 1, images: [] });
     } catch (err: any) {
-      setActionError(err?.message || "Lỗi khi đăng bài viết. Vui lòng kiểm tra lại quyền Stylist.");
+      if (err instanceof ApiError && err.code === "ARTICLE_VERSION_CONFLICT") {
+        setHasVersionConflict(true);
+        setLatestRevision(null);
+      }
+      const labels: Record<string, string> = { title: "Tiêu đề", short_summary: "Tóm tắt", full_content: "Nội dung", cover_image_url: "Ảnh bìa", images: "Ảnh minh họa", expected_version: "Phiên bản bài viết" };
+      const validation = err instanceof ApiError ? err.details?.validation_errors : undefined;
+      if (Array.isArray(validation)) {
+        const errors: Record<string, string> = {};
+        validation.forEach(issue => {
+          const field = String(issue.field).split(" -> ")[1] || "form";
+          errors[field] = `${labels[field] || field}: ${issue.message}`;
+        });
+        setFieldErrors(errors);
+        setActionError(Object.values(errors).join(" "));
+      } else setActionError(err?.message || "Không lưu được bài viết. Bản đang soạn và ảnh đã tải vẫn được giữ lại.");
     } finally {
+      submittingRef.current = false;
+      setUploadProgress("");
       setIsSubmitting(false);
     }
   };
@@ -177,9 +258,10 @@ export default function ChuyenCoPhucPage() {
     setArticleActionError(null);
     setArticleActionNotice(null);
     try {
-      await api.deleteHeritageArticle(articleId);
+      const result = await api.deleteHeritageArticle(articleId);
+      detailGeneration.current++;
       setSelectedArticle(null);
-      setArticleActionNotice(`Đã xóa câu chuyện “${title}”.`);
+      setArticleActionNotice(`Đã xóa câu chuyện “${title}”.${result.media_cleanup_pending ? " Một số ảnh thừa đang chờ hệ thống xóa lại." : ""}`);
       void fetchArticles();
     } catch (err: any) {
       setArticleActionError(`Không xóa được câu chuyện: ${err?.message || "Bạn không có quyền hoặc máy chủ không khả dụng."}`);
@@ -194,6 +276,22 @@ export default function ChuyenCoPhucPage() {
     } else {
       router.push("/");
     }
+  };
+
+  const loadLatestRevision = async () => {
+    if (!editingArticle) return;
+    setIsSubmitting(true);
+    try { setLatestRevision(await api.getHeritageArticle(editingArticle.id)); }
+    catch (error: any) { setActionError(error?.message || "Không tải được phiên bản mới. Hãy thử lại."); }
+    finally { setIsSubmitting(false); }
+  };
+
+  const closeEditor = () => {
+    // Only newly uploaded draft files are candidates. The API refuses to delete
+    // anything already referenced by a successfully saved article.
+    storyImages.forEach(image => { if (image.file && image.uploaded) void api.deleteMedia(image.uploaded.media_id).catch(() => {}); });
+    changeImages([]);
+    setShowCreateModal(false);
   };
 
   return (
@@ -220,9 +318,7 @@ export default function ChuyenCoPhucPage() {
               <>
                 <button
                   onClick={() => {
-                    setActionError(null);
-                    setActionSuccess(null);
-                    setShowCreateModal(true);
+                    openEditor(null);
                   }}
                   className="inline-flex items-center space-x-2 px-5 py-2.5 rounded-full bg-heritage-red hover:bg-heritage-red-dark text-white text-xs sm:text-sm font-semibold shadow-md hover:shadow-lg transition-all"
                 >
@@ -354,7 +450,7 @@ export default function ChuyenCoPhucPage() {
             {articles.map((article, idx) => (
               <article
                 key={article.id || idx}
-                onClick={() => { setArticleActionError(null); setSelectedArticle(article); }}
+                onClick={() => void openArticle(article)}
                 className="group bg-white rounded-2xl border border-stone-200/90 overflow-hidden shadow-xs hover:shadow-xl hover:border-heritage-red/40 transition-all duration-300 flex flex-col cursor-pointer"
               >
                 {/* Image Banner / Illustration */}
@@ -458,7 +554,8 @@ export default function ChuyenCoPhucPage() {
                 </span>
               </div>
               <button
-                onClick={() => setSelectedArticle(null)}
+                aria-label="Đóng câu chuyện"
+                onClick={() => { detailGeneration.current++; setSelectedArticle(null); }}
                 className="p-1.5 rounded-lg text-stone-400 hover:text-stone-700 hover:bg-stone-100 transition-colors"
               >
                 <X className="w-5 h-5" />
@@ -493,6 +590,9 @@ export default function ChuyenCoPhucPage() {
                   {/* Actions (Delete if author/admin, Studio link) */}
                   <div className="flex items-center space-x-2">
                     {(isAdmin || (user && user.id === selectedArticle.author_id)) && (
+                      <button type="button" disabled={isLoadingDetail || !!detailError} onClick={() => openEditor(selectedArticle)} className="min-h-11 rounded-lg px-3 text-xs font-semibold text-heritage-red hover:bg-red-50 disabled:opacity-50">Chỉnh sửa</button>
+                    )}
+                    {(isAdmin || (user && user.id === selectedArticle.author_id)) && (
                       <button
                         type="button"
                         aria-label="Xóa câu chuyện"
@@ -509,6 +609,8 @@ export default function ChuyenCoPhucPage() {
               </div>
 
               {/* Cover Image if available */}
+              {isLoadingDetail && <p role="status" className="text-sm text-stone-500">Đang tải toàn bộ câu chuyện...</p>}
+              {detailError && <div role="alert" className="rounded-xl bg-red-50 p-4 text-sm text-red-700">{detailError}<button type="button" onClick={() => void openArticle(selectedArticle)} className="ml-3 min-h-11 underline">Thử tải lại nội dung</button></div>}
               {selectedArticle.cover_image_url && !selectedArticle.cover_image_url.includes(".example") && (
                 <div className="rounded-xl overflow-hidden shadow-sm border border-stone-200 max-h-80">
                   <img
@@ -568,7 +670,7 @@ export default function ChuyenCoPhucPage() {
                       );
                     }
                     return (
-                      <p key={i} className="text-stone-700 leading-relaxed font-sans">
+                      <p key={i} className="text-stone-700 leading-relaxed font-sans whitespace-pre-wrap">
                         {para}
                       </p>
                     );
@@ -577,6 +679,19 @@ export default function ChuyenCoPhucPage() {
               )}
 
               {/* Modern Interpretation / Stylist Advice */}
+              {!!selectedArticle.images?.length && (
+                <section aria-label="Tư liệu minh họa" className="space-y-4">
+                  <h2 className="font-serif text-lg font-bold text-stone-900">Tư liệu minh họa</h2>
+                  {selectedArticle.images.map((image, index) => (
+                    <figure key={image.media_id} className="space-y-2">
+                      <a href={image.url} target="_blank" rel="noopener noreferrer" aria-label={`Mở ảnh tư liệu ${index + 1} kích thước đầy đủ`}>
+                        <img src={image.url} alt={image.caption || `Ảnh minh họa ${index + 1} cho ${selectedArticle.title}`} loading="lazy" className="max-h-[70vh] w-full rounded-xl border border-stone-200 bg-stone-50 object-contain" />
+                      </a>
+                      {image.caption && <figcaption className="whitespace-pre-wrap text-center text-xs leading-relaxed text-stone-600">{image.caption}</figcaption>}
+                    </figure>
+                  ))}
+                </section>
+              )}
               {selectedArticle.modern_interpretation && (
                 <div className="bg-red-50/60 border border-red-200/80 rounded-xl p-4 space-y-1.5 text-xs text-stone-800">
                   <div className="font-bold uppercase tracking-wider flex items-center gap-1.5 text-[11px] text-heritage-red">
@@ -623,13 +738,13 @@ export default function ChuyenCoPhucPage() {
                 </div>
                 <div>
                   <h3 className="font-serif text-sm sm:text-base font-bold text-stone-900">
-                    Soạn thảo Câu chuyện Cổ phục mới
+                    {editingArticle ? "Chỉnh sửa Câu chuyện Cổ phục" : "Soạn thảo Câu chuyện Cổ phục mới"}
                   </h3>
                   <p className="text-[10px] text-stone-500">Tác giả: {user?.displayName} ({user?.roles.join(", ")})</p>
                 </div>
               </div>
               <button
-                onClick={() => setShowCreateModal(false)}
+                onClick={closeEditor}
                 disabled={isSubmitting}
                 className="p-1 rounded-lg text-stone-400 hover:text-stone-700"
               >
@@ -638,13 +753,38 @@ export default function ChuyenCoPhucPage() {
             </div>
 
             {/* Form Fields */}
-            <form onSubmit={handleCreateStory} className="p-6 overflow-y-auto space-y-4">
+            <form ref={formRef} noValidate onSubmit={handleCreateStory} className="p-4 sm:p-6 overflow-y-auto space-y-4">
+              <fieldset disabled={isSubmitting} className="min-w-0 space-y-4">
               {actionError && (
-                <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl flex items-center space-x-2">
+                <div ref={errorRef} role="alert" className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl flex items-center space-x-2">
                   <AlertCircle className="w-4 h-4 shrink-0" />
                   <span>{actionError}</span>
                 </div>
               )}
+
+              {hasVersionConflict && <section aria-label="Đối chiếu phiên bản bài viết" className="space-y-3 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm">
+                <p>Bản đang soạn và ảnh của bạn vẫn được giữ nguyên. Hãy đối chiếu trước khi lưu lại.</p>
+                <button type="button" onClick={() => void loadLatestRevision()} className="min-h-11 rounded-lg border border-amber-400 px-3 font-semibold">Xem phiên bản mới</button>
+                {latestRevision && <>
+                  <div className="max-h-64 space-y-2 overflow-y-auto rounded-lg bg-white p-3">
+                    <p className="font-semibold">Phiên bản {latestRevision.version}: {latestRevision.title}</p>
+                    <p>{latestRevision.category} · {latestRevision.era}</p>
+                    <p className="whitespace-pre-wrap">{latestRevision.short_summary}</p>
+                    <p className="whitespace-pre-wrap">{latestRevision.full_content}</p>
+                    <p className="whitespace-pre-wrap">{latestRevision.historical_context}</p>
+                    <p className="whitespace-pre-wrap">{latestRevision.modern_interpretation}</p>
+                    {latestRevision.images?.map(image => <figure key={image.media_id}><img src={image.url} alt={image.caption || "Ảnh của phiên bản mới"} className="max-h-32 object-contain" /><figcaption>{image.caption}</figcaption></figure>)}
+                  </div>
+                  <button type="button" onClick={async () => {
+                    if (await confirm({ title: "Dùng bản đang soạn để thay thế?", description: "Khi bấm Lưu chỉnh sửa, nội dung và danh sách ảnh đang soạn sẽ thay thế phiên bản vừa đối chiếu. Hãy giữ lại những thay đổi bạn muốn trước khi tiếp tục.", confirmLabel: "Đã đối chiếu, tiếp tục", tone: "danger" })) {
+                      setEditingArticle(previous => previous ? { ...previous, version: latestRevision.version } : previous);
+                      setHasVersionConflict(false);
+                      setLatestRevision(null);
+                      setActionError(null);
+                    }
+                  }} className="min-h-11 rounded-lg border border-amber-400 px-3 font-semibold">Đã đối chiếu, dùng bản đang soạn</button>
+                </>}
+              </section>}
 
               {actionSuccess && (
                 <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-xl flex items-center space-x-2">
@@ -660,11 +800,15 @@ export default function ChuyenCoPhucPage() {
                 <input
                   type="text"
                   required
+                  aria-label="Tiêu đề câu chuyện"
+                  aria-invalid={!!fieldErrors.title}
+                  aria-describedby={fieldErrors.title ? "story-title-error" : undefined}
                   value={newTitle}
                   onChange={(e) => setNewTitle(e.target.value)}
                   placeholder="Ví dụ: Bí ẩn Phượng ổ trên áo Nhật Bình hoàng gia..."
                   className="w-full px-3 py-2 text-xs rounded-xl border border-stone-300 focus:outline-none focus:ring-2 focus:ring-heritage-red/20 focus:border-heritage-red transition-all"
                 />
+                {fieldErrors.title && <p id="story-title-error" className="mt-1 text-xs text-red-700">{fieldErrors.title}</p>}
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -672,17 +816,21 @@ export default function ChuyenCoPhucPage() {
                   <label className="block text-xs font-semibold text-stone-800 mb-1">
                     Thể loại chủ đề
                   </label>
-                  <select
+                  <input
+                    aria-label="Thể loại chủ đề"
+                    list="story-categories"
                     value={newCategory}
                     onChange={(e) => setNewCategory(e.target.value)}
                     className="w-full px-3 py-2 text-xs rounded-xl border border-stone-300 bg-white focus:outline-none focus:border-heritage-red"
-                  >
+                    placeholder="Tự nhập thể loại hoặc chọn gợi ý"
+                  />
+                  <datalist id="story-categories">
                     <option value="Điển tích Hoàng cung">Điển tích Hoàng cung</option>
                     <option value="Nghiên cứu Cổ phong">Nghiên cứu Cổ phong</option>
                     <option value="Bí quyết Phối đồ">Bí quyết Phối đồ</option>
                     <option value="Ý nghĩa Hoa văn">Ý nghĩa Hoa văn</option>
                     <option value="Thời trang Đương đại">Thời trang Đương đại</option>
-                  </select>
+                  </datalist>
                 </div>
 
                 <div>
@@ -728,11 +876,15 @@ export default function ChuyenCoPhucPage() {
                 <textarea
                   rows={2}
                   required
+                  aria-label="Tóm tắt câu chuyện"
+                  aria-invalid={!!fieldErrors.short_summary}
+                  aria-describedby={fieldErrors.short_summary ? "story-summary-error" : undefined}
                   value={newSummary}
                   onChange={(e) => setNewSummary(e.target.value)}
                   placeholder="Một câu văn đắt giá gợi mở về ý nghĩa lịch sử hoặc vẻ đẹp của trang phục..."
                   className="w-full px-3 py-2 text-xs rounded-xl border border-stone-300 focus:outline-none focus:border-heritage-red"
                 />
+                {fieldErrors.short_summary && <p id="story-summary-error" className="mt-1 text-xs text-red-700">{fieldErrors.short_summary}</p>}
               </div>
 
               <div>
@@ -755,11 +907,15 @@ export default function ChuyenCoPhucPage() {
                 <textarea
                   rows={6}
                   required
+                  aria-label="Nội dung câu chuyện"
+                  aria-invalid={!!fieldErrors.full_content}
+                  aria-describedby={fieldErrors.full_content ? "story-content-error" : undefined}
                   value={newFullContent}
                   onChange={(e) => setNewFullContent(e.target.value)}
                   placeholder="Kể câu chuyện về nguồn gốc tà áo, ý nghĩa ngũ sắc, hoa văn, hoặc cách Stylist cảm nhận khi khoác lên mình... (Hỗ trợ định dạng phân đoạn bằng xuống dòng)"
                   className="w-full px-3 py-2 text-xs rounded-xl border border-stone-300 focus:outline-none focus:border-heritage-red"
                 />
+                {fieldErrors.full_content && <p id="story-content-error" className="mt-1 text-xs text-red-700">{fieldErrors.full_content}</p>}
               </div>
 
               <div>
@@ -775,46 +931,60 @@ export default function ChuyenCoPhucPage() {
                 />
               </div>
 
+              <StoryImagePicker images={storyImages} coverId={newCoverImage ? storyImages.find(image => image.uploaded?.url === newCoverImage)?.id : storyImages[0]?.id} onSelectCover={image => {
+                setNewCoverImage(image.uploaded?.url || "");
+                changeImages([image, ...storyImages.filter(item => item.id !== image.id)]);
+              }} onChange={images => {
+                const previousCover = storyImages[0]?.uploaded?.url;
+                if (previousCover && newCoverImage === previousCover && images[0]?.id !== storyImages[0]?.id) setNewCoverImage(images[0]?.uploaded?.url || "");
+                storyImages.filter(image => image.file && image.uploaded && !images.some(item => item.id === image.id)).forEach(image => { void api.deleteMedia(image.uploaded!.media_id).catch(() => {}); });
+                changeImages(images);
+              }} disabled={isSubmitting} />
               <div>
                 <label className="block text-xs font-semibold text-stone-800 mb-1">
-                  Đường dẫn ảnh bìa (Cover Image URL / Cloudflare R2)
+                  Đường dẫn ảnh bìa riêng (tùy chọn)
                 </label>
                 <input
                   type="url"
+                  aria-label="Đường dẫn ảnh bìa riêng"
+                  aria-invalid={!!fieldErrors.cover_image_url}
+                  aria-describedby={fieldErrors.cover_image_url ? "story-cover-error" : undefined}
                   value={newCoverImage}
                   onChange={(e) => setNewCoverImage(e.target.value)}
                   placeholder="https://pub-6b5603ef95b646cdbf77ae1dc62532cb.r2.dev/..."
                   className="w-full px-3 py-2 text-xs rounded-xl border border-stone-300 focus:outline-none focus:border-heritage-red"
                 />
+                {fieldErrors.cover_image_url && <p id="story-cover-error" className="mt-1 text-xs text-red-700">{fieldErrors.cover_image_url}</p>}
               </div>
 
               <div className="pt-2 flex items-center justify-end space-x-2">
                 <button
                   type="button"
                   disabled={isSubmitting}
-                  onClick={() => setShowCreateModal(false)}
+                  onClick={closeEditor}
                   className="px-4 py-2 text-xs font-medium text-stone-600 hover:text-stone-900 rounded-xl hover:bg-stone-100"
                 >
                   Hủy
                 </button>
                 <button
                   type="submit"
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || hasVersionConflict}
                   className="px-5 py-2 bg-heritage-red hover:bg-heritage-red-dark text-white text-xs font-semibold rounded-xl shadow-md flex items-center space-x-1.5 transition-all disabled:opacity-50"
                 >
                   {isSubmitting ? (
                     <>
                       <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      <span>Đang xuất bản...</span>
+                      <span role="status">{uploadProgress || (editingArticle ? "Đang lưu..." : "Đang xuất bản...")}</span>
                     </>
                   ) : (
                     <>
                       <Feather className="w-3.5 h-3.5" />
-                      <span>Xuất bản Câu chuyện</span>
+                      <span>{editingArticle ? "Lưu chỉnh sửa" : "Xuất bản Câu chuyện"}</span>
                     </>
                   )}
                 </button>
               </div>
+              </fieldset>
             </form>
           </div>
         </div>

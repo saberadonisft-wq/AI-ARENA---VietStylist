@@ -441,6 +441,12 @@ def performance_indexes_v3(conn):
     conn.execute("CREATE INDEX IF NOT EXISTS idx_assertion_subject_status_v3 ON cultural_assertions_v3(subject_id, review_status, id)")
 
 
+def heritage_images(conn):
+    columns = {r[1] for r in conn.execute("PRAGMA table_info(heritage_articles)")}
+    if "images_json" not in columns:
+        conn.execute("ALTER TABLE heritage_articles ADD COLUMN images_json TEXT NOT NULL DEFAULT '[]'")
+
+
 MIGRATIONS = [
     ("001_initial_schema", initial),
     ("002_add_blog_articles_fields", blog),
@@ -454,6 +460,7 @@ MIGRATIONS = [
     ("010_dataset_content_v3", dataset_content_v3),
     ("011_dataset_replace_guard_v3", dataset_replace_guard_v3),
     ("012_performance_indexes_v3", performance_indexes_v3),
+    ("013_heritage_images", heritage_images),
 ]
 
 

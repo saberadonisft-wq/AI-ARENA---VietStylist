@@ -10,6 +10,8 @@ from app.core.config import settings
 from app.core.postgres import connection_kwargs, configure_connection
 
 VERSION = "pg_001_runtime_schema"
+STORY_IMAGES_VERSION = "pg_002_heritage_images"
+STORY_IMAGES_SQL = "ALTER TABLE heritage_articles ADD COLUMN images_json TEXT NOT NULL DEFAULT '[]'"
 
 
 def schema_source():
@@ -24,17 +26,22 @@ def schema_checksum():
     return hashlib.sha256(schema_source().encode()).hexdigest()
 
 
-def verify_postgres_schema(conn):
+def verify_postgres_schema(conn, *, with_story_images=True):
     try:
         with conn.transaction():
             markers = conn.execute("SELECT version,checksum FROM schema_migrations").fetchall()
-            if {r["version"]: r["checksum"] for r in markers} != {VERSION: schema_checksum()}:
+            expected_markers = {VERSION: schema_checksum()}
+            if with_story_images:
+                expected_markers[STORY_IMAGES_VERSION] = hashlib.sha256(STORY_IMAGES_SQL.encode()).hexdigest()
+            if {r["version"]: r["checksum"] for r in markers} != expected_markers:
                 return False
             columns = conn.execute("SELECT table_name,column_name FROM information_schema.columns WHERE table_schema=%s ORDER BY table_name,ordinal_position", (settings.DATABASE_SCHEMA,)).fetchall()
             actual = {}
             for row in columns:
                 actual.setdefault(row["table_name"], []).append(row["column_name"])
             expected = schema_manifest()
+            if with_story_images:
+                expected["columns"]["heritage_articles"].append("images_json")
             if any(actual.get(table) != names for table, names in expected["columns"].items()):
                 return False
             protected = conn.execute("SELECT c.relname,c.relrowsecurity FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname=%s AND c.relkind='r'", (settings.DATABASE_SCHEMA,)).fetchall()
@@ -67,11 +74,18 @@ def migrate_postgres(*, dry_run=False, check=False):
                     conn.execute(sql.SQL("REVOKE ALL ON SCHEMA {} FROM {}").format(schema, sql.Identifier(role)))
             tables = conn.execute("SELECT tablename FROM pg_tables WHERE schemaname=%s", (settings.DATABASE_SCHEMA,)).fetchall()
             if tables:
+                if verify_postgres_schema(conn, with_story_images=False):
+                    conn.execute(STORY_IMAGES_SQL)
+                    conn.execute("INSERT INTO schema_migrations(version,description,checksum) VALUES(%s,%s,%s)",
+                                 (STORY_IMAGES_VERSION, "Heritage story illustrations", hashlib.sha256(STORY_IMAGES_SQL.encode()).hexdigest()))
                 if not verify_postgres_schema(conn):
                     raise RuntimeError("Existing application schema is incompatible; no tables were replaced.")
                 return {"database": "postgresql", "schema": settings.DATABASE_SCHEMA,
                         "schema_ready": True, "created_tables": 0, "seeded_rows": 0, "dry_run": dry_run}
             conn.execute(schema_source(), prepare=False)
+            conn.execute(STORY_IMAGES_SQL)
+            conn.execute("INSERT INTO schema_migrations(version,description,checksum) VALUES(%s,%s,%s)",
+                         (STORY_IMAGES_VERSION, "Heritage story illustrations", hashlib.sha256(STORY_IMAGES_SQL.encode()).hexdigest()))
             conn.execute("INSERT INTO schema_migrations(version,description,checksum) VALUES(%s,%s,%s)",
                          (VERSION, "PostgreSQL runtime schema without seed", schema_checksum()))
             if not verify_postgres_schema(conn):
