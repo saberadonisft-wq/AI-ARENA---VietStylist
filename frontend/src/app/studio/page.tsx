@@ -30,6 +30,7 @@ import ColorAnalysisPanel from "@/features/studio/ColorAnalysisPanel";
 import CompareModal from "@/features/studio/CompareModal";
 import ExportModal from "@/features/studio/ExportModal";
 import StarterOutfitModal from "@/features/studio/StarterOutfitModal";
+import StylingQuestionnaire, { INITIAL_STYLING_PREFERENCES, type StylingPreferences } from "@/features/studio/StylingQuestionnaire";
 import GeminiTryOnModal from "@/features/studio/GeminiTryOnModal";
 import AuthModal from "@/components/AuthModal";
 import ToastContainer, { type ToastItem } from "@/components/ui/Toast";
@@ -160,14 +161,16 @@ export default function StudioPage() {
   const isSaving = studio.saving;
   const saveSuccessMessage = studio.message;
 
-  // AI Prompt nhanh
-  const [aiPrompt, setAiPrompt] = useState("");
+  const [stylingPreferences, setStylingPreferences] = useState<StylingPreferences>(INITIAL_STYLING_PREFERENCES);
+  const questionnaire = { ...stylingPreferences, occasionId: stylingPreferences.occasionId ?? selectedOccasion,
+    styleMode: stylingPreferences.styleMode ?? styleMode };
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [recommendationNotice, setRecommendationNotice] = useState<string | null>(null);
   const [recommendationError, setRecommendationError] = useState<string | null>(null);
   const recommendationRequest = useRef<AbortController | null>(null);
   const [pendingRecommendation, setPendingRecommendation] = useState<{
     title: string; explanation: string; source: string; model: string; items: SnapshotItem[];
+    occasionId: string; styleMode: OutfitSnapshot["styleMode"];
   } | null>(null);
   const [isApplyingRecommendation, setIsApplyingRecommendation] = useState(false);
 
@@ -534,7 +537,23 @@ export default function StudioPage() {
   // Trợ lý AI Gemini gợi ý phối đồ (F11)
   const handleAskAIStylist = async () => {
     if (!isLoggedIn) { requestAccountAction("recommendations"); return; }
-    if (!aiPrompt.trim() || recommendationRequest.current) return;
+    if (recommendationRequest.current || isApplyingRecommendation) return;
+    const occasion = occasions.find(item => item.id === questionnaire.occasionId);
+    const garmentType = garmentTypes.find(item => item.id === questionnaire.garmentTypeId);
+    if (!occasion || (questionnaire.garmentTypeId && !garmentType)) {
+      setRecommendationError("Hãy chọn dịp sử dụng và loại trang phục có trong danh mục hiện tại.");
+      return;
+    }
+    const prompt = [
+      "Hãy đề xuất bộ phối Việt phục từ danh mục theo phiếu nhu cầu sau:",
+      `Dịp sử dụng: ${occasion.name}.`,
+      `Phong cách: ${{ traditional: "Truyền thống", remix: "Remix, kết hợp hiện đại", modern_fusion: "Cách tân hiện đại" }[questionnaire.styleMode]}.`,
+      `Đối tượng: ${questionnaire.gender === "male" ? "Nam" : questionnaire.gender === "female" ? "Nữ" : "Không giới hạn"}.`,
+      `Loại trang phục ưu tiên: ${garmentType?.name || "Đề xuất loại phù hợp với dịp sử dụng"}.`,
+      `Tông màu mong muốn: ${questionnaire.palette}.`,
+      `Ưu tiên: ${questionnaire.priority}.`,
+      "Giữ nguyên các món đã khóa. Nếu danh mục không đáp ứng một sở thích, giải thích rõ giới hạn; không tự tạo trang phục hoặc biến thể ngoài danh mục.",
+    ].join("\n");
     const controller = new AbortController();
     recommendationRequest.current = controller;
     setIsAiLoading(true);
@@ -547,9 +566,10 @@ export default function StudioPage() {
       }));
 
       const res = await api.getAIRecommendations({
-        prompt: aiPrompt.trim(),
-        occasion_id: selectedOccasion,
-        style_mode: styleMode,
+        prompt,
+        occasion_id: occasion.id,
+        style_mode: questionnaire.styleMode,
+        gender: questionnaire.gender || undefined,
         locked_items: lockedList,
       }, controller.signal);
       if (controller.signal.aborted) return;
@@ -564,7 +584,8 @@ export default function StudioPage() {
           assetVersion: 1,
           colorHex: it.hex_color || undefined,
         }));
-        setPendingRecommendation({ title: recOutfit.title, explanation: recOutfit.explanation || "", source: res.source, model: res.model, items: newItems });
+        setPendingRecommendation({ title: recOutfit.title, explanation: recOutfit.explanation || "", source: res.source, model: res.model, items: newItems,
+          occasionId: occasion.id, styleMode: questionnaire.styleMode });
       } else setRecommendationNotice(res.notice || "Chưa có gợi ý phù hợp từ danh mục hiện tại. Bản phối chưa thay đổi.");
     } catch (err: any) {
       if (!controller.signal.aborted) setRecommendationError(err?.statusCode === 401 ? "Phiên đăng nhập hết hạn. Hãy đăng nhập lại để dùng gợi ý AI." : `Không lấy được gợi ý phối đồ: ${err.message}`);
@@ -599,7 +620,8 @@ export default function StudioPage() {
         return;
       }
       studio.dispatch({ type: "commit", update: doc => ({ ...doc, title: recommendation.title,
-        snapshot: { ...doc.snapshot, items: mergeUnlockedItems(doc.snapshot.items, available, doc.snapshot.lockedSlots || []) } }) });
+        snapshot: { ...doc.snapshot, occasionId: recommendation.occasionId, styleMode: recommendation.styleMode,
+          items: mergeUnlockedItems(doc.snapshot.items, available, doc.snapshot.lockedSlots || []) } }) });
       setActionNotice(`Đã áp dụng gợi ý từ ${recommendation.source === "gemini" ? "Gemini" : "bộ quy tắc"}; các vị trí khóa được giữ nguyên. Màu chỉ đổi khi ảnh vượt kiểm tra an toàn.`);
       setPendingRecommendation(null);
     } catch (error: any) {
@@ -1261,25 +1283,10 @@ export default function StudioPage() {
               <Sparkles className="w-3.5 h-3.5 text-heritage-red" />
               <span>Gợi ý phối đồ</span>
             </div>
-            <p className="text-xs text-stone-500">Nhập mong muốn để nhận gợi ý từ danh mục. Bạn được xem trước khi áp dụng.</p>
-            <form onSubmit={event => { event.preventDefault(); void handleAskAIStylist(); }} className="flex items-center gap-2">
-              <input
-                type="text"
-                aria-label="Yêu cầu gợi ý phối đồ"
-                maxLength={4000}
-                value={aiPrompt}
-                onChange={(e) => setAiPrompt(e.target.value)}
-                placeholder="Ví dụ: Phối áo ngũ thân chụp kỷ yếu thanh lịch..."
-                className="min-h-11 min-w-0 flex-1 text-sm px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:border-heritage-red"
-              />
-              <button
-                type="submit"
-                disabled={isAiLoading || isApplyingRecommendation || !aiPrompt.trim()}
-                className="min-h-11 shrink-0 px-4 py-2 bg-heritage-red text-white rounded-lg text-xs font-semibold hover:bg-heritage-red-dark transition-all disabled:opacity-50"
-              >
-                {isAiLoading ? "Đang tìm…" : "Gợi ý"}
-              </button>
-            </form>
+            <StylingQuestionnaire value={questionnaire} occasions={occasions} garmentTypes={garmentTypes.filter(type => type.is_active !== false)}
+              disabled={isAiLoading || isApplyingRecommendation || isInitialLoading || !!catalogError || !!catalogItemsError}
+              loading={isAiLoading} onSubmit={() => void handleAskAIStylist()}
+              onChange={value => { setStylingPreferences(value); setPendingRecommendation(null); setRecommendationNotice(null); setRecommendationError(null); }} />
             {isAiLoading && (
               <div role="status" className="flex items-center space-x-2 text-xs text-heritage-red pt-1">
                 <span className="w-2 h-2 rounded-full bg-heritage-red animate-ping shrink-0" />

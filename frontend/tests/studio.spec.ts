@@ -1173,45 +1173,85 @@ test("an account switch in another tab hides old work and ignores its pending sa
 });
 
 
-test("styling recommendation previews Gemini results before applying and supports Enter", async ({ page }) => {
+test("styling questionnaire sends chosen needs and previews Gemini results before applying", async ({ page }) => {
   await mockApi(page);
   await loginForGeneration(page);
   let calls = 0;
   await page.route("**/api/recommendations/ai", async route => {
     calls++;
-    expect(route.request().postDataJSON().prompt).toBe("Cổ phục nam chụp kỷ yếu");
+    const body = route.request().postDataJSON();
+    expect(body).toMatchObject({ occasion_id: "ky_yeu", style_mode: "remix", gender: "male", locked_items: [] });
+    for (const choice of ["Kỷ yếu", "Remix, kết hợp hiện đại", "Đối tượng: Nam", "Ngũ thân", "Trầm ấm · nâu, đỏ sẫm", "Thoải mái, dễ vận động"]) expect(body.prompt).toContain(choice);
     await route.fulfill({ contentType: "application/json", body: JSON.stringify({ source: "gemini", model: "test", outfits: [{
       title: "Gợi ý đã kiểm thử", explanation: "Chọn từ danh mục", items: [{ slot: TEST_GARMENT.slot, item_id: TEST_GARMENT.itemId, variant_id: TEST_GARMENT.variantId, hex_color: TEST_GARMENT.colorHex, item_name: "Trang phục 0" }],
     }] }) });
   });
   await page.goto("/studio");
   const panel = page.getByRole("region", { name: "Gợi ý phối đồ", exact: true });
-  await panel.getByRole("textbox").fill("Cổ phục nam chụp kỷ yếu");
-  await panel.getByRole("textbox").press("Enter");
+  await expect(panel.getByRole("textbox")).toHaveCount(0);
+  await expect(panel.getByRole("button", { name: "Gợi ý", exact: true })).toBeDisabled();
+  await panel.getByLabel("Dịp sử dụng", { exact: true }).selectOption("ky_yeu");
+  await panel.getByLabel("Phong cách phối đồ", { exact: true }).selectOption("remix");
+  await panel.getByLabel("Đối tượng phối đồ", { exact: true }).selectOption("male");
+  await panel.getByLabel("Loại trang phục ưu tiên", { exact: true }).selectOption("ngu_than");
+  await panel.getByLabel("Tông màu mong muốn", { exact: true }).selectOption({ label: "Trầm ấm · nâu, đỏ sẫm" });
+  await panel.getByLabel("Ưu tiên khi phối đồ", { exact: true }).selectOption({ label: "Thoải mái, dễ vận động" });
+  await panel.getByRole("button", { name: "Gợi ý", exact: true }).click();
   await expect(panel.getByText("Nguồn: Gemini")).toBeVisible();
   expect((await readDraft(page))?.snapshot.items || []).toHaveLength(0);
   await panel.getByRole("button", { name: "Áp dụng gợi ý" }).click();
   await expect.poll(async () => (await readDraft(page))?.snapshot.items[0]?.itemId).toBe(TEST_GARMENT.itemId);
+  expect((await readDraft(page)).snapshot).toMatchObject({ occasionId: "ky_yeu", styleMode: "remix" });
   expect(calls).toBe(1);
 });
 
-test("styling recommendation shows failures and fallback beside the input and can retry", async ({ page }) => {
+test("styling questionnaire preserves choices on retry and clears an outdated preview", async ({ page }) => {
   await mockApi(page);
   await loginForGeneration(page);
   let calls = 0;
+  const requests: unknown[] = [];
   await page.route("**/api/recommendations/ai", route => {
     calls++;
+    requests.push(route.request().postDataJSON());
     return calls === 1
       ? route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ error: { code: "UNAVAILABLE", message: "Máy chủ đang bận" } }) })
       : route.fulfill({ contentType: "application/json", body: JSON.stringify({ source: "cultural_rule_engine", model: "fallback", notice: "Gemini đã chạm hạn mức. Đây là gợi ý dự phòng.", outfits: [{ title: "Tham khảo", explanation: "Chọn theo vị trí", items: [{ slot: TEST_GARMENT.slot, item_id: TEST_GARMENT.itemId, item_name: "Trang phục 0" }] }] }) });
   });
   await page.goto("/studio");
   const panel = page.getByRole("region", { name: "Gợi ý phối đồ", exact: true });
-  await panel.getByRole("textbox").fill("Cổ phục");
+  await panel.getByLabel("Dịp sử dụng", { exact: true }).selectOption("tet");
   await panel.getByRole("button", { name: "Gợi ý", exact: true }).click();
   await expect(panel.getByRole("alert")).toContainText("Máy chủ đang bận");
   await panel.getByRole("button", { name: "Gợi ý", exact: true }).click();
   await expect(panel.getByRole("alert")).toHaveCount(0);
   await expect(panel.getByRole("status")).toContainText("Gemini đã chạm hạn mức");
   await expect(panel.getByText("Nguồn: bộ quy tắc")).toBeVisible();
+  expect(requests[0]).toEqual(requests[1]);
+  await panel.getByLabel("Tông màu mong muốn", { exact: true }).selectOption({ label: "Tươi sáng · đỏ, vàng" });
+  await expect(panel.getByRole("button", { name: "Áp dụng gợi ý" })).toHaveCount(0);
+  await expect(panel.getByRole("status")).toHaveCount(0);
+});
+
+test("styling questionnaire fits phone widths and keeps selections separate from the draft", async ({ page }) => {
+  await mockApi(page);
+  await loginForGeneration(page);
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.goto("/studio");
+  const panel = page.getByRole("region", { name: "Gợi ý phối đồ", exact: true });
+  const before = await readDraft(page);
+  await panel.getByLabel("Dịp sử dụng", { exact: true }).selectOption("ky_yeu");
+  await panel.getByLabel("Phong cách phối đồ", { exact: true }).selectOption("remix");
+  expect(await readDraft(page)).toEqual(before);
+  for (const width of [320, 375, 768, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    const invalid = await panel.locator("select, button").evaluateAll(elements => elements.filter(element => {
+      const box = element.getBoundingClientRect();
+      return box.width < 44 || box.height < 44 || box.left < 0 || box.right > innerWidth;
+    }).map(element => element.getAttribute("aria-label") || element.textContent));
+    expect(invalid, `Controls at ${width}px`).toEqual([]);
+  }
+  await page.setViewportSize({ width: 375, height: 1000 });
+  await panel.screenshot({ path: test.info().outputPath("styling-questionnaire-mobile.png") });
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await panel.screenshot({ path: test.info().outputPath("styling-questionnaire-desktop.png") });
 });
