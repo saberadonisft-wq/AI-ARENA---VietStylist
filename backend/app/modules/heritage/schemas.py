@@ -1,5 +1,5 @@
 from typing import List, Optional, Literal
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class HeritageSourceResponse(BaseModel):
@@ -91,3 +91,12 @@ class CreateStoryRequest(BaseModel):
     cover_image_url: Optional[str] = None
     read_time_minutes: Optional[int] = 5
     images: List[StoryImageInput] = Field(default_factory=list, max_length=12)
+
+    @field_validator("title", "short_summary", "full_content", mode="before")
+    @classmethod
+    def strip_text(cls, value):
+        return value.strip() if isinstance(value, str) else value
+
+
+class UpdateStoryRequest(CreateStoryRequest):
+    expected_version: int = Field(ge=1, description="Version loaded by the editor; stale writes return 409.")

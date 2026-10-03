@@ -2256,7 +2256,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CreateStoryRequest"
+                "$ref": "#/components/schemas/UpdateStoryRequest"
               }
             }
           }
@@ -22330,6 +22330,139 @@
           "revision"
         ],
         "title": "UpdateSolutionFormRequest"
+      },
+      "UpdateStoryRequest": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 3,
+            "title": "Title"
+          },
+          "short_summary": {
+            "type": "string",
+            "minLength": 10,
+            "title": "Short Summary"
+          },
+          "full_content": {
+            "type": "string",
+            "minLength": 20,
+            "title": "Full Content"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category",
+            "default": "Điển tích Cổ phục"
+          },
+          "era": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Era",
+            "default": "Triều Nguyễn"
+          },
+          "related_garment_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Related Garment Id"
+          },
+          "historical_context": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Historical Context"
+          },
+          "modern_interpretation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Modern Interpretation"
+          },
+          "structural_description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Structural Description"
+          },
+          "cover_image_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image Url"
+          },
+          "read_time_minutes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Read Time Minutes",
+            "default": 5
+          },
+          "images": {
+            "items": {
+              "$ref": "#/components/schemas/StoryImageInput"
+            },
+            "type": "array",
+            "maxItems": 12,
+            "title": "Images"
+          },
+          "expected_version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Expected Version",
+            "description": "Version loaded by the editor; stale writes return 409."
+          }
+        },
+        "type": "object",
+        "required": [
+          "title",
+          "short_summary",
+          "full_content",
+          "expected_version"
+        ],
+        "title": "UpdateStoryRequest"
       },
       "UpdateUserAdminRequest": {
         "properties": {

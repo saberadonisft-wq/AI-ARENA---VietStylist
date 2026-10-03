@@ -5,6 +5,7 @@ from app.modules.heritage.schemas import (
     HeritageArticleDetailResponse,
     HeritageSourceResponse,
     CreateStoryRequest,
+    UpdateStoryRequest,
     StoryImageUploadRequest,
 )
 from app.modules.media.schemas import UploadUrlResponse
@@ -63,7 +64,7 @@ def create_story(
 @router.put("/articles/{id_or_slug}")
 def update_story(
     id_or_slug: str,
-    req: CreateStoryRequest,
+    req: UpdateStoryRequest,
     current_user: AuthenticatedUser = Depends(require_role(["stylist", "admin"])),
 ):
     return HeritageService.update_story(id_or_slug, req, {"id": current_user.user_id, "roles": current_user.roles})

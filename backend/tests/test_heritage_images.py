@@ -69,8 +69,9 @@ def test_edit_permissions_content_category_and_retained_images(png_bytes):
     payload = story([{"media_id": image["id"], "caption": "Nguồn gốc"}])
     created = client.post("/api/heritage/articles", headers=author, json=payload).json()
     path = f"/api/heritage/articles/{created['id']}"
-    payload.update(category="Thể loại tự viết", full_content="Toàn bộ nội dung mới đã được chỉnh sửa và lưu lại.")
+    payload.update(category="Thể loại tự viết", full_content="Toàn bộ nội dung mới đã được chỉnh sửa và lưu lại.", expected_version=1)
     assert client.put(path, headers=author, json=payload).status_code == 200
+    payload["expected_version"] = 2
     assert client.put(path, headers=ADMIN, json=payload).status_code == 200
     detail = client.get(path).json()
     assert detail["full_content"] == payload["full_content"]
@@ -80,3 +81,67 @@ def test_edit_permissions_content_category_and_retained_images(png_bytes):
     assert detail["slug"] == created["slug"]
     Database.execute("UPDATE user_roles SET role='stylist' WHERE user_id=?", ("dev-user-media-1",))
     assert client.put(path, headers={"Authorization": auth_header("dev-user-media-1")}, json=payload).status_code == 403
+
+
+def test_concurrent_edit_rejects_stale_write():
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Barrier
+    payload = story([])
+    created = client.post("/api/heritage/articles", headers=ADMIN, json=payload).json()
+    path = f"/api/heritage/articles/{created['id']}"
+    barrier = Barrier(2)
+    def save(title):
+        barrier.wait()
+        return client.put(path, headers=ADMIN, json={**payload, "title": title, "expected_version": 1})
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        responses = list(pool.map(save, ["First editor title", "Second editor title"]))
+    assert sorted(r.status_code for r in responses) == [200, 409]
+    conflict = next(r for r in responses if r.status_code == 409)
+    assert conflict.json()["error"]["code"] == "ARTICLE_VERSION_CONFLICT"
+    current = client.get(path).json()
+    assert current["version"] == 2
+    assert current["title"] == next(r for r in responses if r.status_code == 200).json()["title"]
+    assert client.put(path, headers=ADMIN, json=payload).status_code == 422
+
+
+def test_shared_gallery_and_cover_protect_media_until_last_reference_removed(png_bytes):
+    image = upload_image(png_bytes)
+    first = client.post("/api/heritage/articles", headers=ADMIN, json=story([{"media_id": image["id"]}])).json()
+    second = client.post("/api/heritage/articles", headers=ADMIN, json={**story([]), "cover_image_url": image["public_url"]}).json()
+    assert client.delete(f"/api/media/{image['id']}", headers=ADMIN).status_code == 409
+    assert client.delete(f"/api/heritage/articles/{first['id']}", headers=ADMIN).status_code == 200
+    assert client.get(image["public_url"]).status_code == 200
+    assert client.delete(f"/api/heritage/articles/{second['id']}", headers=ADMIN).status_code == 200
+    assert client.get(image["public_url"]).status_code != 200
+    assert Database.fetch_one("SELECT status FROM media_assets WHERE id=?", (image["id"],))["status"] == "deleted"
+
+
+def test_removed_image_cleanup_survives_storage_failure_and_retries(png_bytes, monkeypatch):
+    from app.infrastructure.r2.client import r2_client
+    from app.modules.media.service import MediaService
+    image = upload_image(png_bytes)
+    created = client.post("/api/heritage/articles", headers=ADMIN, json=story([{"media_id": image["id"]}])).json()
+    original = r2_client.delete_object
+    monkeypatch.setattr(r2_client, "delete_object", lambda *args: False)
+    response = client.put(f"/api/heritage/articles/{created['id']}", headers=ADMIN,
+                          json={**story([]), "expected_version": 1})
+    assert response.status_code == 200
+    assert response.json()["media_cleanup_pending"] == 1
+    assert Database.fetch_one("SELECT status FROM media_assets WHERE id=?", (image["id"],))["status"] == "deleting"
+    assert client.post("/api/heritage/articles", headers=ADMIN, json=story([{"media_id": image["id"]}])).status_code == 422
+    monkeypatch.setattr(r2_client, "delete_object", original)
+    Database.execute("UPDATE media_assets SET next_reconcile_at=0 WHERE id=?", (image["id"],))
+    assert MediaService.cleanup()["failed"] == 0
+    assert Database.fetch_one("SELECT status FROM media_assets WHERE id=?", (image["id"],))["status"] == "deleted"
+
+
+def test_library_reference_is_not_deleted_with_story(png_bytes):
+    image = upload_image(png_bytes)
+    Database.execute("UPDATE accounts SET avatar_url=? WHERE id=?", (image["public_url"], "dev-user-admin"))
+    created = client.post("/api/heritage/articles", headers=ADMIN, json=story([{"media_id": image["id"]}])).json()
+    assert client.delete(f"/api/heritage/articles/{created['id']}", headers=ADMIN).status_code == 200
+    assert client.get(image["public_url"]).status_code == 200
+
+
+def test_whitespace_is_validated_before_story_creation():
+    assert client.post("/api/heritage/articles", headers=ADMIN, json={**story([]), "title": "   "}).status_code == 422

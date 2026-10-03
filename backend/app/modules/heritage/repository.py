@@ -10,7 +10,9 @@ class HeritageRepository:
         category: Optional[str] = None,
         search: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
-        query = "SELECT * FROM heritage_articles WHERE status = 'published'"
+        query = ("SELECT id,title,slug,short_summary,status,version,author_id,author_name,author_role,"
+                 "cover_image_url,category,era,related_garment_id,read_time_minutes,likes_count,created_at "
+                 "FROM heritage_articles WHERE status = 'published'")
         params = []
         if era and era.lower() != "all":
             query += " AND era = ?"
@@ -25,19 +27,21 @@ class HeritageRepository:
         return Database.fetch_all(query, tuple(params))
 
     @staticmethod
-    def get_article_by_slug_or_id(identifier: str, published_only: bool = True) -> Optional[Dict[str, Any]]:
+    def get_article_by_slug_or_id(identifier: str, published_only: bool = True, conn=None) -> Optional[Dict[str, Any]]:
         if published_only:
             return Database.fetch_one(
                 "SELECT * FROM heritage_articles WHERE (id = ? OR slug = ?) AND status = 'published'",
                 (identifier, identifier),
+                conn=conn,
             )
         return Database.fetch_one(
             "SELECT * FROM heritage_articles WHERE id = ? OR slug = ?",
             (identifier, identifier),
+            conn=conn,
         )
 
     @staticmethod
-    def create_story(story_data: Dict[str, Any]) -> str:
+    def create_story(story_data: Dict[str, Any], conn=None) -> str:
         Database.execute("""
             INSERT INTO heritage_articles (
                 id, title, slug, short_summary, full_content,
@@ -65,22 +69,23 @@ class HeritageRepository:
             story_data.get("read_time_minutes", 5),
             story_data.get("likes_count", 0),
             json.dumps(story_data.get("images", []), ensure_ascii=False),
-        ))
+        ), conn=conn)
         return story_data["id"]
 
     @staticmethod
-    def update_story(story_id: str, data: Dict[str, Any]) -> None:
+    def update_story(story_id: str, data: Dict[str, Any], expected_version: int, conn=None) -> bool:
         fields = ("title", "short_summary", "full_content", "category", "era", "related_garment_id",
                   "historical_context", "modern_interpretation", "structural_description", "cover_image_url", "read_time_minutes")
-        Database.execute(
+        return Database.execute(
             "UPDATE heritage_articles SET " + ", ".join(f"{field}=?" for field in fields)
-            + ", images_json=?, version=version+1 WHERE id=?",
-            tuple(data.get(field) for field in fields) + (json.dumps(data["images"], ensure_ascii=False), story_id),
-        )
+            + ", images_json=?, version=version+1, updated_at=CURRENT_TIMESTAMP WHERE id=? AND version=?",
+            tuple(data.get(field) for field in fields) + (json.dumps(data["images"], ensure_ascii=False), story_id, expected_version),
+            conn=conn,
+        ) == 1
 
     @staticmethod
-    def delete_story(story_id: str) -> bool:
-        count = Database.execute("DELETE FROM heritage_articles WHERE id = ?", (story_id,))
+    def delete_story(story_id: str, conn=None) -> bool:
+        count = Database.execute("DELETE FROM heritage_articles WHERE id = ?", (story_id,), conn=conn)
         return count > 0
 
     @staticmethod
