@@ -16,7 +16,7 @@ from fastapi.testclient import TestClient
 from app.core.config import settings
 from app.core.database import Database, init_database
 from app.core import postgres
-from app.core.postgres_migrations import schema_source, schema_checksum, VERSION, verify_postgres_schema
+from app.core.postgres_migrations import schema_source, schema_checksum, VERSION, verify_postgres_schema, STORY_IMAGES_SQL, STORY_IMAGES_VERSION
 from app.main import app
 
 
@@ -39,6 +39,10 @@ def test_postgres_runtime_rollback_only(monkeypatch, png_bytes):
                 raw.execute(sql.SQL("CREATE SCHEMA {}").format(sql.Identifier(schema)))
                 raw.execute(schema_source(), prepare=False)
                 raw.execute("INSERT INTO schema_migrations(version,description,checksum) VALUES(%s,%s,%s)", (VERSION, "rollback-only probe", schema_checksum()))
+                assert verify_postgres_schema(raw, with_story_images=False)
+                import hashlib
+                raw.execute(STORY_IMAGES_SQL)
+                raw.execute("INSERT INTO schema_migrations(version,description,checksum) VALUES(%s,%s,%s)", (STORY_IMAGES_VERSION, "story images", hashlib.sha256(STORY_IMAGES_SQL.encode()).hexdigest()))
                 assert verify_postgres_schema(raw)
 
                 class RollbackPool:

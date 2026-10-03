@@ -1552,6 +1552,170 @@
         }
       }
     },
+    "/api/heritage/images/uploads": {
+      "post": {
+        "tags": [
+          "Heritage Knowledge & Stylist Blog"
+        ],
+        "summary": "Upload Story Image",
+        "operationId": "upload_story_image_api_heritage_images_uploads_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StoryImageUploadRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadUrlResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "410": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Gone"
+          },
+          "413": {
+            "description": "Request Entity Too Large",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        }
+      }
+    },
     "/api/heritage/articles": {
       "get": {
         "tags": [
@@ -17674,6 +17838,14 @@
             ],
             "title": "Read Time Minutes",
             "default": 5
+          },
+          "images": {
+            "items": {
+              "$ref": "#/components/schemas/StoryImageInput"
+            },
+            "type": "array",
+            "maxItems": 12,
+            "title": "Images"
           }
         },
         "type": "object",
@@ -18954,6 +19126,13 @@
             "type": "array",
             "title": "Sources",
             "default": []
+          },
+          "images": {
+            "items": {
+              "$ref": "#/components/schemas/StoryImageResponse"
+            },
+            "type": "array",
+            "title": "Images"
           }
         },
         "type": "object",
@@ -21507,6 +21686,85 @@
           "items"
         ],
         "title": "StarterOutfitResponse"
+      },
+      "StoryImageInput": {
+        "properties": {
+          "media_id": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Media Id"
+          },
+          "caption": {
+            "type": "string",
+            "maxLength": 500,
+            "title": "Caption",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "media_id"
+        ],
+        "title": "StoryImageInput"
+      },
+      "StoryImageResponse": {
+        "properties": {
+          "media_id": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Media Id"
+          },
+          "caption": {
+            "type": "string",
+            "maxLength": 500,
+            "title": "Caption",
+            "default": ""
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          }
+        },
+        "type": "object",
+        "required": [
+          "media_id",
+          "url"
+        ],
+        "title": "StoryImageResponse"
+      },
+      "StoryImageUploadRequest": {
+        "properties": {
+          "filename": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Filename"
+          },
+          "mime_type": {
+            "type": "string",
+            "enum": [
+              "image/jpeg",
+              "image/png",
+              "image/webp"
+            ],
+            "title": "Mime Type"
+          },
+          "size_bytes": {
+            "type": "integer",
+            "maximum": 10485760.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Size Bytes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "filename",
+          "mime_type",
+          "size_bytes"
+        ],
+        "title": "StoryImageUploadRequest"
       },
       "SynthesizeRequest": {
         "properties": {

@@ -1,9 +1,15 @@
 import uuid
 import re
+import json
 from typing import List, Dict, Any, Optional
 from app.modules.heritage.repository import HeritageRepository
 from app.modules.heritage.schemas import CreateStoryRequest
 from app.core.errors import AppError
+from app.modules.media.repository import MediaRepository
+from app.modules.media.service import MediaService
+from app.modules.media.schemas import RequestUploadUrlInput
+from app.infrastructure.r2.client import r2_client
+from app.core.config import settings
 
 
 def slugify_vietnamese(text: str) -> str:
@@ -22,6 +28,18 @@ def slugify_vietnamese(text: str) -> str:
 
 
 class HeritageService:
+    @staticmethod
+    def create_image_upload(req, user_id):
+        if r2_client.is_configured and not settings.R2_PUBLIC_DOMAIN:
+            raise AppError("PUBLIC_MEDIA_DOMAIN_REQUIRED", "Chưa cấu hình kho ảnh công khai.", 503)
+        # This publishing capability is restricted by the heritage router to
+        # stylist/admin and raster images; general public/SVG uploads stay restricted.
+        return MediaService.create_upload_session(
+            user_id,
+            RequestUploadUrlInput(**req.model_dump(), media_type="image", visibility="public"),
+            roles=("editor",),
+        )
+
     @staticmethod
     def list_articles(
         era: Optional[str] = None,
@@ -56,11 +74,27 @@ class HeritageService:
             })
 
         result = dict(article)
+        images = result.pop("images_json", [])
+        result["images"] = json.loads(images) if isinstance(images, str) else images
         result["sources"] = formatted_sources
         return result
 
     @staticmethod
     def create_story(req: CreateStoryRequest, user: Dict[str, Any]) -> Dict[str, Any]:
+        images = []
+        seen = set()
+        for image in req.images:
+            media = MediaRepository.get_media_by_id(image.media_id)
+            if (
+                not media or media["owner_id"] != user.get("id")
+                or media["status"] != "ready" or media["visibility"] != "public"
+                or media["media_type"] != "image"
+                or media["mime_type"] not in {"image/png", "image/jpeg", "image/webp"}
+                or not media.get("public_url") or image.media_id in seen
+            ):
+                raise AppError("INVALID_STORY_IMAGE", "Ảnh minh họa phải là ảnh công khai đã tải xong của bạn và không trùng lặp.", 422)
+            seen.add(image.media_id)
+            images.append({"media_id": image.media_id, "caption": image.caption.strip(), "url": media["public_url"]})
         story_id = f"story_{uuid.uuid4().hex[:10]}"
         base_slug = slugify_vietnamese(req.title)
         slug = f"{base_slug}-{uuid.uuid4().hex[:4]}"
@@ -84,7 +118,8 @@ class HeritageService:
             "author_id": user.get("id"),
             "author_name": author_name,
             "author_role": author_role,
-            "cover_image_url": req.cover_image_url,
+            "cover_image_url": req.cover_image_url or (images[0]["url"] if images else None),
+            "images": images,
             "category": req.category or "Điển tích Cổ phục",
             "era": req.era or "Triều Nguyễn",
             "related_garment_id": req.related_garment_id,

@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Optional, Literal
 from pydantic import BaseModel, Field
 
 
@@ -17,6 +17,21 @@ class ArticleSourceCitation(BaseModel):
     source: HeritageSourceResponse
     page_reference: Optional[str] = None
     quote: Optional[str] = None
+
+
+class StoryImageInput(BaseModel):
+    media_id: str = Field(min_length=1, max_length=100)
+    caption: str = Field(default="", max_length=500)
+
+
+class StoryImageResponse(StoryImageInput):
+    url: str
+
+
+class StoryImageUploadRequest(BaseModel):
+    filename: str = Field(min_length=1, max_length=255)
+    mime_type: Literal["image/jpeg", "image/png", "image/webp"]
+    size_bytes: int = Field(gt=0, le=10485760)
 
 
 class HeritageArticleSummaryResponse(BaseModel):
@@ -60,6 +75,7 @@ class HeritageArticleDetailResponse(BaseModel):
     likes_count: Optional[int] = 0
     created_at: Optional[str] = None
     sources: List[ArticleSourceCitation] = []
+    images: List[StoryImageResponse] = Field(default_factory=list)
 
 
 class CreateStoryRequest(BaseModel):
@@ -74,3 +90,4 @@ class CreateStoryRequest(BaseModel):
     structural_description: Optional[str] = None
     cover_image_url: Optional[str] = None
     read_time_minutes: Optional[int] = 5
+    images: List[StoryImageInput] = Field(default_factory=list, max_length=12)

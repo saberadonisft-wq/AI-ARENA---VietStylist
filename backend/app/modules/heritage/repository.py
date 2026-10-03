@@ -1,3 +1,4 @@
+import json
 from typing import List, Optional, Dict, Any
 from app.core.database import Database
 
@@ -43,8 +44,8 @@ class HeritageRepository:
                 historical_context, structural_description, modern_interpretation,
                 author_id, author_name, author_role, cover_image_url,
                 category, era, related_garment_id, read_time_minutes, likes_count,
-                status
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'published')
+                images_json, status
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'published')
         """, (
             story_data["id"],
             story_data["title"],
@@ -63,6 +64,7 @@ class HeritageRepository:
             story_data.get("related_garment_id"),
             story_data.get("read_time_minutes", 5),
             story_data.get("likes_count", 0),
+            json.dumps(story_data.get("images", []), ensure_ascii=False),
         ))
         return story_data["id"]
 

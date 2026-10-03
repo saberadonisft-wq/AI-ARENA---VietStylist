@@ -5,11 +5,21 @@ from app.modules.heritage.schemas import (
     HeritageArticleDetailResponse,
     HeritageSourceResponse,
     CreateStoryRequest,
+    StoryImageUploadRequest,
 )
+from app.modules.media.schemas import UploadUrlResponse
 from app.modules.heritage.service import HeritageService
 from app.core.security import require_role, AuthenticatedUser
 
 router = APIRouter(prefix="/heritage", tags=["Heritage Knowledge & Stylist Blog"])
+
+
+@router.post("/images/uploads", response_model=UploadUrlResponse)
+def upload_story_image(
+    req: StoryImageUploadRequest,
+    current_user: AuthenticatedUser = Depends(require_role(["stylist", "admin"])),
+):
+    return HeritageService.create_image_upload(req, current_user.user_id)
 
 
 @router.get("/articles", response_model=List[HeritageArticleSummaryResponse])
