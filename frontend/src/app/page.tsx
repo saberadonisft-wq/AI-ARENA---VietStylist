@@ -14,8 +14,6 @@ import {
   ArrowRight,
   ArrowDown,
   BookOpen,
-  ShieldCheck,
-  Palette,
   Layers,
   CheckCircle2,
   ChevronRight,
@@ -547,7 +545,7 @@ export default function WelcomePage() {
         <div className="text-center space-y-4 max-w-3xl mx-auto mb-8 sm:mb-16">
           <div className="inline-flex items-center space-x-2 px-3.5 py-1.5 rounded-full bg-heritage-indigo/10 text-heritage-indigo border border-heritage-indigo/20 text-xs font-semibold uppercase tracking-wider">
             <Sparkles className="w-3.5 h-3.5 text-heritage-indigo" />
-            <span>Công Nghệ & Chuẩn Mực Văn Hóa</span>
+            <span>Công Cụ Phối Đồ 2D</span>
           </div>
 
           <h2 className="font-serif text-2xl sm:text-4xl font-bold text-stone-900 tracking-tight">
@@ -555,11 +553,11 @@ export default function WelcomePage() {
           </h2>
 
           <p className="text-base text-stone-600 sm:font-light leading-relaxed">
-            VietStylist kết hợp sức mạnh xử lý canvas đa lớp trực quan với hệ thống thẩm định tri thức di sản nghiêm cẩn.
+            Sắp xếp các lớp trang phục trên bảng phối, lưu bản phối và xuất ảnh để chia sẻ.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 max-w-4xl mx-auto">
           {/* Feature 1 */}
           <div className="bg-white p-5 sm:p-7 rounded-3xl border border-stone-200/90 shadow-sm hover:shadow-xl hover:-translate-y-2 hover:border-amber-400/50 transition-all duration-300 space-y-4 text-left group">
             <div className="w-12 h-12 rounded-2xl bg-heritage-red/10 text-heritage-red flex items-center justify-center font-bold text-xl transform group-hover:scale-115 group-hover:rotate-6 transition-transform duration-300 shadow-2xs">
@@ -574,32 +572,6 @@ export default function WelcomePage() {
           </div>
 
           {/* Feature 2 */}
-          <div className="bg-white p-5 sm:p-7 rounded-3xl border border-stone-200/90 shadow-sm hover:shadow-xl hover:-translate-y-2 hover:border-emerald-400/50 transition-all duration-300 space-y-4 text-left group">
-            <div className="w-12 h-12 rounded-2xl bg-heritage-jade/10 text-heritage-jade flex items-center justify-center font-bold text-xl transform group-hover:scale-115 group-hover:rotate-6 transition-transform duration-300 shadow-2xs">
-              <ShieldCheck className="w-6 h-6" />
-            </div>
-            <h3 className="font-serif text-lg font-bold text-stone-900 group-hover:text-heritage-jade transition-colors">
-              Thẩm Định Chuẩn Hữu Nhậm
-            </h3>
-            <p className="text-base sm:text-sm text-stone-600 leading-relaxed sm:font-light">
-              Hệ thống thời gian thực kiểm tra hướng cài vạt áo (Hữu nhậm - cài sang phải) chuẩn quy thức cổ truyền, cảnh báo các lỗi cấm kỵ văn hóa.
-            </p>
-          </div>
-
-          {/* Feature 3 */}
-          <div className="bg-white p-5 sm:p-7 rounded-3xl border border-stone-200/90 shadow-sm hover:shadow-xl hover:-translate-y-2 hover:border-amber-400/50 transition-all duration-300 space-y-4 text-left group">
-            <div className="w-12 h-12 rounded-2xl bg-heritage-gold/15 text-heritage-gold flex items-center justify-center font-bold text-xl transform group-hover:scale-115 group-hover:rotate-6 transition-transform duration-300 shadow-2xs">
-              <Palette className="w-6 h-6" />
-            </div>
-            <h3 className="font-serif text-lg font-bold text-stone-900 group-hover:text-amber-700 transition-colors">
-              Hòa Sắc Ngũ Hành 1 Chạm
-            </h3>
-            <p className="text-base sm:text-sm text-stone-600 leading-relaxed sm:font-light">
-              Gợi ý bảng phối màu tương sinh Kim - Mộc - Thủy - Hỏa - Thổ cùng gợi ý phụ kiện che mưa, che nắng theo thời tiết 63 tỉnh thành.
-            </p>
-          </div>
-
-          {/* Feature 4 */}
           <div className="bg-white p-5 sm:p-7 rounded-3xl border border-stone-200/90 shadow-sm hover:shadow-xl hover:-translate-y-2 hover:border-indigo-400/50 transition-all duration-300 space-y-4 text-left group">
             <div className="w-12 h-12 rounded-2xl bg-heritage-indigo/10 text-heritage-indigo flex items-center justify-center font-bold text-xl transform group-hover:scale-115 group-hover:rotate-6 transition-transform duration-300 shadow-2xs">
               <Share2 className="w-6 h-6" />
