@@ -132,7 +132,9 @@ export interface OutfitSnapshot {
   overlapDirection: "right_over_left" | "left_over_right";
   items: SnapshotItem[];
   lockedSlots?: string[];
-  backgroundTheme?: "white" | "dopaper";
+  backgroundTheme?: "white" | "dopaper" | "occasion";
+  neutralBackgroundTheme?: "white" | "dopaper";
+  backgroundFade?: number;
   aspectRatio?: "1:1" | "9:16";
   culturalSettings?: {
     dataset_version: string;

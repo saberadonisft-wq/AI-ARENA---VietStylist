@@ -17,9 +17,12 @@ export default function ColorAnalysisPanel({
 }: ColorAnalysisPanelProps) {
   const [analysis, setAnalysis] = useState<ColorAnalysisResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [retry, setRetry] = useState(0);
 
   useEffect(() => {
     setAnalysis(null);
+    setError(null);
     if (!equippedColors || equippedColors.length === 0) { setIsLoading(false); return; }
 
     let isMounted = true;
@@ -30,7 +33,7 @@ export default function ColorAnalysisPanel({
       .then((data) => {
         if (isMounted) setAnalysis(data);
       })
-      .catch((err) => console.error("Lỗi phân tích màu:", err))
+      .catch(() => { if (isMounted) setError("Chưa phân tích được màu sắc. Bạn có thể thử lại."); })
       .finally(() => {
         if (isMounted) setIsLoading(false);
       });
@@ -38,7 +41,7 @@ export default function ColorAnalysisPanel({
     return () => {
       isMounted = false;
     };
-  }, [JSON.stringify(equippedColors)]);
+  }, [JSON.stringify(equippedColors), retry]);
 
   if (isLoading && !analysis) {
     return (
@@ -53,6 +56,11 @@ export default function ColorAnalysisPanel({
     );
   }
 
+  if (error) return <section aria-label="Hài hòa Màu sắc" className="p-3.5 bg-white rounded-xl border border-stone-200 space-y-3">
+    <h3 className="text-xs font-semibold">Hài hòa Màu sắc</h3>
+    <p role="alert" className="text-sm text-amber-900">{error}</p>
+    <button type="button" onClick={() => setRetry(value => value + 1)} className="min-h-11 rounded-lg border border-stone-300 px-3 text-xs font-semibold">Thử lại phân tích màu</button>
+  </section>;
   if (!analysis) return null;
 
   return (
@@ -81,7 +89,7 @@ export default function ColorAnalysisPanel({
         <div className="flex items-center space-x-1.5">
           <span className="text-[11px] text-stone-500 font-medium">Chủ đạo:</span>
           <div
-            className="w-4.5 h-4.5 rounded-full border border-black/15 shadow-sm"
+            className="w-[18px] h-[18px] shrink-0 rounded-full border border-black/15 shadow-sm"
             style={{ backgroundColor: analysis.dominant_color }}
             title={analysis.dominant_color}
           />
@@ -94,7 +102,7 @@ export default function ColorAnalysisPanel({
               {analysis.accent_colors.map((hex, idx) => (
                 <div
                   key={idx}
-                  className="w-4.5 h-4.5 rounded-full border-2 border-white shadow-sm"
+                  className="w-[18px] h-[18px] shrink-0 rounded-full border-2 border-white shadow-sm"
                   style={{ backgroundColor: hex }}
                   title={hex}
                 />

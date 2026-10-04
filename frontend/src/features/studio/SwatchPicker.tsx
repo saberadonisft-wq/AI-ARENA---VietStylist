@@ -34,6 +34,8 @@ export default function SwatchPicker({
           return (
             <button
               key={v.id}
+              type="button"
+              aria-pressed={isSelected}
               disabled={disabled}
               onClick={() => onSelectVariant(v)}
               className={`group relative flex min-h-11 min-w-11 items-center space-x-2 pl-2 pr-3 py-1 rounded-full border text-left transition-all ${

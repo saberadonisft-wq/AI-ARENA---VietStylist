@@ -1,5 +1,7 @@
 "use client";
 
+import Modal from "@/components/ui/Modal";
+import { slotLabel, itemLabel } from "@/lib/catalog/display";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { CatalogItem, OutfitSnapshot } from "@/lib/types/api";
 import type { OutfitSpecV2 } from "@/lib/types/v3";
@@ -30,7 +32,7 @@ interface GeminiTryOnModalProps {
   onReloadCatalog: () => Promise<void>;
   ownerId?: string;
   onReplaceUnavailableItems: () => void;
-  onExportOutfit: () => Promise<string>;
+  onExportOutfit: () => Promise<Blob>;
   onSaveOutfit: () => Promise<boolean>;
   isLoggedIn: boolean;
 }
@@ -272,9 +274,8 @@ export default function GeminiTryOnModal({
       }
 
       setStatus("uploading");
-      const boardUrl = await onExportOutfit();
+      const boardBlob = await onExportOutfit();
       if (controller.signal.aborted) return;
-      const boardBlob = await (await fetch(boardUrl)).blob();
       if (boardBlob.size > 10 * 1024 * 1024) {
         throw new Error("Ảnh bản phối vượt 10 MB. Hãy chọn ít món hoặc ảnh nhỏ hơn rồi thử lại.");
       }
@@ -303,13 +304,15 @@ export default function GeminiTryOnModal({
     setManualBusy(true);
     setManualNotice(null);
     try {
-      const url = await onExportOutfit();
+      const url = URL.createObjectURL(await onExportOutfit());
       const anchor = document.createElement("a");
       anchor.href = url;
       anchor.download = "vietstylist-ban-phoi.png";
       document.body.appendChild(anchor);
       anchor.click();
       anchor.remove();
+      // Keep the download URL alive until the browser has accepted the click.
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
       setManualNotice("Đã tải ảnh bản phối. Hãy đính kèm ảnh này khi dùng prompt ở công cụ khác.");
     } catch (error) {
       setErrorMessage((error as Error).message);
@@ -346,9 +349,9 @@ export default function GeminiTryOnModal({
   const isBusy = status === "uploading" || status === "generating" || status === "loading_result";
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Thử đồ bằng Gemini">
-      <div className="bg-white rounded-lg max-w-3xl w-full shadow-2xl border border-stone-200 overflow-hidden flex flex-col max-h-[90vh]">
-        <div className="px-5 py-4 border-b border-stone-200 flex items-center justify-between bg-stone-50">
+    <Modal isOpen={isOpen} onClose={onClose} closeDisabled={isBusy} label="Thử đồ bằng Gemini">
+      <div className="bg-white rounded-lg max-w-3xl w-full shadow-2xl border border-stone-200 overflow-hidden flex flex-col max-h-full">
+        <div className="shrink-0 px-5 py-4 border-b border-stone-200 flex items-center justify-between bg-stone-50">
           <div className="flex items-center space-x-2 min-w-0">
             <Sparkles className="w-5 h-5 text-heritage-gold shrink-0" />
             <div className="min-w-0">
@@ -356,16 +359,16 @@ export default function GeminiTryOnModal({
               <p className="text-xs text-stone-500 truncate">{outfitTitle}</p>
             </div>
           </div>
-          <button onClick={onClose} disabled={isBusy} className="p-1 text-stone-400 hover:text-stone-700" title="Đóng">
+          <button onClick={onClose} disabled={isBusy} className="p-1 text-stone-400 hover:text-stone-700" title="Đóng" aria-label="Đóng thử đồ AI">
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <div className="p-6 space-y-5 overflow-y-auto flex-1">
+        <div className="p-6 space-y-5 min-h-0 overflow-y-auto flex-1">
           <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-900 flex items-start space-x-2">
             <Info className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
             <p className="leading-relaxed">
-              Ảnh bản phối đang xem sẽ được gửi làm ảnh tham chiếu. Ảnh nhân vật là tùy chọn; nếu có, hãy chọn ảnh toàn thân, đứng thẳng và đủ sáng. Ảnh tải lên được lưu riêng tư trong tài khoản và gửi đến Gemini khi tạo ảnh.
+              Bản phối sẽ được xuất trên nền trắng để AI nhận diện trang phục rõ hơn. Ảnh nhân vật là tùy chọn; nếu có, hãy chọn ảnh toàn thân, đứng thẳng và đủ sáng. Ảnh tải lên được lưu riêng tư trong tài khoản và gửi đến Gemini khi tạo ảnh.
             </p>
           </div>
 
@@ -376,7 +379,7 @@ export default function GeminiTryOnModal({
             <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-900 space-y-2">
               <p>{unavailableItems.length} món trong bản phối không còn trong danh mục đã xuất bản. Chúng vẫn được giữ trong bản phối, nhưng chưa thể xuất hoặc gửi cho AI.</p>
               <ul className="list-disc space-y-1 pl-5 text-xs">{unavailableItems.map(item => (
-                <li key={`${item.slot}:${item.itemId}`}>{catalogItems.find(candidate => candidate.id === item.itemId)?.name || item.itemId} · vị trí {item.slot}</li>
+                <li key={`${item.slot}:${item.itemId}`}>{itemLabel(item.itemId, catalogItems)} · vị trí {slotLabel(item.slot)}</li>
               ))}</ul>
               <button type="button" onClick={onReplaceUnavailableItems} disabled={!catalogItems.length} className="rounded-md border border-red-300 bg-white px-3 py-2 text-xs font-semibold disabled:opacity-50">
                 Đóng và chọn món thay thế
@@ -506,6 +509,6 @@ export default function GeminiTryOnModal({
           </div>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 }

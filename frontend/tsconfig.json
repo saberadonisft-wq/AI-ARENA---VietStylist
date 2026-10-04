@@ -29,12 +29,13 @@
     }
   },
   "include": [
-    "next-env.d.ts",
     "**/*.ts",
     "**/*.tsx",
-    ".next/types/**/*.ts",
+    ".next-build/types/**/*.ts",
     ".next-test/types/**/*.ts",
-    ".next-build/types/**/*.ts"
+    ".next/types/**/*.ts",
+    "next-env.d.ts",
+    ".next-ui-detail-fixes/types/**/*.ts"
   ],
   "exclude": [
     "node_modules"

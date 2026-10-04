@@ -9,6 +9,7 @@ import { shareUrlForOrigin } from "@/lib/shareUrl";
 import { useAuth } from "@/lib/auth/context";
 import { useCatalog } from "@/lib/catalog/CatalogProvider";
 import { ArrowLeft, Share2, Trash2, Globe, Lock, Sparkles, Check } from "lucide-react";
+import { slotLabel, styleLabel, itemLabel } from "@/lib/catalog/display";
 import AuthModal from "@/components/AuthModal";
 import { useConfirmDialog } from "@/components/ui/ConfirmDialog";
 
@@ -162,13 +163,13 @@ export default function LookbookDetailPage() {
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
       {/* Top bar */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <Link
           href="/lookbook"
           className="inline-flex items-center space-x-1.5 text-xs font-semibold text-stone-600 hover:text-heritage-red transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
-          <span>Quay lại Lookbooks</span>
+          <span>Quay lại Lookbook</span>
         </Link>
 
         <div className="flex items-center space-x-2">
@@ -197,8 +198,8 @@ export default function LookbookDetailPage() {
 
       {/* Thông báo chia sẻ */}
       {shareUrl && (
-        <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center justify-between text-xs text-emerald-900">
-          <div className="space-y-0.5">
+        <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between text-xs text-emerald-900">
+          <div className="min-w-0 flex-1 space-y-0.5">
             <span className="font-bold flex items-center space-x-1">
               <Check className="w-4 h-4 text-emerald-600" />
               <span>Liên kết xem có hiệu lực trong 30 ngày:</span>
@@ -207,7 +208,7 @@ export default function LookbookDetailPage() {
           </div>
           <button
             onClick={() => void copyShareLink()}
-            className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg font-semibold hover:bg-emerald-700 transition-colors"
+            className="min-h-11 shrink-0 whitespace-nowrap px-3 py-1.5 bg-emerald-600 text-white rounded-lg font-semibold hover:bg-emerald-700 transition-colors"
           >
             Sao chép liên kết
           </button>
@@ -261,18 +262,18 @@ export default function LookbookDetailPage() {
                 {/* Tóm tắt các món trong bộ phối */}
                 <div className="space-y-1.5 text-xs bg-[#FAF8F5] p-3 rounded-xl border border-stone-100">
                   {entry.snapshot.items.map((it) => (
-                    <div key={it.slot} className="flex items-center justify-between">
-                      <span className="text-stone-500 capitalize">{it.slot}:</span>
-                      <span className="font-medium text-stone-800 truncate max-w-[200px]" title={it.itemId}>
-                        {catalogItems.find(item => item.id === it.itemId)?.name || "Trang phục không còn trong danh mục"}
+                    <div key={it.slot} className="flex min-w-0 items-start justify-between gap-3">
+                      <span className="shrink-0 text-stone-500">{slotLabel(it.slot)}:</span>
+                      <span className="min-w-0 break-words text-right font-medium text-stone-800 [overflow-wrap:anywhere]" title={itemLabel(it.itemId, catalogItems)}>
+                        {itemLabel(it.itemId, catalogItems)}
                       </span>
                     </div>
                   ))}
                 </div>
 
-                <div className="flex items-center justify-between pt-2 border-t border-stone-100 text-xs">
+                <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-stone-100 text-xs">
                   <span className="text-[11px] text-stone-500">
-                    Phong cách: <strong className="capitalize">{entry.snapshot.styleMode}</strong>
+                    Phong cách: <strong className="capitalize">{styleLabel(entry.snapshot.styleMode)}</strong>
                   </span>
                   <Link
                     href={`/studio?loadOutfit=${encodeURIComponent(entry.outfit_id)}`}

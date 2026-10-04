@@ -1,186 +1,81 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { OutfitSnapshot } from "@/lib/types/api";
+import { useEffect, useRef, useState } from "react";
+import type { CatalogItem, OutfitSnapshot } from "@/lib/types/api";
 import { api } from "@/lib/api/client";
-import { X, ArrowRightLeft, Check, Sparkles } from "lucide-react";
+import { itemLabel, slotLabel, styleLabel } from "@/lib/catalog/display";
+import Modal from "@/components/ui/Modal";
+import { X, ArrowRightLeft } from "lucide-react";
 
-interface CompareModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  snapshotA: OutfitSnapshot;
-  snapshotB: OutfitSnapshot;
-  onSelectOutfit: (chosenSnapshot: OutfitSnapshot) => void;
-}
+type Comparison = { summary_message: string; style_changed: boolean; diffs: Array<{
+  slot: string; is_changed: boolean; item_a_name?: string; item_a_id?: string;
+  item_b_name?: string; item_b_id?: string;
+}> };
 
-export default function CompareModal({
-  isOpen,
-  onClose,
-  snapshotA,
-  snapshotB,
-  onSelectOutfit,
-}: CompareModalProps) {
-  const [diffData, setDiffData] = useState<any>(null);
-  const [activeTab, setActiveTab] = useState<"side_by_side" | "diff">("side_by_side");
-
+export default function CompareModal({ isOpen, onClose, snapshotA, snapshotB, catalogItems, onSelectOutfit }: {
+  isOpen: boolean; onClose: () => void; snapshotA: OutfitSnapshot; snapshotB: OutfitSnapshot;
+  catalogItems: CatalogItem[]; onSelectOutfit: (snapshot: OutfitSnapshot) => void;
+}) {
+  const [diffData, setDiffData] = useState<Comparison | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [retry, setRetry] = useState(0);
+  const request = useRef<{ key: string; promise: Promise<Comparison> }>();
+  const comparisonItemLabel = (id?: string, name?: string) => name?.trim() && name !== id
+    ? name : id ? itemLabel(id, catalogItems) : "—";
   useEffect(() => {
-    if (!isOpen) return;
-
-    let cancelled = false;
-    setDiffData(null);
-    api
-      .compareOutfits({ snapshot_a: snapshotA, snapshot_b: snapshotB })
-      .then((data) => { if (!cancelled) setDiffData(data); })
-      .catch((err) => console.error("Lỗi so sánh:", err));
-    return () => { cancelled = true; };
-  }, [isOpen, snapshotA, snapshotB]);
-
-  if (!isOpen) return null;
-
-  return (
-    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] flex flex-col shadow-2xl border border-stone-300 overflow-hidden">
-        {/* Modal Header */}
-        <div className="px-6 py-4 border-b border-stone-200 flex items-center justify-between bg-stone-50">
-          <div className="flex items-center space-x-2">
-            <ArrowRightLeft className="w-5 h-5 text-heritage-indigo" />
-            <h3 className="font-serif text-lg font-bold text-stone-900">
-              So sánh hai phương án phối đồ
-            </h3>
-          </div>
-          <button onClick={onClose} className="text-stone-400 hover:text-stone-700">
-            <X className="w-5 h-5" />
-          </button>
+    if (!isOpen) { request.current = undefined; return; }
+    let active = true;
+    setDiffData(null); setError(null); setLoading(true);
+    const key = JSON.stringify([snapshotA, snapshotB, retry]);
+    // Reuse the pending request across Strict Mode mount cleanup. Retry and
+    // document changes still issue a fresh comparison.
+    if (request.current?.key !== key) request.current = { key,
+      promise: api.compareOutfits({ snapshot_a: snapshotA, snapshot_b: snapshotB }),
+    };
+    request.current.promise
+      .then(data => { if (active) setDiffData(data); })
+      .catch(() => { if (active) setError("Chưa tải được bảng so sánh chi tiết. Hai bản phối vẫn được giữ nguyên."); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [isOpen, snapshotA, snapshotB, retry]);
+  return <Modal isOpen={isOpen} onClose={onClose} label="So sánh hai phương án phối đồ">
+    <div className="flex max-h-full w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-stone-300 bg-white shadow-2xl">
+      <div className="flex shrink-0 items-center justify-between gap-3 border-b border-stone-200 bg-stone-50 px-4 py-3 sm:px-6">
+        <div className="flex min-w-0 items-center gap-2"><ArrowRightLeft aria-hidden="true" className="h-5 w-5 shrink-0 text-heritage-indigo" /><h3 className="font-serif text-lg font-bold">So sánh hai phương án phối đồ</h3></div>
+        <button type="button" aria-label="Đóng so sánh" onClick={onClose} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-stone-500 hover:bg-stone-100"><X className="h-5 w-5" /></button>
+      </div>
+      <div className="min-h-0 overflow-y-auto p-4 sm:p-6 space-y-6">
+        {loading && <p role="status" className="text-sm text-stone-600">Đang so sánh…</p>}
+        {error && <div className="space-y-2"><p role="alert" className="text-sm text-amber-900">{error}</p><button type="button" onClick={() => setRetry(value => value + 1)} className="min-h-11 rounded-lg border border-stone-300 px-3 text-sm font-semibold">Thử lại so sánh</button></div>}
+        {diffData && <p role="status" className="rounded-xl border border-heritage-indigo/20 bg-heritage-indigo/10 p-3 text-xs text-heritage-indigo">{diffData.summary_message}{diffData.style_changed && " · Khác phong cách"}</p>}
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+          {([{ name: "A", detail: "Bản đã ghim", snapshot: snapshotA }, { name: "B", detail: "Bản đang chỉnh", snapshot: snapshotB }] as const).map(option => <section key={option.name} aria-label={`Phương án ${option.name}`} className="min-w-0 space-y-4 rounded-xl border border-stone-200 bg-stone-50 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2"><h4 className="font-serif text-sm font-bold">Phương án {option.name} ({option.detail})</h4><span className="rounded-full bg-stone-200 px-2 py-0.5 text-xs">{styleLabel(option.snapshot.styleMode)}</span></div>
+            <dl className="space-y-2 text-xs">
+              {option.snapshot.items.map(item => <div key={item.slot} className="flex min-w-0 items-start justify-between gap-3 border-t border-stone-200 pt-2">
+                <dt className="shrink-0 text-stone-500">{slotLabel(item.slot)}:</dt>
+                <dd className="flex min-w-0 items-start justify-end gap-1.5 text-right font-medium">
+                  {item.colorHex && <span className="mt-0.5 h-3 w-3 shrink-0 rounded-full border border-black/20" style={{ backgroundColor: item.colorHex }} />}
+                  <span className="min-w-0 break-words [overflow-wrap:anywhere]">{itemLabel(item.itemId, catalogItems)}</span>
+                </dd>
+              </div>)}
+              {option.snapshot.items.length === 0 && <p className="text-stone-500">Bản phối này chưa có trang phục.</p>}
+            </dl>
+            <button type="button" onClick={() => { onSelectOutfit(option.snapshot); onClose(); }} className="min-h-11 w-full whitespace-nowrap rounded-lg bg-stone-800 px-3 py-2 text-xs font-semibold text-white hover:bg-stone-900">Chỉnh sửa phương án {option.name}</button>
+          </section>)}
         </div>
-
-        {/* Modal Body */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
-          {/* Tóm tắt so sánh */}
-          {diffData && (
-            <div className="p-3 bg-heritage-indigo/10 border border-heritage-indigo/20 rounded-xl text-xs text-heritage-indigo font-medium flex items-center justify-between">
-              <span>{diffData.summary_message}</span>
-              {diffData.style_changed && (
-                <span className="bg-white/80 px-2 py-0.5 rounded text-[10px] font-bold">
-                  Khác phong cách
-                </span>
-              )}
-            </div>
-          )}
-
-          {/* Hai cột Phương án A & B */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Phương án A */}
-            <div className="border border-stone-200 rounded-xl p-4 bg-[#FAF8F5] space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="font-serif font-bold text-sm text-stone-900">
-                  Phương án A (Bản đã ghim)
-                </span>
-                <span className="text-xs px-2 py-0.5 rounded-full bg-stone-200 text-stone-700 font-medium">
-                  {snapshotA.styleMode}
-                </span>
-              </div>
-
-              <div className="space-y-2 text-xs divide-y divide-stone-200/60">
-                {snapshotA.items.map((it) => (
-                  <div key={it.slot} className="pt-2 first:pt-0 flex items-center justify-between">
-                    <span className="text-stone-500 capitalize">{it.slot}:</span>
-                    <div className="flex items-center space-x-1.5 font-medium text-stone-800">
-                      {it.colorHex && (
-                        <div
-                          className="w-3 h-3 rounded-full border border-black/20"
-                          style={{ backgroundColor: it.colorHex }}
-                        />
-                      )}
-                      <span>{it.itemId}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <button
-                onClick={() => {
-                  onSelectOutfit(snapshotA);
-                  onClose();
-                }}
-                className="w-full py-2 px-4 rounded-lg bg-stone-800 hover:bg-stone-900 text-white font-medium text-xs transition-colors"
-              >
-                Tiếp tục chỉnh sửa Phương án A
-              </button>
-            </div>
-
-            {/* Phương án B */}
-            <div className="border-2 border-heritage-red/40 rounded-xl p-4 bg-red-50/20 space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="font-serif font-bold text-sm text-heritage-red">
-                  Phương án B (Bản đang chỉnh)
-                </span>
-                <span className="text-xs px-2 py-0.5 rounded-full bg-heritage-red/10 text-heritage-red font-medium">
-                  {snapshotB.styleMode}
-                </span>
-              </div>
-
-              <div className="space-y-2 text-xs divide-y divide-stone-200/60">
-                {snapshotB.items.map((it) => (
-                  <div key={it.slot} className="pt-2 first:pt-0 flex items-center justify-between">
-                    <span className="text-stone-500 capitalize">{it.slot}:</span>
-                    <div className="flex items-center space-x-1.5 font-medium text-stone-800">
-                      {it.colorHex && (
-                        <div
-                          className="w-3 h-3 rounded-full border border-black/20"
-                          style={{ backgroundColor: it.colorHex }}
-                        />
-                      )}
-                      <span>{it.itemId}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <button
-                onClick={() => {
-                  onSelectOutfit(snapshotB);
-                  onClose();
-                }}
-                className="w-full py-2 px-4 rounded-lg bg-heritage-red hover:bg-heritage-red-dark text-white font-medium text-xs transition-colors"
-              >
-                Tiếp tục chỉnh sửa Phương án B
-              </button>
-            </div>
+        {diffData && <section className="space-y-2" aria-label="Bảng đối chiếu chi tiết"><h4 className="font-serif text-sm font-bold">Thay đổi theo vị trí</h4>
+          <div className="divide-y divide-stone-100 rounded-xl border border-stone-200 text-xs">
+            <div className="grid grid-cols-3 gap-2 p-2.5 font-semibold"><span>Vị trí</span><span>Phương án A</span><span>Phương án B</span></div>
+            {diffData.diffs.map(diff => <div key={diff.slot} className={`grid grid-cols-3 gap-2 p-2.5 [overflow-wrap:anywhere] ${diff.is_changed ? "bg-amber-50" : ""}`}>
+              <span className="min-w-0 font-semibold">{slotLabel(diff.slot)}</span>
+              <span className="min-w-0">{comparisonItemLabel(diff.item_a_id, diff.item_a_name)}</span>
+              <span className="min-w-0">{comparisonItemLabel(diff.item_b_id, diff.item_b_name)}{diff.is_changed && <span className="mt-1 block font-semibold text-amber-800">Đã đổi</span>}</span>
+            </div>)}
           </div>
-
-          {/* Bảng đối chiếu chi tiết từng Slot */}
-          {diffData && diffData.diffs && (
-            <div className="space-y-2">
-              <h4 className="font-serif font-bold text-xs text-stone-800 uppercase tracking-wider">
-                Bảng Đối Chiếu Thay Đổi Từng Vị Trí
-              </h4>
-              <div className="border border-stone-200 rounded-xl overflow-hidden divide-y divide-stone-100 text-xs">
-                {diffData.diffs.map((d: any) => (
-                  <div
-                    key={d.slot}
-                    className={`grid grid-cols-3 p-2.5 items-center ${
-                      d.is_changed ? "bg-amber-50/40" : "bg-white"
-                    }`}
-                  >
-                    <span className="font-semibold text-stone-700 capitalize">{d.slot}</span>
-                    <span className="text-stone-600 truncate">{d.item_a_name || d.item_a_id || "—"}</span>
-                    <div className="flex items-center justify-between">
-                      <span className={`truncate ${d.is_changed ? "font-bold text-heritage-red" : "text-stone-600"}`}>
-                        {d.item_b_name || d.item_b_id || "—"}
-                      </span>
-                      {d.is_changed && (
-                        <span className="text-[10px] text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded font-bold ml-2">
-                          Đã đổi
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
+        </section>}
       </div>
     </div>
-  );
+  </Modal>;
 }

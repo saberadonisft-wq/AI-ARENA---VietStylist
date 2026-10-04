@@ -1,13 +1,15 @@
 "use client";
 
-import React, { useState } from "react";
-import { Download, Share2, X, Sparkles, Check } from "lucide-react";
+import React, { useEffect, useRef, useState } from "react";
+import Modal from "@/components/ui/Modal";
+import { Download, Share2, X, Sparkles } from "lucide-react";
 
 interface ExportModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onExport: (ratio: "1:1" | "9:16") => Promise<string>;
+  onExport: (ratio: "1:1" | "9:16") => Promise<Blob>;
   outfitTitle: string;
+  documentKey: string;
 }
 
 export default function ExportModal({
@@ -15,30 +17,49 @@ export default function ExportModal({
   onClose,
   onExport,
   outfitTitle,
+  documentKey,
 }: ExportModalProps) {
   const [aspectRatio, setAspectRatio] = useState<"1:1" | "9:16">("9:16");
   const [exportedImageUrl, setExportedImageUrl] = useState<string | null>(null);
+  const [exportedBlob, setExportedBlob] = useState<Blob | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const operationId = useRef(0);
+
+  useEffect(() => {
+    operationId.current++;
+    setExportedImageUrl(null);
+    setExportedBlob(null);
+    setError(null);
+    setIsExporting(false);
+    return () => { operationId.current++; };
+  }, [isOpen, documentKey]);
+
+  useEffect(() => () => { if (exportedImageUrl) URL.revokeObjectURL(exportedImageUrl); }, [exportedImageUrl]);
 
   const handleGenerate = async (ratio: "1:1" | "9:16") => {
     if (isExporting) return;
+    const generation = ++operationId.current;
     setError(null);
     setExportedImageUrl(null);
     setAspectRatio(ratio);
+    setExportedBlob(null);
     setIsExporting(true);
     try {
-      const dataUrl = await onExport(ratio);
-      setExportedImageUrl(dataUrl);
+      const blob = await onExport(ratio);
+      if (generation === operationId.current) {
+        setExportedBlob(blob);
+        setExportedImageUrl(URL.createObjectURL(blob));
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Không xuất được ảnh. Vui lòng thử lại.");
+      if (generation === operationId.current) setError(err instanceof Error ? err.message : "Không xuất được ảnh. Vui lòng thử lại.");
     } finally {
-      setIsExporting(false);
+      if (generation === operationId.current) setIsExporting(false);
     }
   };
 
   const handleDownload = () => {
-    if (!exportedImageUrl) return;
+    if (!exportedImageUrl || !exportedBlob) return;
     const a = document.createElement("a");
     a.href = exportedImageUrl;
     a.download = `vietstylist-${Date.now()}.png`;
@@ -48,11 +69,10 @@ export default function ExportModal({
   };
 
   const handleShare = async () => {
-    if (!exportedImageUrl) return;
+    if (!exportedImageUrl || !exportedBlob) return;
     setError(null);
     try {
-      const blob = await (await fetch(exportedImageUrl)).blob();
-      const file = new File([blob], "vietstylist.png", { type: "image/png" });
+      const file = new File([exportedBlob], "vietstylist.png", { type: "image/png" });
       if (navigator.share && navigator.canShare?.({ files: [file] })) {
         await navigator.share({ title: outfitTitle || "Bản phối VietStylist", files: [file] });
       } else {
@@ -67,23 +87,23 @@ export default function ExportModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl border border-stone-200 overflow-hidden flex flex-col">
+    <Modal isOpen={isOpen} onClose={onClose} label="Xuất ảnh bản phối">
+      <div className="bg-white rounded-2xl max-w-lg w-full max-h-full shadow-2xl border border-stone-200 overflow-hidden flex flex-col">
         {/* Header */}
-        <div className="px-5 py-4 border-b border-stone-200 flex items-center justify-between bg-stone-50">
+        <div className="shrink-0 px-5 py-4 border-b border-stone-200 flex items-center justify-between bg-stone-50">
           <div className="flex items-center space-x-2">
             <Sparkles className="w-4 h-4 text-heritage-gold" />
             <h3 className="font-serif text-base font-bold text-stone-900">
               Xuất ảnh bản phối
             </h3>
           </div>
-          <button onClick={onClose} className="text-stone-400 hover:text-stone-700">
+          <button type="button" aria-label="Đóng xuất ảnh" onClick={onClose} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-stone-400 hover:text-stone-700">
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Body */}
-        <div className="p-6 space-y-5">
+        <div className="min-h-0 overflow-y-auto p-4 sm:p-6 space-y-5">
           {/* Chọn tỷ lệ khung hình */}
           <div className="space-y-2">
             <label className="text-xs font-semibold text-stone-700 uppercase tracking-wider block">
@@ -91,6 +111,7 @@ export default function ExportModal({
             </label>
             <div className="grid grid-cols-2 gap-3">
               <button
+                aria-pressed={aspectRatio === "9:16"}
                 disabled={isExporting}
                 onClick={() => handleGenerate("9:16")}
                 className={`p-3 rounded-xl border text-center transition-all flex flex-col items-center space-y-1.5 ${
@@ -106,6 +127,7 @@ export default function ExportModal({
               </button>
 
               <button
+                aria-pressed={aspectRatio === "1:1"}
                 disabled={isExporting}
                 onClick={() => handleGenerate("1:1")}
                 className={`p-3 rounded-xl border text-center transition-all flex flex-col items-center space-y-1.5 ${
@@ -146,9 +168,11 @@ export default function ExportModal({
             )}
           </div>
 
+        </div>
+        <div className="shrink-0 space-y-2 border-t border-stone-200 px-4 py-3 sm:px-6">
           {error && <p role="alert" className="text-sm text-amber-900">{error}</p>}
           {/* Nút hành động */}
-          <div className="flex items-center space-x-3 pt-2">
+          <div className="flex items-center space-x-3">
             <button
               onClick={handleDownload}
               disabled={!exportedImageUrl || isExporting}
@@ -169,6 +193,6 @@ export default function ExportModal({
           </div>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 }
