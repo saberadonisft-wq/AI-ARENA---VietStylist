@@ -40,7 +40,9 @@ class OutfitSnapshot(BaseModel):
     overlapDirection: str = "right_over_left"
     items: List[SnapshotItem] = []
     lockedSlots: List[str] = Field(default_factory=list)
-    backgroundTheme: Literal["white", "dopaper"] = "white"
+    backgroundTheme: Literal["white", "dopaper", "occasion"] = "white"
+    neutralBackgroundTheme: Literal["white", "dopaper"] = "white"
+    backgroundFade: float = Field(default=0, ge=0, le=100, allow_inf_nan=False)
     aspectRatio: Literal["1:1", "9:16"] = "9:16"
     culturalSettings: Optional[CulturalSettings] = None
 

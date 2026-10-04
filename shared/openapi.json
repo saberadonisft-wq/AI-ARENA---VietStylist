@@ -20896,10 +20896,27 @@
             "type": "string",
             "enum": [
               "white",
-              "dopaper"
+              "dopaper",
+              "occasion"
             ],
             "title": "Backgroundtheme",
             "default": "white"
+          },
+          "neutralBackgroundTheme": {
+            "type": "string",
+            "enum": [
+              "white",
+              "dopaper"
+            ],
+            "title": "Neutralbackgroundtheme",
+            "default": "white"
+          },
+          "backgroundFade": {
+            "type": "number",
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Backgroundfade",
+            "default": 0
           },
           "aspectRatio": {
             "type": "string",
@@ -20981,10 +20998,27 @@
             "type": "string",
             "enum": [
               "white",
-              "dopaper"
+              "dopaper",
+              "occasion"
             ],
             "title": "Backgroundtheme",
             "default": "white"
+          },
+          "neutralBackgroundTheme": {
+            "type": "string",
+            "enum": [
+              "white",
+              "dopaper"
+            ],
+            "title": "Neutralbackgroundtheme",
+            "default": "white"
+          },
+          "backgroundFade": {
+            "type": "number",
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Backgroundfade",
+            "default": 0
           },
           "aspectRatio": {
             "type": "string",
