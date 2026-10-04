@@ -35,6 +35,14 @@ import {
   Layers,
 } from "lucide-react";
 
+const CUSTOM_ERA = "custom";
+const STORY_ERAS = [
+  { value: "Triều Nguyễn", label: "Triều Nguyễn (1802 - 1945)" },
+  { value: "Triều Lê", label: "Triều Lê (1428 - 1789)" },
+  { value: "Lý - Trần", label: "Thời Lý - Trần (1009 - 1400)" },
+  { value: "Đương đại Remix", label: "Đương đại Remix Cổ phục" },
+];
+
 export default function ChuyenCoPhucPage() {
   const router = useRouter();
   const { user, isLoggedIn, isAdmin, isStylist } = useAuth();
@@ -76,6 +84,7 @@ export default function ChuyenCoPhucPage() {
   const [newTitle, setNewTitle] = useState("");
   const [newCategory, setNewCategory] = useState("Điển tích Hoàng cung");
   const [newEra, setNewEra] = useState("Triều Nguyễn");
+  const [customEra, setCustomEra] = useState("");
   const [newRelatedGarment, setNewRelatedGarment] = useState("");
   const [newSummary, setNewSummary] = useState("");
   const [newHistoricalContext, setNewHistoricalContext] = useState("");
@@ -121,7 +130,10 @@ export default function ChuyenCoPhucPage() {
     setNewSummary(article?.short_summary || "");
     setNewFullContent(article?.full_content || "");
     setNewCategory(article?.category || "Điển tích Hoàng cung");
-    setNewEra(article?.era || "Triều Nguyễn");
+    const era = article?.era || "Triều Nguyễn";
+    const isCustomEra = !STORY_ERAS.some(option => option.value === era);
+    setNewEra(isCustomEra ? CUSTOM_ERA : era);
+    setCustomEra(isCustomEra ? era : "");
     setNewRelatedGarment(article?.related_garment_id || "");
     setNewHistoricalContext(article?.historical_context || "");
     setNewModernInterpretation(article?.modern_interpretation || "");
@@ -190,6 +202,8 @@ export default function ChuyenCoPhucPage() {
     setActionSuccess(null);
 
     const errors = validateStoryText(newTitle, newSummary, newFullContent, newCoverImage);
+    const era = newEra === CUSTOM_ERA ? customEra.trim() : newEra;
+    if (!era) errors.era = "Hãy nhập triều đại / thời kỳ.";
     setFieldErrors(errors);
     if (Object.keys(errors).length) {
       setActionError("Hãy kiểm tra các ô được đánh dấu bên dưới trước khi tải ảnh.");
@@ -207,7 +221,7 @@ export default function ChuyenCoPhucPage() {
         short_summary: newSummary.trim(),
         full_content: newFullContent.trim(),
         category: newCategory,
-        era: newEra,
+        era,
         related_garment_id: newRelatedGarment || undefined,
         historical_context: newHistoricalContext.trim() || undefined,
         modern_interpretation: newModernInterpretation.trim() || undefined,
@@ -229,7 +243,7 @@ export default function ChuyenCoPhucPage() {
         setHasVersionConflict(true);
         setLatestRevision(null);
       }
-      const labels: Record<string, string> = { title: "Tiêu đề", short_summary: "Tóm tắt", full_content: "Nội dung", cover_image_url: "Ảnh bìa", images: "Ảnh minh họa", expected_version: "Phiên bản bài viết" };
+      const labels: Record<string, string> = { title: "Tiêu đề", short_summary: "Tóm tắt", full_content: "Nội dung", era: "Triều đại / Thời kỳ", cover_image_url: "Ảnh bìa", images: "Ảnh minh họa", expected_version: "Phiên bản bài viết" };
       const validation = err instanceof ApiError ? err.details?.validation_errors : undefined;
       if (Array.isArray(validation)) {
         const errors: Record<string, string> = {};
@@ -805,7 +819,6 @@ export default function ChuyenCoPhucPage() {
                   aria-describedby={fieldErrors.title ? "story-title-error" : undefined}
                   value={newTitle}
                   onChange={(e) => setNewTitle(e.target.value)}
-                  placeholder="Ví dụ: Bí ẩn Phượng ổ trên áo Nhật Bình hoàng gia..."
                   className="w-full px-3 py-2 text-xs rounded-xl border border-stone-300 focus:outline-none focus:ring-2 focus:ring-heritage-red/20 focus:border-heritage-red transition-all"
                 />
                 {fieldErrors.title && <p id="story-title-error" className="mt-1 text-xs text-red-700">{fieldErrors.title}</p>}
@@ -834,19 +847,36 @@ export default function ChuyenCoPhucPage() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-stone-800 mb-1">
+                  <label htmlFor="story-era" className="block text-xs font-semibold text-stone-800 mb-1">
                     Triều đại / Thời kỳ
                   </label>
                   <select
+                    id="story-era"
                     value={newEra}
                     onChange={(e) => setNewEra(e.target.value)}
                     className="w-full px-3 py-2 text-xs rounded-xl border border-stone-300 bg-white focus:outline-none focus:border-heritage-red"
                   >
-                    <option value="Triều Nguyễn">Triều Nguyễn (1802 - 1945)</option>
-                    <option value="Triều Lê">Triều Lê (1428 - 1789)</option>
-                    <option value="Lý - Trần">Thời Lý - Trần (1009 - 1400)</option>
-                    <option value="Đương đại Remix">Đương đại Remix Cổ phục</option>
+                    {STORY_ERAS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+                    <option value={CUSTOM_ERA}>Tự viết</option>
                   </select>
+                  {newEra === CUSTOM_ERA && (
+                    <div className="mt-2">
+                      <label htmlFor="story-custom-era" className="block text-xs font-semibold text-stone-800 mb-1">
+                        Triều đại / Thời kỳ tự viết
+                      </label>
+                      <input
+                        id="story-custom-era"
+                        type="text"
+                        required
+                        value={customEra}
+                        onChange={(e) => setCustomEra(e.target.value)}
+                        aria-invalid={!!fieldErrors.era}
+                        aria-describedby={fieldErrors.era ? "story-era-error" : undefined}
+                        className="w-full px-3 py-2 text-xs rounded-xl border border-stone-300 focus:outline-none focus:border-heritage-red"
+                      />
+                    </div>
+                  )}
+                  {fieldErrors.era && <p id="story-era-error" className="mt-1 text-xs text-red-700">{fieldErrors.era}</p>}
                 </div>
               </div>
 
@@ -881,7 +911,6 @@ export default function ChuyenCoPhucPage() {
                   aria-describedby={fieldErrors.short_summary ? "story-summary-error" : undefined}
                   value={newSummary}
                   onChange={(e) => setNewSummary(e.target.value)}
-                  placeholder="Một câu văn đắt giá gợi mở về ý nghĩa lịch sử hoặc vẻ đẹp của trang phục..."
                   className="w-full px-3 py-2 text-xs rounded-xl border border-stone-300 focus:outline-none focus:border-heritage-red"
                 />
                 {fieldErrors.short_summary && <p id="story-summary-error" className="mt-1 text-xs text-red-700">{fieldErrors.short_summary}</p>}
@@ -895,7 +924,6 @@ export default function ChuyenCoPhucPage() {
                   type="text"
                   value={newHistoricalContext}
                   onChange={(e) => setNewHistoricalContext(e.target.value)}
-                  placeholder="Trích dẫn thư tịch cổ (Đại Nam Hội Điển, Lịch triều hiến chương...)"
                   className="w-full px-3 py-2 text-xs rounded-xl border border-stone-300 focus:outline-none focus:border-heritage-red"
                 />
               </div>
@@ -912,7 +940,6 @@ export default function ChuyenCoPhucPage() {
                   aria-describedby={fieldErrors.full_content ? "story-content-error" : undefined}
                   value={newFullContent}
                   onChange={(e) => setNewFullContent(e.target.value)}
-                  placeholder="Kể câu chuyện về nguồn gốc tà áo, ý nghĩa ngũ sắc, hoa văn, hoặc cách Stylist cảm nhận khi khoác lên mình... (Hỗ trợ định dạng phân đoạn bằng xuống dòng)"
                   className="w-full px-3 py-2 text-xs rounded-xl border border-stone-300 focus:outline-none focus:border-heritage-red"
                 />
                 {fieldErrors.full_content && <p id="story-content-error" className="mt-1 text-xs text-red-700">{fieldErrors.full_content}</p>}
@@ -926,7 +953,6 @@ export default function ChuyenCoPhucPage() {
                   type="text"
                   value={newModernInterpretation}
                   onChange={(e) => setNewModernInterpretation(e.target.value)}
-                  placeholder="Lời khuyên phối cùng phụ kiện, hài guốc hoặc áo khoác duster hiện đại..."
                   className="w-full px-3 py-2 text-xs rounded-xl border border-stone-300 focus:outline-none focus:border-heritage-red"
                 />
               </div>
@@ -940,22 +966,7 @@ export default function ChuyenCoPhucPage() {
                 storyImages.filter(image => image.file && image.uploaded && !images.some(item => item.id === image.id)).forEach(image => { void api.deleteMedia(image.uploaded!.media_id).catch(() => {}); });
                 changeImages(images);
               }} disabled={isSubmitting} />
-              <div>
-                <label className="block text-xs font-semibold text-stone-800 mb-1">
-                  Đường dẫn ảnh bìa riêng (tùy chọn)
-                </label>
-                <input
-                  type="url"
-                  aria-label="Đường dẫn ảnh bìa riêng"
-                  aria-invalid={!!fieldErrors.cover_image_url}
-                  aria-describedby={fieldErrors.cover_image_url ? "story-cover-error" : undefined}
-                  value={newCoverImage}
-                  onChange={(e) => setNewCoverImage(e.target.value)}
-                  placeholder="https://pub-6b5603ef95b646cdbf77ae1dc62532cb.r2.dev/..."
-                  className="w-full px-3 py-2 text-xs rounded-xl border border-stone-300 focus:outline-none focus:border-heritage-red"
-                />
-                {fieldErrors.cover_image_url && <p id="story-cover-error" className="mt-1 text-xs text-red-700">{fieldErrors.cover_image_url}</p>}
-              </div>
+              {fieldErrors.cover_image_url && <p id="story-cover-error" role="alert" className="mt-1 text-xs text-red-700">{fieldErrors.cover_image_url}</p>}
 
               <div className="pt-2 flex items-center justify-end space-x-2">
                 <button

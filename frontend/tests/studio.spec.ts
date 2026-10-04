@@ -2,6 +2,20 @@ import { test, expect, Page } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import { DRAFT_KEY, INITIAL_DOCUMENT, mergeUnlockedItems, parseDraft, sameDocument, studioReducer } from "../src/features/studio/state";
 import { buildManualTryOnPrompt } from "../src/features/studio/tryOnPrompt";
+import { occasionBackgroundPatch, OCCASION_BACKGROUNDS, backgroundUrl } from "../src/features/studio/backgrounds";
+
+test("all occasion background assets exist in both formats and old drafts keep their neutral choice", () => {
+  for (const occasion of Object.keys(OCCASION_BACKGROUNDS)) {
+    for (const ratio of ["1:1", "9:16"] as const) {
+      expect(readFileSync(`public${backgroundUrl(occasion, ratio)}`).length).toBeGreaterThan(10000);
+    }
+  }
+  const old = parseDraft(JSON.stringify({ snapshot: { ...INITIAL_DOCUMENT.snapshot, backgroundTheme: "dopaper" } }))!;
+  const selected = { ...old.snapshot, ...occasionBackgroundPatch(old.snapshot, "tet") };
+  expect(selected).toMatchObject({ backgroundTheme: "occasion", neutralBackgroundTheme: "dopaper" });
+  expect(occasionBackgroundPatch(selected)).toMatchObject({ backgroundTheme: "dopaper", occasionId: undefined });
+  expect(backgroundUrl("unknown", "1:1")).toBeUndefined();
+});
 
 const TEST_GARMENT = { slot: "outerwear", itemId: "item-test-outerwear", variantId: "variant-test-outerwear", assetVersion: 1, colorHex: "#8B1E24" };
 const TEST_DOCUMENT = { ...structuredClone(INITIAL_DOCUMENT), snapshot: { ...structuredClone(INITIAL_DOCUMENT.snapshot), items: [TEST_GARMENT] } };
@@ -227,7 +241,7 @@ test("refresh preserves draft, first change can undo, and saving updates one out
   await expect.poll(async () => (await readDraft(page))?.title).toBe("Nháp cần giữ");
   await page.getByRole("button", { name: "Tiếp tục bản nháp", exact: true }).click();
   await expect(title).toHaveValue("Nháp cần giữ");
-  await page.getByRole("button", { name: "Remix Đương đại" }).click();
+  await page.getByRole("button", { name: "Remix · kết hợp hiện đại" }).click();
   await page.getByTitle("Hoàn tác (Ctrl+Z)").click();
   await expect.poll(async () => (await readDraft(page))?.snapshot.styleMode).toBe("traditional");
   await page.getByRole("button", { name: "Lưu bộ phối", exact: true }).click();
@@ -293,9 +307,13 @@ test("board zoom preserves the outfit and exported pixels while dragging uses zo
     await page.getByRole("button", { name: "Vuông (Instagram / Post)" }).click();
     const image = page.getByAltText("Bản phối xuất");
     await expect(image).toBeVisible();
-    const src = await image.getAttribute("src");
+    // Blob URLs are unique per export; compare the actual PNG bytes instead.
+    const bytes = await image.evaluate(async node => {
+      const data = await (await fetch((node as HTMLImageElement).src)).arrayBuffer();
+      return [...new Uint8Array(data)];
+    });
     await page.getByRole("heading", { name: "Xuất ảnh bản phối", exact: true }).locator("../..").getByRole("button").click();
-    return src;
+    return bytes;
   };
   const exportedBefore = await exportImage();
   const fit = (await board.boundingBox())!;
@@ -305,7 +323,7 @@ test("board zoom preserves the outfit and exported pixels while dragging uses zo
   expect(zoomed.width).toBeCloseTo(fit.width * 2, 0);
   expect(zoomed.height).toBeCloseTo(fit.height * 2, 0);
   expect((await readDraft(page)).snapshot.items).toEqual(original);
-  expect(await exportImage()).toBe(exportedBefore);
+  expect(await exportImage()).toEqual(exportedBefore);
   const image = page.locator("#content-outerwear image");
   await image.scrollIntoViewIfNeeded();
   const box = (await image.boundingBox())!;
@@ -334,6 +352,183 @@ test("board zoom preserves the outfit and exported pixels while dragging uses zo
   await zoomOut.click();
   await expect(zoomOut).toBeDisabled();
   await expect(page.getByLabel("Mức thu phóng bảng phối", { exact: true })).toHaveText("50%");
+});
+
+for (const width of [375, 1440]) {
+  test(`occasion backgrounds preserve locked placement, neutral choice and history at ${width}`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    const saves = await mockApi(page, { flatlay_image_url: "/garments/item_ao_tac_xanh_reu_transparent.png" });
+    await loginForGeneration(page);
+    await page.goto("/studio");
+    await page.getByText("Trang phục 0", { exact: true }).click();
+    const controls = page.getByRole("region", { name: "Điều chỉnh trang phục" });
+    await controls.getByRole("button", { name: "Xoay phải 15 độ", exact: true }).click();
+    await controls.getByRole("button", { name: "Khóa món đang chọn", exact: true }).click();
+    const original = (await readDraft(page)).snapshot;
+    await page.getByRole("button", { name: "Giấy Dó", exact: true }).click();
+    if (width < 1024) await page.getByRole("tab", { name: "Chọn trang phục", exact: true }).click();
+    await page.getByRole("button", { name: "Tết", exact: true }).click();
+    const bg = page.getByTestId("board-background");
+    await expect(bg).toHaveAttribute("data-background-status", "ready");
+    await expect(bg).toHaveAttribute("data-background-url", /tet-portrait/);
+    const fade = page.getByRole("slider", { name: "Độ mờ ảnh nền" });
+    await expect(fade).toHaveValue("0");
+    await fade.fill("45");
+    await expect(fade).toHaveAttribute("aria-valuetext", "45%");
+    await page.getByTitle("Hoàn tác (Ctrl+Z)").click();
+    await expect(fade).toHaveValue("0");
+    await fade.fill("45");
+    await expect(page.getByRole("button", { name: "Theo hoàn cảnh", exact: true })).toHaveAttribute("aria-pressed", "true");
+    expect((await readDraft(page)).snapshot).toMatchObject({ items: original.items, lockedSlots: original.lockedSlots,
+      backgroundTheme: "occasion", neutralBackgroundTheme: "dopaper" });
+    await page.getByRole("button", { name: "1:1", exact: true }).click();
+    await expect(bg).toHaveAttribute("data-background-url", /tet-square/);
+    await expect(bg).toHaveAttribute("data-background-status", "ready");
+    await page.getByTestId("outfit-artboard").screenshot({ path: test.info().outputPath("tet-square-real-garment.png") });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await page.getByRole("button", { name: "Bỏ chọn hoàn cảnh" }).click();
+    await expect(page.getByRole("button", { name: "Giấy Dó", exact: true })).toHaveAttribute("aria-pressed", "true");
+    await page.getByTitle("Hoàn tác (Ctrl+Z)").click();
+    await expect(bg).toHaveAttribute("data-background-status", "ready");
+    await page.getByRole("button", { name: "Trắng Studio", exact: true }).click();
+    await expect(bg).toHaveAttribute("data-background-status", "neutral");
+    await page.getByRole("button", { name: "Tết", exact: true }).click();
+    await page.getByRole("button", { name: "Lưu bộ phối", exact: true }).click();
+    await expect.poll(() => saves.length).toBe(1);
+    expect(saves[0].body.snapshot).toMatchObject({ backgroundTheme: "occasion", neutralBackgroundTheme: "white", backgroundFade: 45, items: original.items });
+    await page.reload();
+    await expect(fade).toHaveValue("45");
+    await expect(bg).toHaveAttribute("data-background-status", "ready");
+    await expect(bg).toHaveAttribute("data-background-url", /tet-square/);
+    // Reopen the server snapshot with no local draft to mask a persistence bug.
+    await page.evaluate(key => {
+      for (const storedKey of Object.keys(localStorage)) {
+        if (storedKey.startsWith(key)) localStorage.removeItem(storedKey);
+      }
+    }, DRAFT_KEY);
+    await page.goto("/studio?loadOutfit=saved-1");
+    await expect(fade).toHaveValue("45");
+    await expect(bg).toHaveAttribute("data-background-status", "ready");
+    await expect(bg).toHaveAttribute("data-background-url", /tet-square/);
+    expect((await readDraft(page)).snapshot).toMatchObject({ items: original.items,
+      lockedSlots: original.lockedSlots, backgroundTheme: "occasion", neutralBackgroundTheme: "white" });
+  });
+}
+
+test("all eight scenes render and export the matching background in both ratios", async ({ page }) => {
+  test.setTimeout(60_000);
+  await mockApi(page);
+  await loginForGeneration(page);
+  await page.route("**/api/catalog/occasions", route => route.fulfill({ json:
+    Object.entries(OCCASION_BACKGROUNDS).map(([id, scene]) => ({ id, name: scene.title, season: "all" })),
+  }));
+  await page.goto("/studio");
+  await page.getByText("Trang phục 0", { exact: true }).click();
+  const bg = page.getByTestId("board-background");
+  for (const [id, scene] of Object.entries(OCCASION_BACKGROUNDS)) {
+    await page.getByRole("button", { name: scene.title, exact: true }).click();
+    await page.getByRole("slider", { name: "Độ mờ ảnh nền" }).fill(String(Object.keys(OCCASION_BACKGROUNDS).indexOf(id) % 3 * 50));
+    for (const ratio of ["1:1", "9:16"] as const) {
+      await page.getByRole("button", { name: ratio, exact: true }).click();
+      await expect(bg).toHaveAttribute("data-background-url", backgroundUrl(id, ratio)!);
+      await expect(bg).toHaveAttribute("data-background-status", "ready");
+      // Finish the crossfade before comparing visible pixels with the PNG.
+      await bg.evaluate(async node => { await Promise.all(node.getAnimations({ subtree: true }).map(a => a.finished)); });
+      await page.getByRole("button", { name: "Xuất ảnh", exact: true }).click();
+      await page.getByRole("button", { name: ratio === "1:1" ? "Vuông (Instagram / Post)" : "Story / Reels (9:16)" }).click();
+      const preview = page.getByAltText("Bản phối xuất");
+      await expect(preview).toBeVisible();
+      const difference = await preview.evaluate(async node => {
+        const exported = node as HTMLImageElement; await exported.decode();
+        const visible = [...document.querySelectorAll<HTMLCanvasElement>('[data-testid="board-background"] canvas')].at(-1)!;
+        const canvas = document.createElement("canvas"); canvas.width = visible.width; canvas.height = visible.height;
+        const ctx = canvas.getContext("2d")!;
+        ctx.drawImage(exported, 0, 0, canvas.width, canvas.height);
+        const originalCtx = visible.getContext("2d")!;
+        const fadeOverlay = visible.parentElement!.querySelector<HTMLElement>("div");
+        const fade = fadeOverlay ? Number(getComputedStyle(fadeOverlay).opacity) : 0;
+        // Sample background down both outer margins, away from garments and the export footer.
+        let max = 0;
+        for (const x of [0.03, 0.97]) for (const y of [0.1, 0.25, 0.5, 0.7]) {
+          const a = ctx.getImageData(x * canvas.width, y * canvas.height, 1, 1).data;
+          const b = originalCtx.getImageData(x * canvas.width, y * canvas.height, 1, 1).data;
+          for (let c = 0; c < 3; c++) {
+            const displayed = b[c] * (1 - fade) + [250, 248, 245][c] * fade;
+            max = Math.max(max, Math.abs(a[c] - displayed));
+          }
+        }
+        return max;
+      });
+      expect(difference).toBeLessThan(20); // Allow resampling at the different export resolution.
+      await page.getByRole("heading", { name: "Xuất ảnh bản phối", exact: true }).locator("../..").getByRole("button").click();
+    }
+  }
+});
+
+test("a late occasion background cannot replace the latest choice and errors fall back without blocking export", async ({ page }) => {
+  await mockApi(page);
+  await loginForGeneration(page);
+  let release!: () => void;
+  const held = new Promise<void>(resolve => { release = resolve; });
+  await page.route("**/tet-portrait.webp", async route => { await held; await route.continue(); });
+  await page.goto("/studio");
+  await page.getByText("Trang phục 0", { exact: true }).click();
+  await page.getByRole("button", { name: "Tết", exact: true }).click();
+  const bg = page.getByTestId("board-background");
+  await expect(bg).toHaveAttribute("data-background-status", "loading");
+  await page.getByRole("button", { name: "Kỷ yếu", exact: true }).click();
+  await expect(bg).toHaveAttribute("data-background-status", "ready");
+  release();
+  await expect(bg).toHaveAttribute("data-background-url", /ky-yeu-portrait/);
+  await page.route("**/tet-square.webp", route => route.abort());
+  await page.getByRole("button", { name: "1:1", exact: true }).click();
+  await page.getByRole("button", { name: "Tết", exact: true }).click();
+  await expect(bg).toHaveAttribute("data-background-status", "fallback");
+  expect((await readDraft(page)).snapshot.items).toHaveLength(1);
+  await page.getByRole("button", { name: "Xuất ảnh", exact: true }).click();
+  await page.getByRole("button", { name: "Vuông (Instagram / Post)" }).click();
+  await expect(page.getByAltText("Bản phối xuất")).toBeVisible();
+  const pixel = await page.getByAltText("Bản phối xuất").evaluate(async node => {
+    const image = node as HTMLImageElement; await image.decode();
+    const canvas = document.createElement("canvas"); canvas.width = canvas.height = 1400;
+    const ctx = canvas.getContext("2d")!; ctx.drawImage(image, 0, 0);
+    return [...ctx.getImageData(2, 2, 1, 1).data];
+  });
+  expect(pixel).toEqual([255, 255, 255, 255]);
+});
+
+test("shared PNG includes the chosen scene while the AI reference stays white", async ({ page }) => {
+  await mockApi(page);
+  await loginForGeneration(page);
+  await page.goto("/studio");
+  await page.getByText("Trang phục 0", { exact: true }).click();
+  await page.getByRole("button", { name: "Tết", exact: true }).click();
+  await expect(page.getByTestId("board-background")).toHaveAttribute("data-background-status", "ready");
+  await page.getByRole("button", { name: "Xuất ảnh", exact: true }).click();
+  await page.getByRole("button", { name: "Vuông (Instagram / Post)" }).click();
+  const preview = page.getByAltText("Bản phối xuất");
+  await expect(preview).toBeVisible();
+  const pixel = await preview.evaluate(async node => {
+    const image = node as HTMLImageElement; await image.decode();
+    const canvas = document.createElement("canvas"); canvas.width = image.naturalWidth; canvas.height = image.naturalHeight;
+    const ctx = canvas.getContext("2d")!; ctx.drawImage(image, 0, 0);
+    return [...ctx.getImageData(2, 2, 1, 1).data];
+  });
+  expect(pixel.slice(0, 3).some(value => value < 240)).toBe(true);
+  await page.getByRole("heading", { name: "Xuất ảnh bản phối", exact: true }).locator("../..").getByRole("button").click();
+  await page.getByRole("button", { name: "Thử đồ AI", exact: true }).click();
+  const downloading = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Tải ảnh bản phối", exact: true }).click();
+  const download = await downloading;
+  const png = readFileSync((await download.path())!);
+  const aiPixel = await page.evaluate(async src => {
+    const image = new Image(); image.src = src; await image.decode();
+    const canvas = document.createElement("canvas"); canvas.width = image.naturalWidth; canvas.height = image.naturalHeight;
+    const ctx = canvas.getContext("2d")!; ctx.drawImage(image, 0, 0);
+    return [...ctx.getImageData(2, 2, 1, 1).data];
+  }, `data:image/png;base64,${png.toString("base64")}`);
+  expect(aiPixel).toEqual([255, 255, 255, 255]);
+  expect((await readDraft(page)).snapshot.backgroundTheme).toBe("occasion");
 });
 
 test("canvas drag persists, undo restores it, and export includes garment image", async ({ page }) => {
@@ -969,6 +1164,105 @@ test("R08 records Canvas frame intervals and draft writes for one gesture", asyn
   expect(frames.frames).toBeGreaterThan(30);
 });
 
+test("background fade previews without rewriting the draft and commits one undo step per pointer gesture", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await mockApi(page);
+  await page.goto("/studio");
+  await page.getByText("Trang phục 0", { exact: true }).click();
+  await page.getByRole("button", { name: "Tết", exact: true }).click();
+  await expect(page.getByTestId("board-background")).toHaveAttribute("data-background-status", "ready");
+  const before = await readDraft(page);
+  await page.evaluate(key => {
+    let writes = 0;
+    const setItem = Storage.prototype.setItem;
+    Storage.prototype.setItem = function (name, value) {
+      if (name.startsWith(key)) writes++;
+      return setItem.call(this, name, value);
+    };
+    Object.defineProperty(window, "__fadeDraftWrites", { get: () => writes });
+  }, DRAFT_KEY);
+  const slider = page.getByRole("slider", { name: "Độ mờ ảnh nền" });
+  await slider.scrollIntoViewIfNeeded();
+  const box = (await slider.boundingBox())!;
+  await page.mouse.move(box.x + 10, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width * .8, box.y + box.height / 2, { steps: 40 });
+  expect(await readDraft(page)).toEqual(before);
+  expect(await page.evaluate(() => (window as any).__fadeDraftWrites)).toBe(0);
+  expect(await page.getByTestId("board-background").evaluate(node => node.style.getPropertyValue("--studio-background-fade"))).not.toBe("");
+  await page.mouse.up();
+  const value = Number(await slider.inputValue());
+  expect(value).toBeGreaterThan(50);
+  await expect.poll(async () => (await readDraft(page)).snapshot.backgroundFade).toBe(value);
+  expect(await page.evaluate(() => (window as any).__fadeDraftWrites)).toBeLessThanOrEqual(2);
+  await page.getByTitle("Hoàn tác (Ctrl+Z)").click();
+  await expect(slider).toHaveValue(String(before.snapshot.backgroundFade || 0));
+  await page.getByTitle("Làm lại (Ctrl+Y)").click();
+  await expect(slider).toHaveValue(String(value));
+  await page.reload();
+  await expect(slider).toHaveValue(String(value));
+  expect((await readDraft(page)).snapshot.items).toEqual(before.snapshot.items);
+});
+
+test("worker PNG pixels match the native fallback without changing the draft", async ({ page }) => {
+  await mockApi(page);
+  await loginForGeneration(page);
+  await page.addInitScript(() => {
+    const NativeWorker = Worker;
+    let workers = 0;
+    window.Worker = class extends NativeWorker {
+      constructor(url: string | URL, options?: WorkerOptions) { super(url, options); workers++; }
+    };
+    Object.defineProperty(window, "__pngWorkers", { get: () => workers });
+  });
+  await page.goto("/studio");
+  await page.getByText("Trang phục 0", { exact: true }).click();
+  const before = await readDraft(page);
+  const exportPixels = async () => {
+    await page.getByRole("button", { name: "Xuất ảnh", exact: true }).click();
+    await page.getByRole("button", { name: "Story / Reels (9:16)" }).click();
+    const preview = page.getByAltText("Bản phối xuất");
+    await expect(preview).toBeVisible();
+    const result = await preview.evaluate(async node => {
+      const image = node as HTMLImageElement;
+      await image.decode();
+      const canvas = document.createElement("canvas");
+      canvas.width = image.naturalWidth; canvas.height = image.naturalHeight;
+      const context = canvas.getContext("2d")!; context.drawImage(image, 0, 0);
+      const hash = await crypto.subtle.digest("SHA-256", context.getImageData(0, 0, canvas.width, canvas.height).data);
+      return { width: canvas.width, height: canvas.height, pixels: [...new Uint8Array(hash)] };
+    });
+    await page.getByRole("button", { name: "Đóng xuất ảnh", exact: true }).click();
+    return result;
+  };
+  const worker = await exportPixels();
+  expect(worker).toMatchObject({ width: 1400, height: 2488 });
+  expect(await page.evaluate(() => (window as any).__pngWorkers)).toBeGreaterThan(0);
+  await page.evaluate(() => { Object.defineProperty(window, "Worker", { value: undefined, configurable: true }); });
+  expect(await exportPixels()).toEqual(worker);
+  expect((await readDraft(page)).snapshot).toEqual(before.snapshot);
+  await expect(page.locator("#item-transform-outerwear")).not.toHaveAttribute("data-gesture-preview");
+});
+
+test("home loads the shared catalog only after navigating to a consumer and coalesces concurrent consumers", async ({ page }) => {
+  await mockApi(page);
+  const requests: string[] = [];
+  page.on("request", request => {
+    const path = new URL(request.url()).pathname;
+    if (["/api/catalog/items", "/api/catalog/garment-types", "/api/catalog/occasions", "/api/catalog/avatars"].includes(path)) {
+      requests.push(path);
+      expect(request.headers()["content-type"]).toBeUndefined();
+    }
+  });
+  await page.goto("/");
+  await page.locator("footer").scrollIntoViewIfNeeded();
+  await expect(page.locator("footer")).toBeVisible();
+  expect(requests).toEqual([]);
+  await page.locator('a[href="/studio"]').first().click();
+  await expect(page.getByText("Trang phục 0", { exact: true })).toBeVisible();
+  expect(requests.sort()).toEqual(["/api/catalog/avatars", "/api/catalog/garment-types", "/api/catalog/items", "/api/catalog/occasions"]);
+});
+
 test("draft history retains cultural settings and rejects malformed context", () => {
   const document = structuredClone(INITIAL_DOCUMENT);
   document.snapshot.culturalSettings = { dataset_version: "ds_test", ruleset_version: "rules_test", context: {
@@ -993,7 +1287,7 @@ test("empty draft restores all document settings and undo includes presentation"
   await page.getByRole("button", { name: "Tiếp tục bản nháp", exact: true }).click();
   await expect(page.locator("input").first()).toHaveValue("Bộ phối rỗng");
   expect((await readDraft(page)).snapshot.items).toEqual([]);
-  await page.getByRole("button", { name: "Remix Đương đại" }).click();
+  await page.getByRole("button", { name: "Remix · kết hợp hiện đại" }).click();
   await page.getByTitle("Hoàn tác (Ctrl+Z)").click();
   expect((await readDraft(page)).snapshot.styleMode).toBe("traditional");
   await page.reload();
@@ -1199,9 +1493,10 @@ test("styling questionnaire sends chosen needs and previews Gemini results befor
   await panel.getByRole("button", { name: "Gợi ý", exact: true }).click();
   await expect(panel.getByText("Nguồn: Gemini")).toBeVisible();
   expect((await readDraft(page))?.snapshot.items || []).toHaveLength(0);
+  expect((await readDraft(page)).snapshot.backgroundTheme).toBe("white");
   await panel.getByRole("button", { name: "Áp dụng gợi ý" }).click();
   await expect.poll(async () => (await readDraft(page))?.snapshot.items[0]?.itemId).toBe(TEST_GARMENT.itemId);
-  expect((await readDraft(page)).snapshot).toMatchObject({ occasionId: "ky_yeu", styleMode: "remix" });
+  expect((await readDraft(page)).snapshot).toMatchObject({ occasionId: "ky_yeu", styleMode: "remix", backgroundTheme: "occasion" });
   expect(calls).toBe(1);
 });
 
@@ -1238,6 +1533,9 @@ test("styling questionnaire fits phone widths and keeps selections separate from
   await page.setViewportSize({ width: 375, height: 812 });
   await page.goto("/studio");
   const panel = page.getByRole("region", { name: "Gợi ý phối đồ", exact: true });
+  // Hydration persists the initial account draft independently of questionnaire input.
+  // Capture the baseline after that write so a slow CI runner cannot compare with null.
+  await expect.poll(async () => (await readDraft(page))?.ownerId).toBe("generation-user");
   const before = await readDraft(page);
   await panel.getByLabel("Dịp sử dụng", { exact: true }).selectOption("ky_yeu");
   await panel.getByLabel("Phong cách phối đồ", { exact: true }).selectOption("remix");

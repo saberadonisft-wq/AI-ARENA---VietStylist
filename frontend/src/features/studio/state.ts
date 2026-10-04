@@ -1,4 +1,5 @@
 import type { OutfitSnapshot, SnapshotItem } from "@/lib/types/api";
+import { normalizeBackgroundFade } from "./backgrounds";
 
 export const DRAFT_KEY = "viet_stylist_current_draft";
 export interface StudioDocument { title: string; snapshot: OutfitSnapshot }
@@ -32,7 +33,7 @@ export const INITIAL_DOCUMENT: StudioDocument = {
   snapshot: {
     schemaVersion: 1, avatarId: "avatar_nam_chuan", poseId: "front_01",
     styleMode: "traditional", overlapDirection: "right_over_left",
-    lockedSlots: [], backgroundTheme: "white", aspectRatio: "9:16",
+    lockedSlots: [], backgroundTheme: "white", neutralBackgroundTheme: "white", backgroundFade: 0, aspectRatio: "9:16",
     items: [],
   },
 };
@@ -87,8 +88,11 @@ export function parseDraft(raw: string | null): StudioDraft | null {
         !["right_over_left", "left_over_right"].includes(snapshot.overlapDirection) ||
         typeof snapshot.avatarId !== "string" || typeof snapshot.poseId !== "string") return null;
     snapshot.lockedSlots = Array.isArray(snap.lockedSlots) ? snap.lockedSlots.filter((s: unknown) => typeof s === "string") : [];
-    snapshot.backgroundTheme = snap.backgroundTheme === "dopaper" ? "dopaper" : "white";
+    snapshot.backgroundTheme = ["white", "dopaper", "occasion"].includes(snap.backgroundTheme) ? snap.backgroundTheme : "white";
+    snapshot.neutralBackgroundTheme = snap.neutralBackgroundTheme === "dopaper" ||
+      (snap.neutralBackgroundTheme == null && snap.backgroundTheme === "dopaper") ? "dopaper" : "white";
     snapshot.aspectRatio = snap.aspectRatio === "1:1" ? "1:1" : "9:16";
+    snapshot.backgroundFade = normalizeBackgroundFade(snap.backgroundFade);
     const legacyCreateKey = typeof data.pendingSaveKey === "string" && /^[A-Za-z0-9._:-]{8,128}$/.test(data.pendingSaveKey)
       ? data.pendingSaveKey
       : undefined;

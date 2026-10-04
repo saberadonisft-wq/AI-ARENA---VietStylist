@@ -21,6 +21,63 @@ _processing = threading.Lock()
 _session = None
 _VERSION = "isnet-v1"
 _RECOLOR_VERSION = "automatic-fabric-recolor-v2"
+_thumbnail_processing = threading.BoundedSemaphore(2)
+_THUMBNAIL_SIZES = (112, 224, 320, 640)
+
+
+def get_catalog_thumbnail(item_id: str, requested_size: int = 224) -> bytes:
+    # Only known public media can be read: never fetch metadata URLs supplied by
+    # a caller. Check publication even when the derivative is already cached.
+    _, media, source_key = _published_studio_source(item_id)
+    size = next((value for value in _THUMBNAIL_SIZES if value >= requested_size), 640)
+    directory = Path(settings.LOCAL_MEDIA_DIR) / "catalog-thumbnails"
+    target = directory / f"{source_key}-lossless-v1-{size}.webp"
+    try:
+        try:
+            return target.read_bytes()
+        except FileNotFoundError:
+            pass
+        if not _thumbnail_processing.acquire(timeout=8):
+            raise AppError("THUMBNAIL_BUSY", "Đang chuẩn bị ảnh thu nhỏ. Vui lòng thử lại.", 503)
+        try:
+            try:
+                return target.read_bytes()
+            except FileNotFoundError:
+                pass
+            data = r2_client.read_object(media["bucket"], media["object_key"], settings.MEDIA_IMAGE_MAX_BYTES)
+            with Image.open(io.BytesIO(data)) as source:
+                if source.width * source.height > settings.MEDIA_MAX_PIXELS:
+                    raise AppError("IMAGE_TOO_LARGE", "Ảnh vượt giới hạn xử lý.", 413)
+                image = ImageOps.exif_transpose(source).convert("RGBA")
+            image.thumbnail((size, size), Image.Resampling.LANCZOS)
+            output = io.BytesIO()
+            image.save(output, format="WEBP", lossless=True, exact=True, method=4)
+            result = output.getvalue()
+            directory.mkdir(parents=True, exist_ok=True)
+            # Independent bounded cache: thumbnails cannot evict Studio cutouts.
+            cached = sorted(directory.glob("*.webp"), key=lambda path: path.stat().st_mtime)
+            for obsolete in cached[:-255]:
+                try:
+                    obsolete.unlink(missing_ok=True)
+                except (PermissionError, FileNotFoundError):
+                    pass
+            with tempfile.NamedTemporaryFile(dir=directory, delete=False) as temp:
+                temp.write(result)
+                temporary = Path(temp.name)
+            try:
+                temporary.replace(target)
+            finally:
+                temporary.unlink(missing_ok=True)
+            return result
+        finally:
+            _thumbnail_processing.release()
+    except AppError:
+        raise
+    except (UnidentifiedImageError, Image.DecompressionBombError) as exc:
+        raise AppError("INVALID_IMAGE", "Ảnh trang phục không hợp lệ.", 422) from exc
+    except Exception as exc:
+        logger.warning("Catalog thumbnail failed: %s", type(exc).__name__)
+        raise AppError("THUMBNAIL_UNAVAILABLE", "Chưa tải được ảnh thu nhỏ.", 503) from exc
 
 
 def make_cutout(data: bytes) -> bytes:

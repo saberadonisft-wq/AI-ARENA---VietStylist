@@ -1,9 +1,9 @@
 import json
-import json
 from typing import List, Optional, Dict, Any
 from app.modules.catalog.repository import CatalogRepository
 from app.modules.catalog.studio_images import _RECOLOR_VERSION
 from app.core.errors import AppError
+from app.core.database import get_db_connection
 
 
 class CatalogService:
@@ -52,23 +52,19 @@ class CatalogService:
         limit: int = 50,
         offset: int = 0,
     ) -> List[Dict[str, Any]]:
-        items = CatalogRepository.get_items(
-            garment_type_id=garment_type_id,
-            slot=slot,
-            gender=gender,
-            occasion_id=occasion_id,
-            search=search,
-            limit=limit,
-            offset=offset,
-        )
-
-        # Batch fetch variants and layers to eliminate N+1 queries (O01)
-        if not items:
-            return []
-
-        item_ids = [item["id"] for item in items]
-        all_variants = CatalogRepository.get_variants_by_item_ids(item_ids)
-        all_layers = CatalogRepository.get_layers_by_item_ids(item_ids)
+        # One pool checkout also avoids repeating the remote connection check
+        # for each of the three batched reads.
+        with get_db_connection() as conn:
+            items = CatalogRepository.get_items(
+                garment_type_id=garment_type_id, slot=slot, gender=gender,
+                occasion_id=occasion_id, search=search, limit=limit, offset=offset,
+                conn=conn,
+            )
+            if not items:
+                return []
+            item_ids = [item["id"] for item in items]
+            all_variants = CatalogRepository.get_variants_by_item_ids(item_ids, conn=conn)
+            all_layers = CatalogRepository.get_layers_by_item_ids(item_ids, conn=conn)
 
         variants_by_item: Dict[str, List[Dict[str, Any]]] = {}
         for v in all_variants:

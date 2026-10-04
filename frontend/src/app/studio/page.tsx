@@ -19,19 +19,25 @@ import {
 import { api } from "@/lib/api/client";
 import { useStudioDocument } from "@/features/studio/useStudioDocument";
 import { mergeUnlockedItems } from "@/features/studio/state";
+import { occasionBackgroundPatch, neutralBackground, type BackgroundTheme } from "@/features/studio/backgrounds";
 import { useAuth } from "@/lib/auth/context";
 import { useCatalog } from "@/lib/catalog/CatalogProvider";
 import Canvas2D, { Canvas2DHandle } from "@/features/studio/Canvas2D";
+import BackgroundFadeControl from "@/features/studio/BackgroundFadeControl";
 import SwatchPicker from "@/features/studio/SwatchPicker";
 import CulturalCheckBadge from "@/features/studio/CulturalCheckBadge";
 const StudioComposerPanel = dynamic(() => import("@/features/composer/components/StudioComposerPanel"), { ssr: false });
 import WeatherWidget from "@/features/studio/WeatherWidget";
 import ColorAnalysisPanel from "@/features/studio/ColorAnalysisPanel";
-import CompareModal from "@/features/studio/CompareModal";
-import ExportModal from "@/features/studio/ExportModal";
-import StarterOutfitModal from "@/features/studio/StarterOutfitModal";
+const CompareModal = dynamic(() => import("@/features/studio/CompareModal"), { ssr: false });
+const ExportModal = dynamic(() => import("@/features/studio/ExportModal"), { ssr: false });
+const StarterOutfitModal = dynamic(() => import("@/features/studio/StarterOutfitModal"), { ssr: false });
 import StylingQuestionnaire, { INITIAL_STYLING_PREFERENCES, type StylingPreferences } from "@/features/studio/StylingQuestionnaire";
 import GeminiTryOnModal from "@/features/studio/GeminiTryOnModal";
+import Modal from "@/components/ui/Modal";
+import { useConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { eraLabel, slotLabel, itemLabel, STYLE_LABELS } from "@/lib/catalog/display";
+import { catalogImageUrl, catalogThumbnailUrl } from "@/lib/catalog/images";
 import AuthModal from "@/components/AuthModal";
 import ToastContainer, { type ToastItem } from "@/components/ui/Toast";
 import {
@@ -85,6 +91,7 @@ async function resolveColorPatch(item: CatalogItem, colorHex: string, variantId?
 }
 
 export default function StudioPage() {
+  const { confirm: confirmWeatherReplacement, dialog: weatherReplacementDialog } = useConfirmDialog();
   const { user, isLoggedIn, isAdmin, isReady: authReady } = useAuth();
   const studio = useStudioDocument(user?.id, authReady, isAdmin);
   const document = studio.history.present;
@@ -119,7 +126,9 @@ export default function StudioPage() {
   }, [equippedItems, catalogItems, catalogItemsError, isInitialLoading]);
   const lockedSlots = useMemo(() => new Set(snapshot.lockedSlots || []), [snapshot.lockedSlots]);
   const setOutfitTitle = (title: string) => studio.dispatch({ type: "commit", update: doc => ({ ...doc, title }) });
-  const setSelectedOccasion = (occasionId: string) => studio.updateSnapshot({ occasionId });
+  const setSelectedOccasion = (occasionId?: string) => studio.dispatch({ type: "commit", update: doc => ({
+    ...doc, snapshot: { ...doc.snapshot, ...occasionBackgroundPatch(doc.snapshot, occasionId) },
+  }) });
   const setStyleMode = (styleMode: OutfitSnapshot["styleMode"]) => studio.updateSnapshot({ styleMode });
   const setOverlapDirection = (overlapDirection: OutfitSnapshot["overlapDirection"]) => studio.updateSnapshot({ overlapDirection });
   const setEquippedItems = (items: SnapshotItem[]) => studio.updateSnapshot({ items });
@@ -190,7 +199,9 @@ export default function StudioPage() {
   const setDisplayRatio = (aspectRatio: "1:1" | "9:16") => studio.updateSnapshot({ aspectRatio });
 
   const canvasBackgroundTheme = snapshot.backgroundTheme || "white";
-  const setCanvasBackgroundTheme = (backgroundTheme: "white" | "dopaper") => studio.updateSnapshot({ backgroundTheme });
+  const setCanvasBackgroundTheme = (backgroundTheme: BackgroundTheme) => studio.updateSnapshot({
+    backgroundTheme, neutralBackgroundTheme: backgroundTheme === "occasion" ? neutralBackground(snapshot) : backgroundTheme,
+  });
 
   useEffect(() => {
     let active = true;
@@ -376,7 +387,8 @@ export default function StudioPage() {
   // Lắng nghe phím tắt: Ctrl+Z, Ctrl+Y, Esc, Phím số 1-6 đổi slot
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if (e.defaultPrevented || window.document.querySelector('dialog[open], [role="dialog"][aria-modal="true"], [role="alertdialog"]')) return;
+      if (e.target instanceof HTMLElement && e.target.closest('input, textarea, select, [contenteditable="true"], [role="combobox"]')) return;
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
         e.preventDefault();
         if (e.shiftKey) handleRedo();
@@ -500,7 +512,7 @@ export default function StudioPage() {
     setSelectedGarmentType(garmentTypes.some(type => type.id === starter.garment_type_id) ? starter.garment_type_id : "all");
     const started = studio.startNewDocument({
       title: starter.title,
-      snapshot: { ...snapshot, occasionId, items: mergeUnlockedItems(snapshot.items, newItems, snapshot.lockedSlots || []) },
+      snapshot: { ...snapshot, ...occasionBackgroundPatch(snapshot, occasionId), items: mergeUnlockedItems(snapshot.items, newItems, snapshot.lockedSlots || []) },
     });
     if (!started) {
       setActionNotice("Chưa thể mở mẫu phối khi bản nháp chưa sẵn sàng. Nội dung hiện tại vẫn được giữ.");
@@ -620,7 +632,7 @@ export default function StudioPage() {
         return;
       }
       studio.dispatch({ type: "commit", update: doc => ({ ...doc, title: recommendation.title,
-        snapshot: { ...doc.snapshot, occasionId: recommendation.occasionId, styleMode: recommendation.styleMode,
+        snapshot: { ...doc.snapshot, ...occasionBackgroundPatch(doc.snapshot, recommendation.occasionId), styleMode: recommendation.styleMode,
           items: mergeUnlockedItems(doc.snapshot.items, available, doc.snapshot.lockedSlots || []) } }) });
       setActionNotice(`Đã áp dụng gợi ý từ ${recommendation.source === "gemini" ? "Gemini" : "bộ quy tắc"}; các vị trí khóa được giữ nguyên. Màu chỉ đổi khi ảnh vượt kiểm tra an toàn.`);
       setPendingRecommendation(null);
@@ -659,10 +671,10 @@ export default function StudioPage() {
     });
   }, [catalogItems, selectedGarmentType, activeSlot]);
 
-  const handleWeatherSuggestion = (accessories: string[]) => {
+  const handleWeatherSuggestion = async (accessories: string[]) => {
     const normalize = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d").toLowerCase().replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
     const requested = accessories.map(normalize).filter(value => value.length > 2);
-    const candidates = catalogItems.filter(item => ["accessory_front", "accessory_back"].includes(item.slot) && item.is_published);
+    const candidates = catalogItems.filter(item => ["accessory_front", "accessory_back", "headwear", "footwear"].includes(item.slot) && item.is_published);
     const matches = candidates.filter(item => {
       const name = normalize(item.name);
       return requested.some(suggestion => name.includes(suggestion) || suggestion.includes(name));
@@ -671,16 +683,29 @@ export default function StudioPage() {
     if (!availableMatches.length) {
       const lockedSlotsWithMatches = [...new Set(matches.map(item => item.slot).filter(slot => lockedSlots.has(slot)))];
       setActionNotice(lockedSlotsWithMatches.length
-        ? `Có phụ kiện phù hợp nhưng ${lockedSlotsWithMatches.join(", ")} đang khóa. Hãy mở khóa vị trí rồi thử lại.`
+        ? `Có phụ kiện phù hợp nhưng ${lockedSlotsWithMatches.map(slotLabel).join(", ")} đang khóa. Hãy mở khóa vị trí rồi thử lại.`
         : accessories.length ? `Danh mục đang xuất bản chưa có phụ kiện khớp gợi ý: ${accessories.join(", ")}.` : "Thời tiết hiện không gợi ý thêm phụ kiện.");
       return;
     }
     const bySlot = new Map(availableMatches.map(item => [item.slot, item]));
+    const replacements = equippedItems.filter(item => bySlot.has(item.slot) && bySlot.get(item.slot)?.id !== item.itemId);
+    if (replacements.length && !await confirmWeatherReplacement({
+      title: "Thay phụ kiện theo thời tiết?",
+      description: `Các vị trí ${replacements.map(item => slotLabel(item.slot)).join(", ")} đang có trang phục. Bạn có muốn thay bằng phụ kiện gợi ý?`,
+      confirmLabel: "Thay phụ kiện", cancelLabel: "Giữ bộ phối",
+    })) return;
     const additions = [...bySlot.values()].map(item => {
       const variant = item.variants.find(candidate => candidate.is_default) || item.variants[0];
       return { slot: item.slot, itemId: item.id, variantId: variant?.id, assetVersion: 1, colorHex: variant?.hex_color };
     });
-    studio.updateSnapshot({ items: [...equippedItems.filter(item => lockedSlots.has(item.slot) || !bySlot.has(item.slot)), ...additions] });
+    studio.dispatch({ type: "commit", update: doc => {
+      // A confirmation must not overwrite edits made while it was open.
+      if (JSON.stringify(doc.snapshot.items) !== JSON.stringify(equippedItems) ||
+          JSON.stringify(doc.snapshot.lockedSlots || []) !== JSON.stringify(snapshot.lockedSlots || [])) return doc;
+      const items = [...doc.snapshot.items.filter(item => !bySlot.has(item.slot)), ...additions.map(item =>
+        doc.snapshot.items.find(current => current.slot === item.slot && current.itemId === item.itemId) || item)];
+      return { ...doc, snapshot: { ...doc.snapshot, items } };
+    } });
     setActionNotice(`Đã thêm ${additions.map(item => catalogItems.find(catalog => catalog.id === item.itemId)?.name).filter(Boolean).join(", ")}.`);
   };
 
@@ -729,8 +754,8 @@ export default function StudioPage() {
         else if (id === "save-success") studio.dismissMessage();
         else if (id === "recovery") setDismissedRecoveryList(recoveryListKey);
       }} />
-      {studio.accountDraftChoice && <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 p-4" role="dialog" aria-modal="true" aria-labelledby="account-draft-choice-title" aria-describedby="account-draft-choice-description">
-        <section className="w-full max-w-lg space-y-4 rounded-2xl bg-white p-5 shadow-2xl">
+      {studio.accountDraftChoice && <Modal isOpen onClose={() => {}} closeDisabled label="Chọn bản phối cần tiếp tục">
+        <section className="w-full max-w-lg max-h-full overflow-y-auto space-y-4 rounded-2xl bg-white p-5 shadow-2xl">
           <div>
             <h2 id="account-draft-choice-title" className="font-serif text-xl font-bold text-stone-900">Chọn bản phối cần tiếp tục</h2>
             <p id="account-draft-choice-description" className="mt-2 text-sm leading-relaxed text-stone-600">Thiết bị và tài khoản đều có nháp riêng. Chọn một bản trước khi tiếp tục thao tác; bản còn lại sẽ được giữ trong mục khôi phục trên thiết bị.</p>
@@ -747,8 +772,8 @@ export default function StudioPage() {
           </div>
           {studio.error && <p role="alert" className="text-sm text-red-700">{studio.error}</p>}
         </section>
-      </div>}
-      {requestedCatalogItem && <div role="status" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-heritage-red/20 bg-white p-4 text-sm"><span>Đã mở <strong>{requestedCatalogItem.name}</strong>. Thêm món này vào vị trí {requestedCatalogItem.slot} trong bản phối?</span><div className="flex gap-2"><button type="button" disabled={lockedSlots.has(requestedCatalogItem.slot)} onClick={addRequestedCatalogItem} className="rounded-lg bg-heritage-red px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">{lockedSlots.has(requestedCatalogItem.slot) ? "Mở khóa vị trí trước" : "Thêm vào bản phối"}</button><button type="button" onClick={() => setRequestedCatalogItemId(null)} className="rounded-lg border border-stone-300 px-3 py-2 text-xs font-semibold">Để sau</button></div></div>}
+      </Modal>}
+      {requestedCatalogItem && <div role="status" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-heritage-red/20 bg-white p-4 text-sm"><span>Đã mở <strong>{requestedCatalogItem.name}</strong>. Thêm món này vào vị trí {slotLabel(requestedCatalogItem.slot)} trong bản phối?</span><div className="flex gap-2"><button type="button" disabled={lockedSlots.has(requestedCatalogItem.slot)} onClick={addRequestedCatalogItem} className="rounded-lg bg-heritage-red px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">{lockedSlots.has(requestedCatalogItem.slot) ? "Mở khóa vị trí trước" : "Thêm vào bản phối"}</button><button type="button" onClick={() => setRequestedCatalogItemId(null)} className="rounded-lg border border-stone-300 px-3 py-2 text-xs font-semibold">Để sau</button></div></div>}
       {studio.isManaging && <div role="status" className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">Bạn đang chỉnh sửa bộ phối với quyền quản trị. Khi lưu, thay đổi được áp dụng vào bộ phối của chủ sở hữu.</div>}
       {studio.error && <div role="alert" aria-label="Lưu bộ phối" className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm">
         <p>{studio.error}</p>
@@ -776,28 +801,12 @@ export default function StudioPage() {
             className="studio-title min-w-0 w-full max-w-full sm:w-48 font-serif font-bold text-xl text-stone-900 bg-transparent border-b border-transparent hover:border-stone-300 focus:border-heritage-red focus:outline-none px-1 py-0.5 tracking-tight"
           />
 
-          {/* Segmented control: Truyền thống vs Remix */}
-          <div className="flex max-w-full flex-wrap items-center bg-stone-100 p-1 rounded-xl border border-stone-200 text-xs font-semibold">
-            <button
-              onClick={() => setStyleMode("traditional")}
-              className={`px-3 py-1 rounded-lg transition-all ${
-                styleMode === "traditional"
-                  ? "bg-white text-stone-900 shadow-xs"
-                  : "text-stone-500 hover:text-stone-800"
-              }`}
-            >
-              Cổ phong Chuẩn mực
-            </button>
-            <button
-              onClick={() => setStyleMode("remix")}
-              className={`px-3 py-1 rounded-lg transition-all ${
-                styleMode === "remix"
-                  ? "bg-heritage-red text-white shadow-xs"
-                  : "text-stone-500 hover:text-stone-800"
-              }`}
-            >
-              Remix Đương đại
-            </button>
+          <div role="group" aria-label="Phong cách bản phối" className="flex max-w-full flex-wrap items-center gap-1 bg-stone-100 p-1 rounded-xl border border-stone-200 text-xs font-semibold">
+            {Object.entries(STYLE_LABELS).map(([mode, label]) => <button key={mode} type="button"
+              aria-pressed={styleMode === mode} onClick={() => setStyleMode(mode as OutfitSnapshot["styleMode"])}
+              className={`px-3 py-1 rounded-lg transition-all ${styleMode === mode ? "bg-white text-stone-900 shadow-xs" : "text-stone-500 hover:text-stone-800"}`}>
+              {label}
+            </button>)}
           </div>
         </div>
 
@@ -864,6 +873,10 @@ export default function StudioPage() {
             <span>{pinnedSnapshotA ? "So sánh hai bản" : "Lưu bản A để so sánh"}</span>
           </button>
 
+          {pinnedSnapshotA && <>
+            <button type="button" onClick={() => { setPinnedSnapshotA(structuredClone(snapshot)); setActionNotice("Đã ghim bản hiện tại làm phương án A."); }} className="min-h-11 rounded-lg border border-stone-300 bg-white px-3 text-xs font-semibold">Ghim lại bản A</button>
+            <button type="button" onClick={() => { setPinnedSnapshotA(null); setIsCompareOpen(false); }} className="min-h-11 rounded-lg border border-stone-300 bg-white px-3 text-xs font-semibold">Bỏ ghim bản A</button>
+          </>}
           {/* Thử đồ AI */}
           <button
             onClick={() => requestAccountAction("try-on")}
@@ -917,7 +930,7 @@ export default function StudioPage() {
       {unavailableSnapshotItems.length > 0 && <div role="alert" className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
         <p className="font-semibold">Một số món trong bản phối không còn được xuất bản. Bản nháp vẫn giữ nguyên các món đó.</p>
         <ul className="mt-2 space-y-2">{unavailableSnapshotItems.map(item => <li key={`${item.slot}:${item.itemId}`} className="flex flex-wrap items-center justify-between gap-2">
-          <span>{catalogItems.find(candidate => candidate.id === item.itemId)?.name || item.itemId} · vị trí {item.slot}</span>
+          <span>{itemLabel(item.itemId, catalogItems)} · vị trí {slotLabel(item.slot)}</span>
           <button type="button" onClick={() => { setActiveSlot(item.slot); setSelectedGarmentType("all"); setMobilePanel("catalog"); }} className="rounded-lg border border-amber-400 bg-white px-3 py-1.5 text-xs font-semibold text-amber-950">Chọn món thay thế</button>
         </li>)}</ul>
       </div>}
@@ -935,7 +948,7 @@ export default function StudioPage() {
               <span className="text-xs font-bold text-stone-500 uppercase tracking-wider">
                 Hoàn cảnh sử dụng
               </span>
-              {selectedOccasion && <button type="button" onClick={() => studio.updateSnapshot({ occasionId: undefined })} className="text-xs text-stone-500 underline hover:text-heritage-red">Bỏ chọn hoàn cảnh</button>}
+              {selectedOccasion && <button type="button" onClick={() => setSelectedOccasion(undefined)} className="text-xs text-stone-500 underline hover:text-heritage-red">Bỏ chọn hoàn cảnh</button>}
             </div>
             {isInitialLoading ? (
               <OccasionGridSkeleton />
@@ -1007,33 +1020,17 @@ export default function StudioPage() {
                 const isLocked = lockedSlots.has(s.slot);
                 const isSelected = activeSlot === s.slot;
                 return (
-                  <button
-                    key={s.slot}
-                    type="button"
-                    onClick={() => setActiveSlot(s.slot)}
-                    className={`group relative min-h-11 px-2.5 py-2 rounded-xl text-xs font-semibold text-center transition-all border select-none ${
-                      isSelected
-                        ? "bg-stone-900 text-white border-stone-900 shadow-xs"
-                        : "bg-stone-50 text-stone-700 border-stone-200/80 hover:bg-stone-100 hover:border-stone-300"
-                    }`}
-                  >
-                    <span className="truncate block">{s.label}</span>
-                    {/* Nút khóa slot tinh tế ở góc, chỉ hiện rõ khi đã khóa hoặc khi rê chuột */}
-                    <span
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        toggleLockSlot(s.slot);
-                      }}
-                      className={`absolute top-1 right-1 hidden lg:block p-0.5 rounded cursor-pointer transition-all ${
-                        isLocked
-                          ? "text-amber-500 opacity-100 bg-amber-50 rounded-full"
-                          : "opacity-0 group-hover:opacity-40 hover:!opacity-100 text-current"
-                      }`}
-                      title={isLocked ? "Đã khóa - Giữ nguyên khi tạo ngẫu nhiên" : "Nhấn để khóa món này"}
-                    >
-                      {isLocked ? <Lock className="w-2.5 h-2.5" /> : <Unlock className="w-2.5 h-2.5" />}
-                    </span>
-                  </button>
+                  <div key={s.slot} className="flex min-w-0 items-stretch gap-0.5">
+                    <button type="button" aria-pressed={isSelected} onClick={() => setActiveSlot(s.slot)}
+                      className={`min-h-11 min-w-0 flex-1 rounded-xl border px-1 py-2 text-xs font-semibold ${isSelected ? "bg-stone-900 text-white border-stone-900" : "bg-stone-50 text-stone-700 border-stone-200 hover:bg-stone-100"}`}>
+                      {s.label}
+                    </button>
+                    <button type="button" aria-label={`${isLocked ? "Mở khóa" : "Khóa"} vị trí ${s.label.toLowerCase()}`}
+                      aria-pressed={isLocked} onClick={() => toggleLockSlot(s.slot)}
+                      className={`flex min-h-11 min-w-8 shrink-0 items-center justify-center rounded-lg border ${isLocked ? "border-amber-300 bg-amber-50 text-amber-800" : "border-stone-200 text-stone-500 hover:bg-stone-100"}`}>
+                      {isLocked ? <Lock aria-hidden="true" className="h-3.5 w-3.5" /> : <Unlock aria-hidden="true" className="h-3.5 w-3.5" />}
+                    </button>
+                  </div>
                 );
               })}
             </div>
@@ -1108,9 +1105,17 @@ export default function StudioPage() {
                     >
                       {/* Thumbnail ảnh minh họa thật hoặc SVG */}
                       <div className="w-14 h-14 rounded-lg bg-[#FAF8F5] border border-stone-200/80 flex items-center justify-center overflow-hidden shrink-0 relative">
-                        {item.metadata?.real_image_url ? (
+                        {catalogImageUrl(item) ? (
                           <img
-                            src={item.metadata.real_image_url}
+                            src={catalogThumbnailUrl(item, 112)}
+                            srcSet={item.metadata?.catalog_media_id ? `${catalogThumbnailUrl(item, 112)} 1x, ${catalogThumbnailUrl(item, 224)} 2x` : undefined}
+                            onError={event => {
+                              const original = catalogImageUrl(item);
+                              if (original && event.currentTarget.src !== new URL(original, window.location.href).href) {
+                                event.currentTarget.removeAttribute("srcset");
+                                event.currentTarget.src = original;
+                              }
+                            }}
                             alt={item.name}
                             loading="lazy"
                             decoding="async"
@@ -1125,9 +1130,9 @@ export default function StudioPage() {
                         ) : (
                           <div className="text-[10px] text-stone-400 text-center font-serif">Cổ phục</div>
                         )}
-                        {item.metadata?.real_image_url && (
+                        {catalogImageUrl(item) && (
                           <span className="absolute bottom-0 right-0 bg-heritage-red text-[8px] font-bold text-white px-1 rounded-tl">
-                            Ảnh thật
+                            Ảnh trang phục
                           </span>
                         )}
                       </div>
@@ -1142,7 +1147,7 @@ export default function StudioPage() {
                           </span>
                         )}
                         <div className="flex items-center space-x-2 text-xs text-stone-500">
-                          <span className="line-clamp-2">Thời {item.era || "Nguyễn"}</span>
+                          <span className="line-clamp-2">{eraLabel(item.era)}</span>
                           {item.variants.length > 0 && (
                             <div className="flex items-center space-x-1">
                               <span>•</span>
@@ -1190,6 +1195,7 @@ export default function StudioPage() {
               {/* Tỉ lệ khung hình */}
               <div className="flex items-center space-x-1 text-xs">
                 <button
+                  aria-pressed={displayRatio === "9:16"}
                   onClick={() => setDisplayRatio("9:16")}
                   className={`min-h-11 min-w-11 px-2.5 py-1 rounded-lg font-mono font-semibold text-xs transition-all ${
                     displayRatio === "9:16" ? "bg-stone-900 text-white shadow-xs" : "bg-stone-100 text-stone-600 hover:bg-stone-200"
@@ -1199,6 +1205,7 @@ export default function StudioPage() {
                   9:16
                 </button>
                 <button
+                  aria-pressed={displayRatio === "1:1"}
                   onClick={() => setDisplayRatio("1:1")}
                   className={`min-h-11 min-w-11 px-2.5 py-1 rounded-lg font-mono font-semibold text-xs transition-all ${
                     displayRatio === "1:1" ? "bg-stone-900 text-white shadow-xs" : "bg-stone-100 text-stone-600 hover:bg-stone-200"
@@ -1212,9 +1219,16 @@ export default function StudioPage() {
 
             {/* Tùy chọn nền & Nút đặt lại vị trí */}
             <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-stone-100 text-xs text-stone-500">
-              <div className="flex items-center space-x-1.5">
+              <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Nền bảng phối">
                 <span className="font-medium text-stone-600">Nền:</span>
+                <button type="button" onClick={() => setCanvasBackgroundTheme("occasion")}
+                  aria-pressed={canvasBackgroundTheme === "occasion"}
+                  title={selectedOccasion ? "Dùng nền của hoàn cảnh đã chọn" : "Chọn hoàn cảnh để hiện nền tương ứng"}
+                  className={`min-h-11 px-2.5 py-1 rounded-md text-xs font-medium border transition-colors ${canvasBackgroundTheme === "occasion" ? "bg-heritage-red text-white border-heritage-red" : "bg-white text-stone-700 border-stone-200"}`}>
+                  Theo hoàn cảnh
+                </button>
                 <button
+                  aria-pressed={canvasBackgroundTheme === "white"}
                   onClick={() => setCanvasBackgroundTheme("white")}
                   className={`min-h-11 px-2.5 py-1 rounded-md text-xs font-medium border transition-colors ${
                     canvasBackgroundTheme === "white"
@@ -1226,6 +1240,7 @@ export default function StudioPage() {
                 </button>
                 <button
                   onClick={() => setCanvasBackgroundTheme("dopaper")}
+                  aria-pressed={canvasBackgroundTheme === "dopaper"}
                   className={`min-h-11 px-2.5 py-1 rounded-md text-xs font-medium border transition-colors ${
                     canvasBackgroundTheme === "dopaper"
                       ? "bg-heritage-red text-white border-heritage-red shadow-xs"
@@ -1248,6 +1263,12 @@ export default function StudioPage() {
             </div>
           </div>
 
+          {canvasBackgroundTheme === "occasion" && (
+            <BackgroundFadeControl value={snapshot.backgroundFade ?? 0}
+              onPreview={value => canvasRef.current?.previewBackgroundFade(value)}
+              onCommit={backgroundFade => studio.updateSnapshot({ backgroundFade })} />
+          )}
+
           <Canvas2D
             ref={canvasRef}
             avatar={currentAvatar}
@@ -1257,6 +1278,9 @@ export default function StudioPage() {
             aspectRatio={displayRatio}
             viewMode="flatlay"
             backgroundTheme={canvasBackgroundTheme}
+            neutralBackgroundTheme={neutralBackground(snapshot)}
+            backgroundFade={snapshot.backgroundFade ?? 0}
+            occasionId={selectedOccasion}
             selectedSlot={activeSlot}
             onSelectItem={(slot) => setActiveSlot(slot)}
             onRemoveItem={(slot) => {
@@ -1298,7 +1322,7 @@ export default function StudioPage() {
             {pendingRecommendation && <div className="space-y-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs">
               <div><strong>{pendingRecommendation.title}</strong><span className="ml-2 text-stone-500">Nguồn: {pendingRecommendation.source === "gemini" ? "Gemini" : "bộ quy tắc"}</span></div>
               {pendingRecommendation.explanation && <p className="text-stone-700">{pendingRecommendation.explanation}</p>}
-              <ul className="space-y-1 text-stone-700">{pendingRecommendation.items.map(item => <li key={item.slot}>{item.slot}: {catalogItems.find(candidate => candidate.id === item.itemId)?.name || "Trang phục trong danh mục"}</li>)}</ul>
+              <ul className="space-y-1 text-stone-700">{pendingRecommendation.items.map(item => <li key={item.slot}>{slotLabel(item.slot)}: {itemLabel(item.itemId, catalogItems)}</li>)}</ul>
               <div className="flex gap-2"><button type="button" disabled={isApplyingRecommendation} onClick={applyPendingRecommendation} className="rounded-lg bg-heritage-red px-3 py-1.5 font-semibold text-white">{isApplyingRecommendation ? "Đang áp dụng…" : "Áp dụng gợi ý"}</button><button type="button" disabled={isApplyingRecommendation} onClick={() => setPendingRecommendation(null)} className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 font-semibold">Bỏ qua</button></div>
             </div>}
           </section>
@@ -1344,7 +1368,7 @@ export default function StudioPage() {
             <div role="status" className="rounded-2xl border border-dashed border-stone-300 bg-white p-4 text-sm text-stone-600">
               {activeCatalogItem
                 ? "Món này chưa có biến thể màu để chỉnh."
-                : `Chọn một món ở mục “Chọn trang phục” để xem thuộc tính của vị trí ${activeSlot}.`}
+                : `Chọn một món ở mục “Chọn trang phục” để xem thuộc tính của vị trí ${slotLabel(activeSlot)}.`}
             </div>
           )}</div>
 
@@ -1415,14 +1439,14 @@ export default function StudioPage() {
       </div>
 
       {/* MODALS */}
-      <StarterOutfitModal
+      {isStarterOpen && <StarterOutfitModal
         isOpen={isStarterOpen}
         onClose={() => setIsStarterOpen(false)}
         onSelectStarter={handleLoadStarter}
-      />
+      />}
 
-      {pendingStarter && <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4" role="dialog" aria-modal="true" aria-labelledby="starter-replace-title">
-        <div className="w-full max-w-md space-y-4 rounded-2xl border border-stone-200 bg-white p-6 shadow-2xl">
+      {pendingStarter && <Modal isOpen onClose={() => setPendingStarter(null)} label="Mở mẫu phối này?">
+        <div className="w-full max-w-md max-h-full overflow-y-auto space-y-4 rounded-2xl border border-stone-200 bg-white p-6 shadow-2xl">
           <h2 id="starter-replace-title" className="font-serif text-lg font-bold text-stone-900">Mở mẫu phối này?</h2>
           <p className="text-sm leading-relaxed text-stone-600">Bản phối chưa lưu hiện tại sẽ được giữ trong mục khôi phục trên thiết bị này. Bạn có thể tiếp tục bản hiện tại hoặc mở mẫu <strong>{pendingStarter.title}</strong>.</p>
           <div className="flex flex-wrap justify-end gap-2">
@@ -1430,24 +1454,25 @@ export default function StudioPage() {
             <button type="button" onClick={() => applyStarter(pendingStarter)} className="rounded-lg bg-heritage-red px-4 py-2 text-sm font-semibold text-white">Mở mẫu phối</button>
           </div>
         </div>
-      </div>}
+      </Modal>}
 
-      {pendingCatalogReplacement && <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4" role="dialog" aria-modal="true" aria-labelledby="catalog-replace-title">
-        <div className="w-full max-w-md space-y-4 rounded-2xl border border-stone-200 bg-white p-6 shadow-2xl">
+      {pendingCatalogReplacement && <Modal isOpen onClose={() => setPendingCatalogReplacement(null)} label="Thay món đang có?">
+        <div className="w-full max-w-md max-h-full overflow-y-auto space-y-4 rounded-2xl border border-stone-200 bg-white p-6 shadow-2xl">
           <h2 id="catalog-replace-title" className="font-serif text-lg font-bold text-stone-900">Thay món đang có?</h2>
-          <p className="text-sm leading-relaxed text-stone-600">Vị trí {pendingCatalogReplacement.slot} đang có trang phục khác. Nếu tiếp tục, bản hiện tại sẽ được giữ trong mục khôi phục trên thiết bị.</p>
+          <p className="text-sm leading-relaxed text-stone-600">Vị trí {slotLabel(pendingCatalogReplacement.slot)} đang có trang phục khác. Nếu tiếp tục, bản hiện tại sẽ được giữ trong mục khôi phục trên thiết bị.</p>
           <div className="flex flex-wrap justify-end gap-2">
             <button type="button" onClick={() => setPendingCatalogReplacement(null)} className="rounded-lg border border-stone-300 px-4 py-2 text-sm font-semibold text-stone-700">Giữ món hiện tại</button>
             <button type="button" disabled={isSaving} onClick={confirmCatalogReplacement} className="rounded-lg bg-heritage-red px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Thay bằng {pendingCatalogReplacement.name}</button>
           </div>
         </div>
-      </div>}
+      </Modal>}
 
-      {pinnedSnapshotA && (
+      {pinnedSnapshotA && isCompareOpen && (
         <CompareModal
           isOpen={isCompareOpen}
           onClose={() => setIsCompareOpen(false)}
           snapshotA={pinnedSnapshotA}
+          catalogItems={catalogItems}
           snapshotB={snapshot}
           onSelectOutfit={(chosen) => {
             studio.dispatch({ type: "commit", update: doc => ({ ...doc, snapshot: chosen }) });
@@ -1455,15 +1480,16 @@ export default function StudioPage() {
         />
       )}
 
-      <ExportModal
+      {isExportOpen && <ExportModal
         isOpen={isExportOpen}
         onClose={() => setIsExportOpen(false)}
         onExport={async (ratio) => {
           if (!canvasRef.current) throw new Error("Canvas chưa sẵn sàng");
-          return canvasRef.current.exportToDataUrl(ratio);
+          return canvasRef.current.exportToBlob(ratio);
         }}
         outfitTitle={outfitTitle}
-      />
+        documentKey={JSON.stringify({ snapshot, outfitTitle })}
+      />}
 
       <GeminiTryOnModal
         key={user?.id || "anonymous"}
@@ -1488,7 +1514,7 @@ export default function StudioPage() {
         }}
         onExportOutfit={async () => {
           if (!canvasRef.current) throw new Error("Canvas chưa sẵn sàng");
-          return canvasRef.current.exportToDataUrl(snapshot.aspectRatio || "9:16");
+          return canvasRef.current.exportToBlob(snapshot.aspectRatio || "9:16", { neutralBackground: true });
         }}
         onSaveOutfit={saveFromTryOn}
         isLoggedIn={isLoggedIn}
@@ -1501,8 +1527,8 @@ export default function StudioPage() {
 
       {/* Modal Giới thiệu Quy chuẩn Văn hóa Hữu Nhậm */}
       {showHuuNhamInfo && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-stone-200">
+        <Modal isOpen onClose={() => setShowHuuNhamInfo(false)} label="Tìm hiểu Hữu nhậm">
+          <div className="bg-white rounded-2xl max-w-lg w-full max-h-full overflow-y-auto p-6 shadow-2xl border border-stone-200">
             <div className="flex items-start justify-between">
               <div className="flex items-center space-x-2.5">
                 <div className="w-10 h-10 rounded-xl bg-heritage-red/10 text-heritage-red flex items-center justify-center font-serif font-bold text-xl">
@@ -1516,6 +1542,7 @@ export default function StudioPage() {
                 </div>
               </div>
               <button
+                aria-label="Đóng thông tin Hữu nhậm"
                 onClick={() => setShowHuuNhamInfo(false)}
                 className="p-1.5 rounded-lg text-stone-400 hover:text-stone-700 hover:bg-stone-100 transition-colors"
               >
@@ -1544,8 +1571,9 @@ export default function StudioPage() {
               </button>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
+      {weatherReplacementDialog}
     </div>
   );
 }

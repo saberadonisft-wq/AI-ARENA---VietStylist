@@ -1,5 +1,6 @@
 from typing import List, Optional
-from fastapi import APIRouter, Query
+import hashlib
+from fastapi import APIRouter, Query, Request
 from fastapi.responses import Response
 from app.modules.catalog.schemas import (
     GarmentTypeResponse,
@@ -11,10 +12,20 @@ from app.modules.catalog.schemas import (
     ColorPreviewResponse,
 )
 from app.modules.catalog.service import CatalogService
-from app.modules.catalog.studio_images import get_studio_image, preview_studio_color
+from app.modules.catalog.studio_images import get_studio_image, get_catalog_thumbnail, preview_studio_color
 from app.core.errors import AppError
 
 router = APIRouter(prefix="/catalog", tags=["Catalog"])
+
+
+def _image_response(request: Request, data: bytes, media_type: str):
+    # Callers validate publication and media state before conditional responses.
+    etag = '"' + hashlib.sha256(data).hexdigest() + '"'
+    headers = {"Cache-Control": "no-cache", "ETag": etag, "X-Content-Type-Options": "nosniff"}
+    candidates = request.headers.get("if-none-match", "").split(",")
+    if any(value.strip() == "*" or value.strip().removeprefix("W/") == etag for value in candidates):
+        return Response(status_code=304, headers=headers)
+    return Response(data, media_type=media_type, headers=headers)
 
 
 @router.get("/garment-types", response_model=List[GarmentTypeResponse])
@@ -68,17 +79,25 @@ def list_avatars():
 
 
 @router.get("/items/{item_id}/studio-image", response_class=Response,
-            responses={200: {"content": {"image/png": {"schema": {"type": "string", "format": "binary"}}}}})
+            responses={200: {"content": {"image/png": {"schema": {"type": "string", "format": "binary"}}}},
+                       304: {"description": "The published image has not changed"}})
 def studio_image(
     item_id: str,
+    request: Request,
     color: Optional[str] = Query(None, pattern=r"^#[0-9A-Fa-f]{6}$"),
     source_version: Optional[str] = Query(None, pattern=r"^[a-f0-9]{64}$"),
     algorithm_version: Optional[str] = Query(None, max_length=64),
 ):
     """Ảnh PNG tách nền, cắt sát trang phục đã công khai, dùng để phối và xuất ảnh."""
-    return Response(get_studio_image(item_id, color, source_version, algorithm_version), media_type="image/png", headers={
-        "Cache-Control": "no-cache", "X-Content-Type-Options": "nosniff",
-    })
+    return _image_response(request, get_studio_image(item_id, color, source_version, algorithm_version), "image/png")
+
+
+@router.get("/items/{item_id}/thumbnail", response_class=Response,
+            responses={200: {"content": {"image/webp": {"schema": {"type": "string", "format": "binary"}}}},
+                       304: {"description": "The published image has not changed"}})
+def catalog_thumbnail(item_id: str, request: Request, size: int = Query(224, ge=64, le=640)):
+    """A lossless display derivative; original media and Studio cutouts are unchanged."""
+    return _image_response(request, get_catalog_thumbnail(item_id, size), "image/webp")
 
 
 @router.get("/items/{item_id}/color-preview", response_model=ColorPreviewResponse)

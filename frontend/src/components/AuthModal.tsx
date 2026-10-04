@@ -132,6 +132,33 @@ export default function AuthModal({
     }
   };
 
+  const loadGoogleScript = (retry = false) => {
+    let script = document.getElementById("gsi-client-script") as HTMLScriptElement | null;
+    if (script && (retry || script.dataset.failed === "true")) {
+      script.remove();
+      script = null;
+    }
+    if (script) {
+      script.addEventListener("load", () => setTimeout(initGoogleButton, 80), { once: true });
+      return;
+    }
+    script = document.createElement("script");
+    script.id = "gsi-client-script";
+    script.src = "https://accounts.google.com/gsi/client";
+    script.async = true;
+    script.defer = true;
+    script.onload = () => {
+      if (!googleBtnContainerRef.current) return;
+      setErrorMsg(current => current?.startsWith("Chưa tải được đăng nhập Google.") ? null : current);
+      setTimeout(initGoogleButton, 80);
+    };
+    script.onerror = () => {
+      script!.dataset.failed = "true";
+      if (googleBtnContainerRef.current) setErrorMsg(current => current || "Chưa tải được đăng nhập Google. Nhấn nút Google để thử tải lại hoặc đăng nhập bằng mật khẩu.");
+    };
+    document.head.appendChild(script);
+  };
+
   useEffect(() => {
     if (isOpen) {
       setActiveTab(defaultTab);
@@ -142,18 +169,7 @@ export default function AuthModal({
       if ((window as any).google?.accounts?.id) {
         setTimeout(initGoogleButton, 80);
       } else {
-        const existingScript = document.getElementById("gsi-client-script") as HTMLScriptElement | null;
-        if (!existingScript) {
-          const script = document.createElement("script");
-          script.id = "gsi-client-script";
-          script.src = "https://accounts.google.com/gsi/client";
-          script.async = true;
-          script.defer = true;
-          script.onload = () => setTimeout(initGoogleButton, 80);
-          document.head.appendChild(script);
-        } else {
-          existingScript.addEventListener("load", () => setTimeout(initGoogleButton, 80), { once: true });
-        }
+        loadGoogleScript();
       }
     } else {
       setIsGsiReady(false);
@@ -227,9 +243,7 @@ export default function AuthModal({
         // One-tap prompt might not show if dismissed
       }
     } else {
-      setErrorMsg(
-        "Dịch vụ Google Identity đang được kết nối. Vui lòng thử lại sau vài giây hoặc chọn Đăng nhập 1-chạm / Mật khẩu."
-      );
+      loadGoogleScript(true);
     }
   };
 
@@ -273,14 +287,14 @@ export default function AuthModal({
         <div className="min-h-0 p-4 sm:p-6 overflow-y-auto overscroll-contain space-y-5">
           {/* Notification banners */}
           {errorMsg && (
-            <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl flex items-start space-x-2">
+            <div role="alert" className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl flex items-start space-x-2">
               <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
               <span>{errorMsg}</span>
             </div>
           )}
 
           {successMsg && (
-            <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-xl flex items-center space-x-2">
+            <div role="status" className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-xl flex items-center space-x-2">
               <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
               <span>{successMsg}</span>
             </div>

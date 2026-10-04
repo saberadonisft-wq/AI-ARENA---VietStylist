@@ -1,5 +1,6 @@
 "use client";
 
+import Modal from "@/components/ui/Modal";
 import React, { useState, useEffect } from "react";
 import { StarterOutfit } from "@/lib/types/api";
 import { api } from "@/lib/api/client";
@@ -37,10 +38,10 @@ export default function StarterOutfitModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl max-w-2xl w-full shadow-2xl border border-stone-200 overflow-hidden flex flex-col">
+    <Modal isOpen={isOpen} onClose={onClose} label="Chọn mẫu phối mở đầu">
+      <div className="bg-white rounded-2xl max-w-2xl w-full max-h-full shadow-2xl border border-stone-200 overflow-hidden flex flex-col">
         {/* Header */}
-        <div className="px-5 py-4 border-b border-stone-200 flex items-center justify-between bg-stone-50">
+        <div className="shrink-0 px-5 py-4 border-b border-stone-200 flex items-center justify-between bg-stone-50">
           <div className="flex items-center space-x-2">
             <Sparkles className="w-5 h-5 text-heritage-red" />
             <h3 className="font-serif text-base font-bold text-stone-900">
@@ -53,7 +54,7 @@ export default function StarterOutfitModal({
         </div>
 
         {/* Body */}
-        <div className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
+        <div className="p-6 space-y-4 min-h-0 overflow-y-auto">
           <p className="text-xs text-stone-600 leading-relaxed">
             Chọn một mẫu để đưa các món có sẵn trong mẫu vào bản phối. Bản nháp hiện tại sẽ được giữ trong mục khôi phục trên thiết bị.
           </p>
@@ -104,6 +105,6 @@ export default function StarterOutfitModal({
           )}
         </div>
       </div>
-    </div>
+    </Modal>
   );
 }

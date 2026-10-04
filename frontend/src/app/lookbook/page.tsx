@@ -8,6 +8,7 @@ import { shareUrlForOrigin } from "@/lib/shareUrl";
 import { useAuth } from "@/lib/auth/context";
 import { FolderHeart, Plus, Share2, Eye, Lock, Globe, Sparkles, Check } from "lucide-react";
 import { LookbookCardSkeleton } from "@/components/ui/Skeleton";
+import Modal from "@/components/ui/Modal";
 import AuthModal from "@/components/AuthModal";
 
 export default function LookbookPage() {
@@ -30,6 +31,16 @@ export default function LookbookPage() {
   const [newVisibility, setNewVisibility] = useState<"private" | "unlisted" | "public">("unlisted");
   const [selectedOutfitVersionIds, setSelectedOutfitVersionIds] = useState<string[]>([]);
   const [isCreating, setIsCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [titleError, setTitleError] = useState<string | null>(null);
+  const createErrorRef = useRef<HTMLParagraphElement>(null);
+  const titleRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (isCreateOpen && createError) {
+      createErrorRef.current?.focus({ preventScroll: true });
+      createErrorRef.current?.scrollIntoView({ block: "nearest" });
+    }
+  }, [isCreateOpen, createError]);
 
   // Share link
   const [activeShareData, setActiveShareData] = useState<{ id: string; url: string } | null>(null);
@@ -87,10 +98,17 @@ export default function LookbookPage() {
 
   const handleCreateLookbook = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newTitle.trim() || isCreating) return;
+    if (isCreating) return;
+    setCreateError(null);
+    if (!newTitle.trim()) {
+      setTitleError("Nhập tên Lookbook có ít nhất một ký tự khác khoảng trắng.");
+      titleRef.current?.focus();
+      return;
+    }
+    setTitleError(null);
     const ownerId = user?.id;
     if (!isLoggedIn || !ownerId || loadedOwnerId !== ownerId) {
-      setActionMessage("Hãy đăng nhập và tải xong dữ liệu tài khoản trước khi tạo Lookbook.");
+      setCreateError("Hãy đăng nhập và tải xong dữ liệu tài khoản trước khi tạo Lookbook.");
       return;
     }
     setIsCreating(true);
@@ -101,7 +119,7 @@ export default function LookbookPage() {
       }));
 
       await api.createLookbook({
-        title: newTitle,
+        title: newTitle.trim(),
         description: newDesc,
         visibility: newVisibility,
         entries,
@@ -116,7 +134,7 @@ export default function LookbookPage() {
         await fetchLookbooks();
       }
     } catch (err: any) {
-      if (ownerId === currentOwnerId.current) setActionMessage("Không tạo được Lookbook: " + (err?.message || "Máy chủ không khả dụng."));
+      if (ownerId === currentOwnerId.current) setCreateError("Không tạo được Lookbook: " + (err?.message || "Máy chủ không khả dụng."));
     } finally {
       if (ownerId === currentOwnerId.current) setIsCreating(false);
     }
@@ -174,7 +192,7 @@ export default function LookbookPage() {
 
         {isLoggedIn ? (
           <button
-            onClick={() => setIsCreateOpen(true)}
+            onClick={() => { setCreateError(null); setTitleError(null); setIsCreateOpen(true); }}
             className="inline-flex items-center space-x-2 px-4 py-2 bg-heritage-red hover:bg-heritage-red-dark text-white rounded-xl text-xs font-semibold shadow-sm transition-all shrink-0"
           >
             <Plus className="w-4 h-4" />
@@ -196,19 +214,19 @@ export default function LookbookPage() {
 
       {/* Thông báo chia sẻ vừa tạo */}
       {activeShareData && activeShareOwnerId === user?.id && (
-        <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center justify-between text-xs text-emerald-900">
-          <div className="space-y-0.5">
+        <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between text-xs text-emerald-900">
+          <div className="min-w-0 flex-1 space-y-0.5">
             <div className="font-bold flex items-center space-x-1.5">
               <Check className="w-4 h-4 text-emerald-600" />
               <span>Liên kết chia sẻ đã sẵn sàng:</span>
             </div>
-            <div className="font-mono text-[11px] text-emerald-700 select-all">
+            <div className="break-all font-mono text-[11px] text-emerald-700 select-all">
               {activeShareData.url}
             </div>
           </div>
           <button
               onClick={() => void copyShareLink()}
-            className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg font-semibold hover:bg-emerald-700 transition-colors shrink-0"
+            className="min-h-11 whitespace-nowrap px-3 py-1.5 bg-emerald-600 text-white rounded-lg font-semibold hover:bg-emerald-700 transition-colors shrink-0"
           >
             Sao chép liên kết
           </button>
@@ -252,7 +270,7 @@ export default function LookbookPage() {
             Bắt đầu bằng cách tạo một bộ sưu tập và chọn các bộ phối từ Studio để đính kèm.
           </p>
           <button
-            onClick={() => setIsCreateOpen(true)}
+            onClick={() => { setCreateError(null); setTitleError(null); setIsCreateOpen(true); }}
             className="px-5 py-2 bg-heritage-red text-white text-xs font-semibold rounded-xl hover:bg-heritage-red-dark transition-all"
           >
             Tạo Lookbook đầu tiên
@@ -326,28 +344,31 @@ export default function LookbookPage() {
 
       {/* Modal Tạo Lookbook */}
       {isCreateOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl border border-stone-200 p-6 space-y-4">
+        <Modal isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)} closeDisabled={isCreating} label="Tạo bộ sưu tập Lookbook mới">
+          <div className="bg-white rounded-2xl max-w-lg w-full max-h-full overflow-y-auto shadow-2xl border border-stone-200 p-4 sm:p-6 space-y-4">
             <h3 className="font-serif text-lg font-bold text-stone-900">
               Tạo Bộ Sưu Tập Lookbook Mới
             </h3>
 
             <form onSubmit={handleCreateLookbook} className="space-y-4 text-xs">
               <div className="space-y-1">
-                <label className="font-semibold text-stone-700">Tên Lookbook *</label>
+                <label htmlFor="lookbook-title" className="font-semibold text-stone-700">Tên Lookbook *</label>
                 <input
+                  id="lookbook-title" ref={titleRef} disabled={isCreating} aria-invalid={!!titleError} aria-describedby={titleError ? "lookbook-title-error" : undefined}
                   type="text"
                   required
                   value={newTitle}
-                  onChange={(e) => setNewTitle(e.target.value)}
+                  onChange={(e) => { setNewTitle(e.target.value); setTitleError(null); }}
                   placeholder="Ví dụ: Kỷ yếu Cố đô Huế 2026..."
                   className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:border-heritage-red"
                 />
+                {titleError && <p id="lookbook-title-error" role="alert" className="text-sm text-red-800">{titleError}</p>}
               </div>
 
               <div className="space-y-1">
-                <label className="font-semibold text-stone-700">Mô tả chủ đề</label>
+                <label htmlFor="lookbook-description" className="font-semibold text-stone-700">Mô tả chủ đề</label>
                 <textarea
+                  id="lookbook-description" disabled={isCreating}
                   value={newDesc}
                   onChange={(e) => setNewDesc(e.target.value)}
                   placeholder="Mô tả phong cách, bối cảnh chụp ảnh..."
@@ -357,15 +378,16 @@ export default function LookbookPage() {
               </div>
 
               <div className="space-y-1">
-                <label className="font-semibold text-stone-700">Quyền riêng tư</label>
+                <label htmlFor="lookbook-visibility" className="font-semibold text-stone-700">Quyền riêng tư</label>
                 <select
+                  id="lookbook-visibility" disabled={isCreating}
                   value={newVisibility}
                   onChange={(e) => setNewVisibility(e.target.value as any)}
                   className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:border-heritage-red bg-stone-50"
                 >
-                  <option value="unlisted">Có liên kết mới xem được (Unlisted - Khuyên dùng)</option>
-                  <option value="public">Công khai toàn mạng (Public)</option>
-                  <option value="private">Riêng tư chỉ mình tôi (Private)</option>
+                  <option value="unlisted">Người có liên kết (khuyên dùng)</option>
+                  <option value="public">Công khai</option>
+                  <option value="private">Riêng tư</option>
                 </select>
               </div>
 
@@ -386,6 +408,7 @@ export default function LookbookPage() {
                         >
                           <input
                             type="checkbox"
+                            disabled={isCreating}
                             checked={isChecked}
                             onChange={(e) => {
                               if (e.target.checked) {
@@ -406,10 +429,11 @@ export default function LookbookPage() {
                 </div>
               )}
 
+              {createError && <p ref={createErrorRef} tabIndex={-1} role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{createError}</p>}
               <div className="flex justify-end space-x-2 pt-2">
                 <button
                   type="button"
-                  onClick={() => setIsCreateOpen(false)}
+                  onClick={() => setIsCreateOpen(false)} disabled={isCreating}
                   className="px-4 py-2 border border-stone-300 rounded-lg hover:bg-stone-50"
                 >
                   Hủy
@@ -424,7 +448,7 @@ export default function LookbookPage() {
               </div>
             </form>
           </div>
-        </div>
+        </Modal>
       )}
 
       <AuthModal

@@ -4,7 +4,9 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { CatalogItem, HeritageArticle } from "@/lib/types/api";
-import { api, API_ORIGIN } from "@/lib/api/client";
+import { eraLabel, slotLabel, genderLabel } from "@/lib/catalog/display";
+import { catalogImageUrl } from "@/lib/catalog/images";
+import { api } from "@/lib/api/client";
 import { BookOpen, Sparkles, ArrowLeft, Shield, Check, Compass } from "lucide-react";
 import { Skeleton } from "@/components/ui/Skeleton";
 
@@ -121,7 +123,7 @@ export default function TrangPhucDetailPage() {
         <div className="md:col-span-5 bg-[#FAF8F5] rounded-2xl p-6 flex flex-col items-center justify-center border border-stone-100 min-h-[360px] relative">
           {(item.metadata?.real_image_url || item.metadata?.catalog_media_id) && !imageLoadFailed ? (
             <img
-              src={item.metadata.real_image_url || `${API_ORIGIN}/api/catalog/items/${encodeURIComponent(item.id)}/studio-image`}
+              src={catalogImageUrl(item)}
               alt={item.name}
               onError={() => setImageLoadFailed(true)}
               className="w-full max-h-80 object-contain drop-shadow-md transition-transform hover:scale-105 duration-300"
@@ -136,9 +138,9 @@ export default function TrangPhucDetailPage() {
             <div className="text-stone-400 text-xs font-serif">Ảnh tư liệu cổ phục</div>
           )}
           {imageLoadFailed && <span role="alert" className="mt-2 text-xs text-amber-800">Không tải được ảnh trang phục. Thông tin bên dưới vẫn dùng được.</span>}
-          {item.metadata?.real_image_url && !imageLoadFailed && (
+          {catalogImageUrl(item) && !imageLoadFailed && (
             <span className="absolute bottom-3 right-3 text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full bg-heritage-red text-white shadow-sm">
-              Ảnh hiện vật thực tế
+              Ảnh trang phục
             </span>
           )}
         </div>
@@ -146,14 +148,14 @@ export default function TrangPhucDetailPage() {
         {/* Thông số & Nút hành động */}
         <div className="md:col-span-7 space-y-5">
           <div className="space-y-2">
-            <div className="flex items-center space-x-2 text-xs text-stone-500">
+            <div className="flex flex-wrap items-center gap-2 text-xs text-stone-500">
               <span className="uppercase font-bold tracking-wider text-heritage-red">
-                {item.era || "Thời Nguyễn"}
+                {eraLabel(item.era)}
               </span>
               <span>•</span>
-              <span className="capitalize">{item.slot}</span>
+              <span className="capitalize">{slotLabel(item.slot)}</span>
               <span>•</span>
-              <span className="capitalize">{item.gender}</span>
+              <span className="capitalize">{genderLabel(item.gender)}</span>
             </div>
             <h1 className="font-serif text-2xl sm:text-3xl font-bold text-stone-900">
               {item.name}
@@ -178,7 +180,7 @@ export default function TrangPhucDetailPage() {
                       style={{ backgroundColor: v.hex_color }}
                     />
                     <span className="font-medium text-stone-800 text-[11px]">{v.color_name}</span>
-                    <span className="text-[9px] text-stone-500">({v.material})</span>
+                    {v.material?.trim() && <span className="text-[9px] text-stone-500">({v.material.trim()})</span>}
                   </div>
                 ))}
               </div>

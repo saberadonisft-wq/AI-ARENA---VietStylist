@@ -20,6 +20,7 @@ class CatalogRepository:
         search: Optional[str] = None,
         limit: int = 50,
         offset: int = 0,
+        *, conn=None,
     ) -> List[Dict[str, Any]]:
         query = """
             SELECT DISTINCT i.* FROM items i
@@ -52,7 +53,7 @@ class CatalogRepository:
         query += " ORDER BY i.created_at ASC LIMIT ? OFFSET ?"
         params.extend([limit, offset])
 
-        return Database.fetch_all(query, tuple(params))
+        return Database.fetch_all(query, tuple(params), conn=conn)
 
     @staticmethod
     def get_item_by_id(item_id: str, published_only: bool = True) -> Optional[Dict[str, Any]]:
@@ -79,7 +80,7 @@ class CatalogRepository:
         return Database.fetch_all("SELECT * FROM item_variants WHERE item_id = ? ORDER BY is_default DESC", (item_id,))
 
     @staticmethod
-    def get_variants_by_item_ids(item_ids: List[str]) -> List[Dict[str, Any]]:
+    def get_variants_by_item_ids(item_ids: List[str], *, conn=None) -> List[Dict[str, Any]]:
         if not item_ids:
             return []
         placeholders = ", ".join(["?"] * len(item_ids))
@@ -87,14 +88,14 @@ class CatalogRepository:
             SELECT * FROM item_variants
             WHERE item_id IN ({placeholders})
             ORDER BY item_id, is_default DESC
-        """, tuple(item_ids))
+        """, tuple(item_ids), conn=conn)
 
     @staticmethod
     def get_layers_by_item_id(item_id: str) -> List[Dict[str, Any]]:
         return Database.fetch_all("SELECT * FROM asset_layers WHERE item_id = ? ORDER BY z_index ASC", (item_id,))
 
     @staticmethod
-    def get_layers_by_item_ids(item_ids: List[str]) -> List[Dict[str, Any]]:
+    def get_layers_by_item_ids(item_ids: List[str], *, conn=None) -> List[Dict[str, Any]]:
         if not item_ids:
             return []
         placeholders = ", ".join(["?"] * len(item_ids))
@@ -102,7 +103,7 @@ class CatalogRepository:
             SELECT * FROM asset_layers
             WHERE item_id IN ({placeholders})
             ORDER BY item_id, z_index ASC
-        """, tuple(item_ids))
+        """, tuple(item_ids), conn=conn)
 
     @staticmethod
     def get_occasions_by_item_id(item_id: str) -> List[Dict[str, Any]]:

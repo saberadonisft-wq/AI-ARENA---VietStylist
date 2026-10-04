@@ -3,6 +3,8 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useCatalog } from "@/lib/catalog/CatalogProvider";
+import { occasionLabel, styleLabel, itemLabel } from "@/lib/catalog/display";
 import { useAuth } from "@/lib/auth/context";
 import { api, API_ORIGIN } from "@/lib/api/client";
 import { OutfitResponse } from "@/lib/types/api";
@@ -50,6 +52,7 @@ export default function TaiKhoanPage() {
   const router = useRouter();
   const { user, isLoggedIn, isAdmin, isStylist, logout } = useAuth();
   const { confirm, dialog } = useConfirmDialog();
+  const { catalogItems, occasions } = useCatalog();
   const currentOwnerId = useRef(user?.id);
   currentOwnerId.current = user?.id;
   const outfitsRequestId = useRef(0);
@@ -929,14 +932,7 @@ export default function TaiKhoanPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {outfits.map((outfit) => {
                   const items = outfit.current_snapshot?.items || [];
-                  const occasionName =
-                    outfit.occasion_id === "ky_yeu"
-                      ? "Kỷ yếu Cổ phong"
-                      : outfit.occasion_id === "tet_nguyen_dan"
-                      ? "Tết Nguyên Đán"
-                      : outfit.occasion_id === "le_hoi_truong"
-                      ? "Lễ hội trường"
-                      : outfit.occasion_id || "Chung";
+                  const occasionName = occasionLabel(outfit.occasion_id, occasions);
                   return (
                     <div
                       key={outfit.id}
@@ -952,7 +948,7 @@ export default function TaiKhoanPage() {
                           </span>
                         </div>
 
-                        <div className="flex items-center space-x-2 mt-2">
+                        <div className="mt-2 flex flex-wrap items-center gap-2">
                           <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-stone-100 text-stone-600">
                             {occasionName}
                           </span>
@@ -963,7 +959,7 @@ export default function TaiKhoanPage() {
                                 : "bg-emerald-100 text-emerald-800"
                             }`}
                           >
-                            {outfit.style_mode === "remix" ? "Phối Remix" : "Cổ phong Chuẩn"}
+                            {styleLabel(outfit.style_mode)}
                           </span>
                         </div>
 
@@ -982,7 +978,7 @@ export default function TaiKhoanPage() {
                                   style={{ backgroundColor: it.colorHex || "#CBD5E0" }}
                                 ></span>
                                 <span className="truncate max-w-[120px]">
-                                  {it.itemId.replace("item_", "").replaceAll("_", " ")}
+                                  {itemLabel(it.itemId, catalogItems)}
                                 </span>
                               </span>
                             ))}
@@ -1087,8 +1083,8 @@ export default function TaiKhoanPage() {
                         {visibleLocalDraft.title || "Bản phối Studio chưa đặt tên"}
                       </h4>
                       <p className="text-xs text-stone-500 mt-0.5">
-                        Hoàn cảnh: {visibleLocalDraft.snapshot?.occasionId || "chưa chọn"} | Phong cách:{" "}
-                        {visibleLocalDraft.snapshot?.styleMode || "chưa chọn"}
+                        Hoàn cảnh: {occasionLabel(visibleLocalDraft.snapshot?.occasionId, occasions)} | Phong cách:{" "}
+                        {styleLabel(visibleLocalDraft.snapshot?.styleMode)}
                       </p>
                     </div>
                     <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-200">

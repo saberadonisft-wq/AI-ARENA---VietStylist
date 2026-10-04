@@ -3,6 +3,10 @@
 import React, { useRef, useImperativeHandle, forwardRef, useState, useEffect, useLayoutEffect } from "react";
 import { Avatar, AssetLayer, SnapshotItem, CatalogItem } from "@/lib/types/api";
 import { API_ORIGIN } from "@/lib/api/client";
+import BoardBackground from "./BoardBackground";
+import DragShadowImage, { pauseDragPreviewPreparation } from "./DragShadowImage";
+import { encodePng } from "./encodePng";
+import { backgroundUrl, loadBackground, paintBackground, type BackgroundTheme, type NeutralBackground } from "./backgrounds";
 import {
   RotateCcw,
   RotateCw,
@@ -19,7 +23,8 @@ import {
 } from "lucide-react";
 
 export interface Canvas2DHandle {
-  exportToDataUrl: (aspectRatio: "1:1" | "9:16") => Promise<string>;
+  exportToBlob: (aspectRatio: "1:1" | "9:16", options?: { neutralBackground?: boolean }) => Promise<Blob>;
+  previewBackgroundFade: (value: number | null) => void;
   resetAllTransforms: () => void;
 }
 
@@ -37,7 +42,10 @@ export interface Canvas2DProps {
   catalogItems?: CatalogItem[];
   aspectRatio?: "1:1" | "9:16";
   viewMode?: "flatlay" | "avatar";
-  backgroundTheme?: "white" | "dopaper";
+  backgroundTheme?: BackgroundTheme;
+  neutralBackgroundTheme?: NeutralBackground;
+  backgroundFade?: number;
+  occasionId?: string;
   selectedSlot?: string | null;
   onSelectItem?: (slot: string) => void;
   onRemoveItem?: (slot: string) => void;
@@ -332,6 +340,9 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
       aspectRatio = "9:16",
       viewMode = "flatlay",
       backgroundTheme = "white",
+      neutralBackgroundTheme = "white",
+      backgroundFade = 0,
+      occasionId,
       selectedSlot: externalSelectedSlot,
       onSelectItem,
       onRemoveItem,
@@ -377,6 +388,7 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
       );
     }, [boardZoom, aspectRatio]);
     const svgRef = useRef<SVGSVGElement | null>(null);
+    const canvasExports = useRef(0);
     const [imageSizes, setImageSizes] = useState<Record<string, { url: string; width: number; height: number }>>({});
     const [imageErrors, setImageErrors] = useState<Record<string, string>>({});
     const [imageRetry, setImageRetry] = useState(0);
@@ -479,9 +491,12 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
       startSvgX: number;
       startSvgY: number;
       initialTransform: ItemTransform;
+      geometry: ItemGeometry;
     };
     const [dragSession, renderDragSession] = useState<DragSession | null>(null);
     const dragSessionRef = useRef<DragSession | null>(null);
+    const pointerFrame = useRef(0);
+    const pendingPointer = useRef<{ clientX: number; clientY: number; pointerId: number } | null>(null);
     const setDragSession = (session: DragSession | null) => {
       dragSessionRef.current = session;
       renderDragSession(session);
@@ -503,8 +518,7 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
       return () => artboard.removeEventListener("touchstart", preventGarmentScroll);
     }, []);
 
-    // Trạng thái ẩn khung chọn khi xuất ảnh
-    const [isExporting, setIsExporting] = useState(false);
+    useEffect(() => () => { cancelAnimationFrame(pointerFrame.current); }, []);
 
     // Lấy thông số hình học chuẩn của món đồ
     const getItemGeometry = (eq: SnapshotItem): ItemGeometry => {
@@ -524,7 +538,7 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
 
     // Lấy transform hiện hành của món đồ
     const getTransform = (eq: SnapshotItem): ItemTransform => {
-      if (transforms[eq.slot]) return transforms[eq.slot];
+      if (transformsRef.current[eq.slot]) return transformsRef.current[eq.slot];
       if (eq.transform) return eq.transform;
       const geom = getItemGeometry(eq);
       return {
@@ -536,7 +550,7 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
     };
 
     // Quy đổi tọa độ chuột sang tọa độ viewBox (800 x 1200) của SVG
-    const getSvgCoordinates = (e: React.PointerEvent | PointerEvent) => {
+    const getSvgCoordinates = (e: { clientX: number; clientY: number }) => {
       if (!svgRef.current) return { x: 0, y: 0 };
       const matrix = svgRef.current.getScreenCTM();
       if (!matrix) return { x: 0, y: 0 };
@@ -563,83 +577,70 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
         startSvgX: pt.x,
         startSvgY: pt.y,
         initialTransform: { ...getTransform(currentEq) },
+        geometry: getItemGeometry(currentEq),
       });
     };
 
-    // Xử lý di chuyển chuột khi đang kéo
-    const handlePointerMove = (e: React.PointerEvent) => {
-      const dragSession = dragSessionRef.current;
-      if (!dragSession || e.pointerId !== dragSession.pointerId) return;
-      if (!dragSession.moved && Math.hypot(e.clientX - dragSession.startClientX, e.clientY - dragSession.startClientY) < dragSession.threshold) return;
-      dragSession.moved = true;
-      e.preventDefault();
-
-      const pt = getSvgCoordinates(e);
-      const currentEq = equippedItems.find((it) => it.slot === dragSession.slot);
-      if (!currentEq) return;
-
-      const geom = getItemGeometry(currentEq);
-      const center = {
-        x: geom.cx + dragSession.initialTransform.dx,
-        y: geom.cy + dragSession.initialTransform.dy,
-      };
-
-      if (dragSession.type === "move") {
-        const deltaX = pt.x - dragSession.startSvgX;
-        const deltaY = pt.y - dragSession.startSvgY;
-
-        setTransforms((prev) => ({
-          ...prev,
-          [dragSession.slot]: {
-            ...dragSession.initialTransform,
-            dx: Math.round(dragSession.initialTransform.dx + deltaX),
-            dy: Math.round(dragSession.initialTransform.dy + deltaY),
-          },
-        }));
-      } else if (dragSession.type === "resize") {
-        const initialDist = Math.hypot(
-          dragSession.startSvgX - center.x,
-          dragSession.startSvgY - center.y
-        );
-        const currentDist = Math.hypot(pt.x - center.x, pt.y - center.y);
-        const factor = initialDist > 10 ? currentDist / initialDist : 1.0;
-        const newScale = Math.max(0.05, Math.min(20, dragSession.initialTransform.scale * factor));
-
-        setTransforms((prev) => ({
-          ...prev,
-          [dragSession.slot]: {
-            ...dragSession.initialTransform,
-            scale: parseFloat(newScale.toFixed(2)),
-          },
-        }));
-      } else if (dragSession.type === "rotate") {
-        const initialAngle =
-          Math.atan2(dragSession.startSvgY - center.y, dragSession.startSvgX - center.x) *
-          (180 / Math.PI);
-        const currentAngle =
-          Math.atan2(pt.y - center.y, pt.x - center.x) * (180 / Math.PI);
-        const angleDiff = currentAngle - initialAngle;
-        const newRotation = (dragSession.initialTransform.rotation + angleDiff) % 360;
-
-        setTransforms((prev) => ({
-          ...prev,
-          [dragSession.slot]: {
-            ...dragSession.initialTransform,
-            rotation: Math.round(newRotation),
-          },
-        }));
+    const flushPointer = () => {
+      const event = pendingPointer.current;
+      pendingPointer.current = null;
+      const session = dragSessionRef.current;
+      if (!event || !session || event.pointerId !== session.pointerId) return;
+      const pt = getSvgCoordinates(event), geom = session.geometry;
+      const initial = session.initialTransform;
+      const center = { x: geom.cx + initial.dx, y: geom.cy + initial.dy };
+      const next = { ...initial };
+      if (session.type === "move") {
+        next.dx = Math.round(initial.dx + pt.x - session.startSvgX);
+        next.dy = Math.round(initial.dy + pt.y - session.startSvgY);
+      } else if (session.type === "resize") {
+        const distance = Math.hypot(session.startSvgX - center.x, session.startSvgY - center.y);
+        const factor = distance > 10 ? Math.hypot(pt.x - center.x, pt.y - center.y) / distance : 1;
+        next.scale = Number(Math.max(.05, Math.min(20, initial.scale * factor)).toFixed(2));
+      } else {
+        const delta = (Math.atan2(pt.y - center.y, pt.x - center.x) - Math.atan2(session.startSvgY - center.y, session.startSvgX - center.x)) * 180 / Math.PI;
+        next.rotation = Math.round((initial.rotation + delta) % 360);
       }
+      transformsRef.current = { ...transformsRef.current, [session.slot]: next };
+      const transform = `translate(${geom.cx + next.dx}, ${geom.cy + next.dy}) rotate(${next.rotation}) scale(${next.scale}) translate(${-geom.cx}, ${-geom.cy})`;
+      // Update only the moving SVG groups; persist one document on release.
+      svgRef.current?.getElementById(`item-transform-${session.slot}`)?.setAttribute("transform", transform);
+      svgRef.current?.getElementById(`selection-overlay-${session.slot}`)?.setAttribute("transform", transform);
+      const group = svgRef.current?.getElementById(`item-transform-${session.slot}`);
+      if (group?.querySelector(".studio-drag-preview")) group.setAttribute("data-gesture-preview", "true");
+    };
+
+    const handlePointerMove = (event: React.PointerEvent) => {
+      const session = dragSessionRef.current;
+      if (!session || event.pointerId !== session.pointerId) return;
+      if (!session.moved && Math.hypot(event.clientX - session.startClientX, event.clientY - session.startClientY) < session.threshold) return;
+      session.moved = true;
+      event.preventDefault();
+      pendingPointer.current = { clientX: event.clientX, clientY: event.clientY, pointerId: event.pointerId };
+      if (!pointerFrame.current) pointerFrame.current = requestAnimationFrame(() => { pointerFrame.current = 0; flushPointer(); });
     };
 
     const finishGesture = (e?: { pointerId: number }, cancelled = false) => {
       const session = dragSessionRef.current;
       if (!session || (e && e.pointerId !== session.pointerId)) return;
+      cancelAnimationFrame(pointerFrame.current);
+      pointerFrame.current = 0;
+      if (!cancelled) flushPointer();
+      pendingPointer.current = null;
+      svgRef.current?.getElementById(`item-transform-${session.slot}`)?.removeAttribute("data-gesture-preview");
+      if (cancelled) {
+        const geom = session.geometry, initial = session.initialTransform;
+        const original = `translate(${geom.cx + initial.dx}, ${geom.cy + initial.dy}) rotate(${initial.rotation}) scale(${initial.scale}) translate(${-geom.cx}, ${-geom.cy})`;
+        svgRef.current?.getElementById(`item-transform-${session.slot}`)?.setAttribute("transform", original);
+        svgRef.current?.getElementById(`selection-overlay-${session.slot}`)?.setAttribute("transform", original);
+      }
       setDragSession(null);
       const changes = transformsRef.current;
       if (!cancelled && session.moved && Object.keys(changes).length) {
         onTransformsCommit?.(changes);
       }
       if (cancelled || onTransformsCommit) setTransforms({});
+      else renderTransforms(changes);
       if (svgRef.current?.hasPointerCapture(session.pointerId)) svgRef.current.releasePointerCapture(session.pointerId);
     };
 
@@ -683,8 +684,14 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
 
     useImperativeHandle(ref, () => ({
       resetAllTransforms,
-      exportToDataUrl: async (ratio: "1:1" | "9:16") => {
+      previewBackgroundFade: value => {
+        const background = containerRef.current?.querySelector<HTMLElement>('[data-testid="board-background"]');
+        if (value === null) background?.style.removeProperty("--studio-background-fade");
+        else background?.style.setProperty("--studio-background-fade", String(Math.min(100, Math.max(0, value)) / 100));
+      },
+      exportToBlob: async (ratio: "1:1" | "9:16", options?: { neutralBackground?: boolean }) => {
         if (!svgRef.current) throw new Error("SVG artboard chưa sẵn sàng");
+        if (dragSessionRef.current) throw new Error("Thả trang phục trước khi xuất ảnh.");
         const missing = equippedItems.some(item => {
           const url = imageUrlFor(getItemInfo(item.itemId), item.colorHex, item.colorSourceVersion, item.colorAlgorithmVersion);
           return url ? imageErrors[item.itemId] === url : !layers.some(layer => layer.item_id === item.itemId && layer.svg_content);
@@ -696,12 +703,20 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
         });
         if (pending) throw new Error("Ảnh trang phục đang tải. Vui lòng đợi ảnh hiển thị đầy đủ rồi thử lại.");
 
-        setIsExporting(true);
-        await new Promise((r) => setTimeout(r, 50));
-
+        const resumePreparation = pauseDragPreviewPreparation();
+        const artboard = containerRef.current;
+        canvasExports.current++;
+        artboard?.setAttribute("data-export-preview", "true");
         try {
+          const sceneUrl = !options?.neutralBackground && backgroundTheme === "occasion" ? backgroundUrl(occasionId, ratio) : undefined;
+          const sceneImage = sceneUrl ? await loadBackground(sceneUrl) : null;
+          const neutral = options?.neutralBackground || backgroundTheme === "white" ? "white" : backgroundTheme === "dopaper" ? "dopaper" : neutralBackgroundTheme;
           const svgElement = svgRef.current.cloneNode(true) as SVGSVGElement;
           svgElement.querySelectorAll('[id^="selection-overlay-"]').forEach(node => node.remove());
+          svgElement.querySelectorAll(".studio-drag-preview").forEach(node => node.remove());
+          // Keep the detached export at full quality. The inert board behind the
+          // dialog uses cached shadows while PNG encoding runs, so backdrop blur
+          // and the loading spinner do not repeatedly repaint six SVG filters.
           // SVG used as an image cannot fetch external image references. Embed every
           // asset into a detached snapshot; fail clearly if CORS prevents retrieval.
           await Promise.all(Array.from(svgElement.querySelectorAll("image")).map(async node => {
@@ -730,59 +745,50 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
           const URL = window.URL || window.webkitURL || window;
           const blobURL = URL.createObjectURL(svgBlob);
 
-          return await new Promise<string>((resolve, reject) => {
+          return await new Promise<Blob>((resolve, reject) => {
             const img = new Image();
             img.crossOrigin = "anonymous";
             img.onload = () => {
               try {
-              const canvas = document.createElement("canvas");
-              const targetWidth = 1400;
-              const targetHeight = ratio === "1:1" ? 1400 : 2488;
+                const canvas = document.createElement("canvas");
+                const targetWidth = 1400;
+                const targetHeight = ratio === "1:1" ? 1400 : 2488;
 
-              canvas.width = targetWidth;
-              canvas.height = targetHeight;
-              const ctx = canvas.getContext("2d");
-              if (!ctx) {
-                throw new Error("Không thể khởi tạo Canvas 2D context");
-              }
+                canvas.width = targetWidth;
+                canvas.height = targetHeight;
+                const ctx = canvas.getContext("2d");
+                if (!ctx) {
+                  throw new Error("Không thể khởi tạo Canvas 2D context");
+                }
 
-              if (backgroundTheme === "white") {
-                ctx.fillStyle = "#FFFFFF";
-                ctx.fillRect(0, 0, targetWidth, targetHeight);
-              } else {
-                ctx.fillStyle = "#FAF8F5";
-                ctx.fillRect(0, 0, targetWidth, targetHeight);
-                ctx.strokeStyle = "rgba(214, 158, 46, 0.35)";
-                ctx.lineWidth = 10;
-                ctx.strokeRect(28, 28, targetWidth - 56, targetHeight - 56);
-              }
+                paintBackground(ctx, targetWidth, targetHeight, neutral, sceneImage, backgroundFade);
 
-              const scale = Math.min((targetWidth - 120) / 800, (targetHeight - 240) / 1200);
-              const drawW = 800 * scale;
-              const drawH = 1200 * scale;
-              const dx = (targetWidth - drawW) / 2;
-              const dy = (targetHeight - drawH) / 2 + (ratio === "1:1" ? 15 : 35);
+                const scale = Math.min((targetWidth - 120) / 800, (targetHeight - 240) / 1200);
+                const drawW = 800 * scale;
+                const drawH = 1200 * scale;
+                const dx = (targetWidth - drawW) / 2;
+                const dy = (targetHeight - drawH) / 2 + (ratio === "1:1" ? 15 : 35);
 
-              ctx.drawImage(img, dx, dy, drawW, drawH);
+                ctx.drawImage(img, dx, dy, drawW, drawH);
 
-              ctx.fillStyle = "#1A202C";
-              ctx.font = "bold 34px serif";
-              ctx.textAlign = "center";
-              const titleText =
-                viewMode === "flatlay"
-                  ? "VIỆT PHỤC REMIX • OOTD FLAT-LAY"
-                  : "VIỆT PHỤC REMIX • CỔ PHỤC STUDIO";
-              ctx.fillText(titleText, targetWidth / 2, targetHeight - (ratio === "1:1" ? 48 : 96));
+                ctx.fillStyle = "#1A202C";
+                ctx.font = "bold 34px serif";
+                ctx.textAlign = "center";
+                const titleText =
+                  viewMode === "flatlay"
+                    ? "VIỆT PHỤC REMIX • OOTD FLAT-LAY"
+                    : "VIỆT PHỤC REMIX • CỔ PHỤC STUDIO";
+                ctx.fillText(titleText, targetWidth / 2, targetHeight - (ratio === "1:1" ? 48 : 96));
 
-              ctx.fillStyle = "#718096";
-              ctx.font = "20px sans-serif";
-              ctx.fillText(
-                "Nền tảng Tôn vinh & Sáng tạo trên nền Di sản Văn hóa Việt Nam",
-                targetWidth / 2,
-                targetHeight - (ratio === "1:1" ? 18 : 55)
-              );
+                ctx.fillStyle = "#718096";
+                ctx.font = "20px sans-serif";
+                ctx.fillText(
+                  "Nền tảng Tôn vinh & Sáng tạo trên nền Di sản Văn hóa Việt Nam",
+                  targetWidth / 2,
+                  targetHeight - (ratio === "1:1" ? 18 : 55)
+                );
 
-              resolve(canvas.toDataURL("image/png"));
+                void encodePng(canvas).then(resolve, reject);
               } catch (err) {
                 reject(err);
               } finally { URL.revokeObjectURL(blobURL); }
@@ -794,7 +800,8 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
             img.src = blobURL;
           });
         } finally {
-          setIsExporting(false);
+          if (--canvasExports.current === 0) artboard?.removeAttribute("data-export-preview");
+          resumePreparation();
         }
       },
     }));
@@ -836,7 +843,7 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
 
       return (
         <g key={eq.itemId} id={`interactive-slot-${eq.slot}`}>
-          <g transform={transformString}>
+          <g id={`item-transform-${eq.slot}`} transform={transformString}>
             {/* Lớp chứa nội dung trang phục: Kéo để di chuyển, Nhấp để chọn */}
             <g
               id={`content-${eq.slot}`}
@@ -848,6 +855,7 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
               {/* 1. Ảnh thật bóc tách (Cloudflare R2 / Public) */}
               {garmentImageUrl ? (
                 <image
+                  className="studio-shadow-original"
                   href={garmentImageUrl}
                   x={x}
                   y={y}
@@ -871,6 +879,7 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
                 />
               ) : null}
             </g>
+            {garmentImageUrl && <DragShadowImage url={garmentImageUrl} x={x} y={y} width={w} height={h} />}
           </g>
         </g>
       );
@@ -1122,10 +1131,9 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
         onPointerCancel={(event) => finishGesture(event, true)}
         onLostPointerCapture={(event) => finishGesture(event, true)}
       >
-        {/* Nền giấy dó nếu bật theme dopaper */}
-        {backgroundTheme === "dopaper" && (
-          <div className="absolute inset-0 bg-radial from-amber-50/70 to-stone-200/50 pointer-events-none" />
-        )}
+        <BoardBackground url={backgroundTheme === "occasion" ? backgroundUrl(occasionId, aspectRatio) : undefined}
+          neutral={backgroundTheme === "dopaper" ? "dopaper" : backgroundTheme === "white" ? "white" : neutralBackgroundTheme}
+          ratio={aspectRatio} backgroundFade={backgroundFade} />
 
         {/* SVG Artboard chuẩn 800 x 1200 px */}
         <svg
@@ -1159,7 +1167,7 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
                 .map((eq) => renderInteractiveItem(eq))}
 
               {/* Lớp khung điều khiển của món đang chọn (luôn nằm trên cùng, không bị món khác che khuất) */}
-              {selectedEq && !isExporting && renderSelectionControls(selectedEq)}
+              {selectedEq && renderSelectionControls(selectedEq)}
             </g>
           ) : (
             /* CHẾ ĐỘ 2: NGƯỜI MẪU 2D (AVATAR STUDIO) */

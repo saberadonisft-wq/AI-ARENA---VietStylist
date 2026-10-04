@@ -1,0 +1,118 @@
+{
+  "generator": "built-in image_gen",
+  "date": "2026-10-03",
+  "assets": [
+    {
+      "id": "dao-pho",
+      "format": "portrait",
+      "file": "dao-pho-portrait.webp",
+      "prompt": "Use case: photorealistic-natural. Create ONE portrait 9:16 photograph, an empty Vietnamese old-town street corner in soft morning daylight, for a fashion outfit composition backdrop. Pale ochre limewashed wall, aged muted blue-green wooden shutters only at far edge, subtle tree shadow, a very small bougainvillea corner. Pale terracotta pavement. Authentic modest Vietnamese vernacular architecture, no generic East Asian palace. The central 65-70% must be calm, mostly plain pale wall and open paving, low texture and low contrast, empty space for overlaying a full outfit. Architecture and plants confined to outer sides or distant background. Soft diffuse neutral light, realistic materials, restrained pale yellow, gray green and terracotta palette, moderate depth. No people, mannequins, clothing, text, signs, logos, watermark, furniture in center. Not a collage. Deliver realistic premium editorial environmental photograph, muted detail that supports garments overlaid later.",
+      "sourceFile": "exec-11be06f4-dc85-4a25-aeee-8ba517bf1fba.png"
+    },
+    {
+      "id": "dao-pho",
+      "format": "square",
+      "file": "dao-pho-square.webp",
+      "prompt": "Use case: lighting-weather / background composition adaptation. Edit the reference environment into a dedicated SQUARE 1:1 fashion backdrop. Preserve the exact location concept, authentic Vietnamese materials, restrained palette and soft neutral illumination. Recompose with decorative features at far left/right and top edges, keeping central 65-70% empty and low-detail. Keep visible floor at bottom. Do not simply crop away distinctive side features. No people, clothing, mannequins, lettering, logos, watermark. One realistic square photograph, no collage.",
+      "sourceFile": "exec-8c421b83-86a7-4973-9c40-35124a4f3540.png"
+    },
+    {
+      "id": "bieu-dien",
+      "format": "portrait",
+      "file": "bieu-dien-portrait.webp",
+      "prompt": "Use case: photorealistic-natural. One portrait 9:16 photograph of an empty small Vietnamese performing arts theater stage before the show, for fashion outfit overlay. Open deep wine red velvet curtains confined to far left and right edges, plain muted warm taupe backdrop, natural brown wooden stage floor, gentle overhead warm diffuse illumination. Central 70% empty, quiet and moderately bright for visibility of both white, red and dark garments overlaid later. Restrained deep burgundy edges, warm wood and subdued golden highlights. Real local theater, modest and elegant, no palace imagery. Moderate depth, photographic material realism, soft light with neutral rendering, not cinematic spotlights. No people, mannequins, clothing, text, signage, logos, instruments, laser, smoke, props in center. Background only, single photograph not collage.",
+      "sourceFile": "exec-6fbb4555-099c-4ae4-ba8e-67898c0b674d.png"
+    },
+    {
+      "id": "bieu-dien",
+      "format": "square",
+      "file": "bieu-dien-square.webp",
+      "prompt": "Use case: lighting-weather / background composition adaptation. Edit the reference environment into a dedicated SQUARE 1:1 fashion backdrop. Preserve the exact location concept, authentic Vietnamese materials, restrained palette and soft neutral illumination. Recompose with decorative features at far left/right and top edges, keeping central 65-70% empty and low-detail. Keep visible floor at bottom. Do not simply crop away distinctive side features. No people, clothing, mannequins, lettering, logos, watermark. One realistic square photograph, no collage.",
+      "sourceFile": "exec-8864fbe0-3de0-4b49-911b-48aeab4e8aa8.png"
+    },
+    {
+      "id": "tet",
+      "format": "portrait",
+      "file": "tet-portrait.webp",
+      "prompt": "Use case: photorealistic-natural. ONE portrait 9:16 photograph of an empty modest southern Vietnamese home veranda at Tet springtime, background for overlaying a fashion outfit. Quiet pale ivory plaster center wall and open light terracotta tiled veranda, dark old wooden door panels at outer edges, a potted yellow ochna mai blossom tree restricted to one outer edge, a few tiny red festive hanging ornaments on that tree only. Restrained cream, soft yellow flowers, muted green and small vermilion red accents. Soft diffuse spring morning daylight, no strong color casts, realistic Vietnamese vernacular house materials, moderate depth. Central 65-70% of frame empty low-detail and bright neutral space for white, red and dark garments overlaid later. No people, mannequins, garments, furniture in center, text, calligraphy, logos, watermark, peach blossom, generic East Asian palace. Single realistic editorial environment photograph, not collage.",
+      "sourceFile": "exec-22a6341f-1fc5-42e3-b9d0-afbacb117bde.png"
+    },
+    {
+      "id": "tet",
+      "format": "square",
+      "file": "tet-square.webp",
+      "prompt": "Use case: lighting-weather / background composition adaptation. Edit the reference environment into a dedicated SQUARE 1:1 fashion backdrop. Preserve the exact location concept, authentic Vietnamese materials, restrained palette and soft neutral illumination. Recompose with decorative features at far left/right and top edges, keeping central 65-70% empty and low-detail. Keep visible floor at bottom. Do not simply crop away distinctive side features. No people, clothing, mannequins, lettering, logos, watermark. One realistic square photograph, no collage.",
+      "sourceFile": "exec-a4cbcae6-f0d4-4c32-a28a-de0ee861e395.png"
+    },
+    {
+      "id": "cuoi-hoi",
+      "format": "portrait",
+      "file": "cuoi-hoi-portrait.webp",
+      "prompt": "Use case: photorealistic-natural. Create ONE portrait 9:16 photograph for a Vietnamese fashion outfit backdrop. An elegant Vietnamese family house veranda prepared for a wedding: dark wooden doors at edges, ivory silk draping and white flowers with tiny vermilion accents only at the sides, spacious plain cream center. Warm ivory, restrained red and dark wood. No spring blossom tree. Soft diffuse neutral daylight, restrained color, moderate depth, realistic material textures. Central 65-70% low detail, empty quiet space for overlaying full garments; architecture, flowers and decorations confined to outer edges or distant background. No people, mannequins, clothes, text, logos, signs, watermark. Single photograph, not collage.",
+      "sourceFile": "exec-ae461a05-7645-4343-9693-ca16f7ad63e5.png"
+    },
+    {
+      "id": "cuoi-hoi",
+      "format": "square",
+      "file": "cuoi-hoi-square.webp",
+      "prompt": "Use case: lighting-weather / background composition adaptation. Edit the reference environment into a dedicated SQUARE 1:1 fashion backdrop. Preserve the exact location concept, authentic Vietnamese materials, restrained palette and soft neutral illumination. Recompose with decorative features at far left/right and top edges, keeping central 65-70% empty and low-detail. Keep visible floor at bottom. Do not simply crop away distinctive side features. No people, clothing, mannequins, lettering, logos, watermark. One realistic square photograph, no collage.",
+      "sourceFile": "exec-5cfc31bc-67db-42ad-822b-2c22ca3471cc.png"
+    },
+    {
+      "id": "ky-yeu",
+      "format": "portrait",
+      "file": "ky-yeu-portrait.webp",
+      "prompt": "Use case: photorealistic-natural. Create ONE portrait 9:16 photograph for a Vietnamese fashion outfit backdrop. Youthful Vietnamese school courtyard in morning light: simple cream school corridor at far side, distant leafy trees, just a few tiny red flamboyant petals in one corner. Open pale sunlit courtyard center. Bright cream and gentle green. Nostalgic school youth, informal and fresh, no grand ceremonial hall. Soft diffuse neutral daylight, restrained color, moderate depth, realistic material textures. Central 65-70% low detail, empty quiet space for overlaying full garments; architecture, flowers and decorations confined to outer edges or distant background. No people, mannequins, clothes, text, logos, signs, watermark. Single photograph, not collage.",
+      "sourceFile": "exec-5a2295ca-fdd2-42ed-b659-5d148656e2a3.png"
+    },
+    {
+      "id": "ky-yeu",
+      "format": "square",
+      "file": "ky-yeu-square.webp",
+      "prompt": "Use case: precise-object-edit. Recompose the supplied Vietnamese environment background into ONE SQUARE 1:1 photograph. Preserve the same concept, material realism, architectural identity, color palette and soft daylight. Move architecture, greenery and decorations to outer edges or far distance; keep center 65-70% quiet, open and low-detail for a fashion outfit overlay. Preserve the defining school courtyard or university hall or heritage corridor features. A spacious bright central ground plane. No people, mannequins, clothing, writing, logos, watermark. Not a collage. Do not crop away all identifying side details.",
+      "sourceFile": "exec-e3c7b5cc-9028-41bb-b8c8-c53fe06bc216.png"
+    },
+    {
+      "id": "le-hoi-truong",
+      "format": "portrait",
+      "file": "le-hoi-truong-portrait.webp",
+      "prompt": "Use case: photorealistic-natural. Create ONE portrait 9:16 photograph for a Vietnamese fashion outfit backdrop. Vietnamese school cultural festival courtyard, bamboo stalls only at edges, a short string of tiny colored pennants along the very top, muted jade green and terracotta orange accents at margins. Large clear bright pale courtyard center. Authentic modest Vietnamese school architecture, youthful restrained festivity. Soft diffuse neutral daylight, restrained color, moderate depth, realistic material textures. Central 65-70% low detail, empty quiet space for overlaying full garments; architecture, flowers and decorations confined to outer edges or distant background. No people, mannequins, clothes, text, logos, signs, watermark. Single photograph, not collage.",
+      "sourceFile": "exec-79fe3cf8-061a-42c2-8ec6-c94f687005ed.png"
+    },
+    {
+      "id": "le-hoi-truong",
+      "format": "square",
+      "file": "le-hoi-truong-square.webp",
+      "prompt": "Use case: precise-object-edit. Recompose the supplied Vietnamese environment background into ONE SQUARE 1:1 photograph. Preserve the same concept, material realism, architectural identity, color palette and soft daylight. Move architecture, greenery and decorations to outer edges or far distance; keep center 65-70% quiet, open and low-detail for a fashion outfit overlay. Preserve the defining school courtyard or university hall or heritage corridor features. A spacious bright central ground plane. No people, mannequins, clothing, writing, logos, watermark. Not a collage. Do not crop away all identifying side details.",
+      "sourceFile": "exec-3d512bd6-6efc-4f2c-a09e-94c96c8bf246.png"
+    },
+    {
+      "id": "di-san",
+      "format": "portrait",
+      "file": "di-san-portrait.webp",
+      "prompt": "Use case: photorealistic-natural. Create ONE portrait 9:16 photograph for a Vietnamese fashion outfit backdrop. Quiet Vietnamese vernacular architectural corridor leading into an empty brick courtyard, aged timber columns confined to edges, modest clay tile eaves above and receding walkway, muted moss and gray stone. Central area calm and open, light buff plaster in distance. No identified real monument, no generic Asian palace. Soft diffuse neutral daylight, restrained color, moderate depth, realistic material textures. Central 65-70% low detail, empty quiet space for overlaying full garments; architecture, flowers and decorations confined to outer edges or distant background. No people, mannequins, clothes, text, logos, signs, watermark. Single photograph, not collage.",
+      "sourceFile": "exec-9531bd8a-d4e1-4306-9673-8dc161466df3.png"
+    },
+    {
+      "id": "di-san",
+      "format": "square",
+      "file": "di-san-square.webp",
+      "prompt": "Use case: precise-object-edit. Recompose the supplied Vietnamese environment background into ONE SQUARE 1:1 photograph. Preserve the same concept, material realism, architectural identity, color palette and soft daylight. Move architecture, greenery and decorations to outer edges or far distance; keep center 65-70% quiet, open and low-detail for a fashion outfit overlay. Preserve the defining school courtyard or university hall or heritage corridor features. A spacious bright central ground plane. No people, mannequins, clothing, writing, logos, watermark. Not a collage. Do not crop away all identifying side details.",
+      "sourceFile": "exec-caca14a9-0b00-4658-9d18-0e8a7edd5535.png"
+    },
+    {
+      "id": "tot-nghiep",
+      "format": "portrait",
+      "file": "tot-nghiep-portrait.webp",
+      "prompt": "Use case: photorealistic-natural. Create ONE portrait 9:16 photograph for a Vietnamese fashion outfit backdrop. Formal Vietnamese university entrance hall with broad pale stone steps, simple dignified columns at outer sides, distant greenery, subtle navy and champagne accents. Symmetric spacious empty ivory stone center. Daylight ceremonial atmosphere, contemporary Vietnamese campus, no ornate European palace or royal ornament, no schoolyard flowers. Soft diffuse neutral daylight, restrained color, moderate depth, realistic material textures. Central 65-70% low detail, empty quiet space for overlaying full garments; architecture, flowers and decorations confined to outer edges or distant background. No people, mannequins, clothes, text, logos, signs, watermark. Single photograph, not collage.",
+      "sourceFile": "exec-93574431-e37f-42d8-bcb8-83bf984d549c.png"
+    },
+    {
+      "id": "tot-nghiep",
+      "format": "square",
+      "file": "tot-nghiep-square.webp",
+      "prompt": "Use case: precise-object-edit. Recompose the supplied Vietnamese environment background into ONE SQUARE 1:1 photograph. Preserve the same concept, material realism, architectural identity, color palette and soft daylight. Move architecture, greenery and decorations to outer edges or far distance; keep center 65-70% quiet, open and low-detail for a fashion outfit overlay. Preserve the defining school courtyard or university hall or heritage corridor features. A spacious bright central ground plane. No people, mannequins, clothing, writing, logos, watermark. Not a collage. Do not crop away all identifying side details.",
+      "sourceFile": "exec-82dc10ce-b4be-42d2-a813-f3a21386725f.png"
+    }
+  ]
+}
