@@ -139,8 +139,35 @@ async def test_valid_primary_response_can_use_more_than_one_quarter_of_budget(ge
     assert result["model"] == MODELS[0]
 
 
-async def test_all_timeouts_obey_total_deadline_and_release_slot(gemini, monkeypatch):
+async def test_slow_failures_leave_time_for_the_last_model_to_answer(gemini, monkeypatch):
+    # Reproduce a busy primary followed by two timeouts, then a valid answer.
+    # Scale the production deadline so this regression does not take 100 seconds.
+    budget_ratio = provider._RECOMMENDATION_TIMEOUT / provider._MODEL_ATTEMPT_TIMEOUT
+    monkeypatch.setattr(provider, "_MODEL_ATTEMPT_TIMEOUT", 0.2)
+    monkeypatch.setattr(provider, "_RECOMMENDATION_TIMEOUT", budget_ratio * 0.2)
+    calls = []
+
+    async def response(url, **kwargs):
+        calls.append(url.rsplit("/", 1)[-1].split(":")[0])
+        if len(calls) == 1:
+            await anyio.sleep(0.03)
+            return httpx.Response(503)
+        if len(calls) < 4:
+            await anyio.sleep_forever()
+        await anyio.sleep(0.1)
+        return success()
+
+    result = await run(gemini, monkeypatch, response)
+    assert calls == MODELS
+    assert result["source"] == "gemini"
+    assert result["model"] == MODELS[-1]
+    assert provider._provider_slots.borrowed_tokens == 0
+
+
+@pytest.mark.parametrize("attempt_timeout", [0.03, 25.0])
+async def test_all_timeouts_obey_total_deadline_and_release_slot(gemini, monkeypatch, attempt_timeout):
     monkeypatch.setattr(provider, "_RECOMMENDATION_TIMEOUT", 0.1)
+    monkeypatch.setattr(provider, "_MODEL_ATTEMPT_TIMEOUT", attempt_timeout)
     calls = []
 
     async def response(*args, **kwargs):
