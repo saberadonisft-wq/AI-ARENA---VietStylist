@@ -238,7 +238,7 @@ export const api = {
     locked_items?: Array<{ slot: string; item_id: string; variant_id?: string }>;
   }) => apiFetch<RecommendationResponse>("/api/recommendations/context", {
     method: "POST",
-    timeoutMs: 45000,
+    timeoutMs: 120000,
     body: JSON.stringify(payload),
   }),
   getAIRecommendations: (payload: {
@@ -249,7 +249,7 @@ export const api = {
     locked_items?: Array<{ slot: string; item_id: string; variant_id?: string }>;
   }, signal?: AbortSignal) => apiFetch<RecommendationResponse>("/api/recommendations/ai", {
     method: "POST",
-    timeoutMs: 45000,
+    timeoutMs: 120000,
     signal,
     body: JSON.stringify(payload),
   }),

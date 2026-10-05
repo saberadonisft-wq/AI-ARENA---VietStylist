@@ -497,15 +497,18 @@ test("a late occasion background cannot replace the latest choice and errors fal
   expect(pixel).toEqual([255, 255, 255, 255]);
 });
 
-test("shared PNG includes the chosen scene while the AI reference stays white", async ({ page }) => {
-  await mockApi(page);
+for (const ratio of ["1:1", "9:16"] as const) {
+test(`saved, downloaded and AI outfit references retain the same scene at ${ratio}`, async ({ page }) => {
+  const saves = await mockApi(page);
   await loginForGeneration(page);
   await page.goto("/studio");
   await page.getByText("Trang phục 0", { exact: true }).click();
+  await page.getByRole("button", { name: ratio, exact: true }).click();
   await page.getByRole("button", { name: "Tết", exact: true }).click();
   await expect(page.getByTestId("board-background")).toHaveAttribute("data-background-status", "ready");
+  await page.getByRole("slider", { name: "Độ mờ ảnh nền" }).fill("35");
   await page.getByRole("button", { name: "Xuất ảnh", exact: true }).click();
-  await page.getByRole("button", { name: "Vuông (Instagram / Post)" }).click();
+  await page.getByRole("button", { name: ratio === "1:1" ? "Vuông (Instagram / Post)" : "Story / Reels (9:16)" }).click();
   const preview = page.getByAltText("Bản phối xuất");
   await expect(preview).toBeVisible();
   const pixel = await preview.evaluate(async node => {
@@ -515,21 +518,55 @@ test("shared PNG includes the chosen scene while the AI reference stays white", 
     return [...ctx.getImageData(2, 2, 1, 1).data];
   });
   expect(pixel.slice(0, 3).some(value => value < 240)).toBe(true);
-  await page.getByRole("heading", { name: "Xuất ảnh bản phối", exact: true }).locator("../..").getByRole("button").click();
+  await page.getByRole("button", { name: "Đóng xuất ảnh", exact: true }).click();
+  await page.getByRole("button", { name: "Thử đồ AI", exact: true }).click();
+  await page.getByRole("dialog", { name: "Thử đồ bằng Gemini" }).getByRole("button", { name: "Lưu bộ phối", exact: true }).click();
+  await expect.poll(() => saves.length).toBe(1);
+  expect(saves[0].body.snapshot).toMatchObject({ backgroundTheme: "occasion", occasionId: "tet", backgroundFade: 35, aspectRatio: ratio });
+  await page.getByRole("button", { name: "Đóng thử đồ AI", exact: true }).click();
+  await page.evaluate(key => {
+    for (const storedKey of Object.keys(localStorage)) if (storedKey.startsWith(key)) localStorage.removeItem(storedKey);
+  }, DRAFT_KEY);
+  await page.goto("/studio?loadOutfit=saved-1");
+  await expect(page.getByTestId("board-background")).toHaveAttribute("data-background-status", "ready");
+  await expect(page.getByRole("slider", { name: "Độ mờ ảnh nền" })).toHaveValue("35");
   await page.getByRole("button", { name: "Thử đồ AI", exact: true }).click();
   const downloading = page.waitForEvent("download");
   await page.getByRole("button", { name: "Tải ảnh bản phối", exact: true }).click();
   const download = await downloading;
+  await download.saveAs(test.info().outputPath("download-with-scene.png"));
   const png = readFileSync((await download.path())!);
-  const aiPixel = await page.evaluate(async src => {
+  const downloadedPixel = await page.evaluate(async src => {
     const image = new Image(); image.src = src; await image.decode();
     const canvas = document.createElement("canvas"); canvas.width = image.naturalWidth; canvas.height = image.naturalHeight;
     const ctx = canvas.getContext("2d")!; ctx.drawImage(image, 0, 0);
     return [...ctx.getImageData(2, 2, 1, 1).data];
   }, `data:image/png;base64,${png.toString("base64")}`);
-  expect(aiPixel).toEqual([255, 255, 255, 255]);
+  expect(downloadedPixel).toEqual(pixel);
+  let uploadedBoard: Buffer | undefined;
+  await page.route("**/test-upload/scene-reference", route => {
+    uploadedBoard = route.request().postDataBuffer()!;
+    return route.fulfill({ status: 200, body: "ok" });
+  });
+  await page.route("http://127.0.0.1:4100/api/media/**", route => route.fulfill({ json:
+    new URL(route.request().url()).pathname === "/api/media/uploads"
+      ? { media_id: "scene-reference", upload_url: "http://127.0.0.1:3100/test-upload/scene-reference", method: "PUT", storage_type: "r2" }
+      : {} }));
+  await page.route("http://127.0.0.1:4100/api/v3/generation/jobs", route => route.fulfill({
+    status: 202, json: { job_id: "scene-job", status: "failed", error: { code: "UNAVAILABLE", message: "Provider fixture unavailable" } },
+  }));
+  await page.getByRole("button", { name: "Tạo ảnh thử đồ", exact: true }).click();
+  await expect.poll(() => uploadedBoard?.length || 0).toBeGreaterThan(0);
+  const aiPixel = await page.evaluate(async src => {
+    const image = new Image(); image.src = src; await image.decode();
+    const canvas = document.createElement("canvas"); canvas.width = image.naturalWidth; canvas.height = image.naturalHeight;
+    const ctx = canvas.getContext("2d")!; ctx.drawImage(image, 0, 0);
+    return [...ctx.getImageData(2, 2, 1, 1).data];
+  }, `data:image/png;base64,${uploadedBoard!.toString("base64")}`);
+  expect(aiPixel).toEqual(pixel);
   expect((await readDraft(page)).snapshot.backgroundTheme).toBe("occasion");
 });
+}
 
 test("canvas drag persists, undo restores it, and export includes garment image", async ({ page }) => {
   await mockApi(page);
@@ -758,6 +795,14 @@ test("manual prompt changes when a person photo is selected", () => {
   expect(withoutPerson).toContain("Choose one adult wearer");
   expect(withPerson).toContain("Preserve their identity");
   expect(withPerson).not.toContain("Choose one adult wearer");
+  for (const prompt of [withoutPerson, withPerson]) {
+    expect(prompt).toContain("authoritative visual reference for both the garments and the background");
+    expect(prompt).toContain("Do not replace, redesign or simplify the scene");
+    expect(prompt).toContain("If the reference has a plain background, keep it plain");
+    expect(prompt).toContain("Keep Image 1's aspect ratio and camera framing");
+    expect(prompt).not.toContain("Ignore the board's background");
+  }
+  expect(withPerson).toContain("Use Image 2 only for the wearer, never for the background");
 });
 
 test("stale outfit items stay in the draft and block Gemini before upload", async ({ page }) => {
@@ -1498,6 +1543,40 @@ test("styling questionnaire sends chosen needs and previews Gemini results befor
   await expect.poll(async () => (await readDraft(page))?.snapshot.items[0]?.itemId).toBe(TEST_GARMENT.itemId);
   expect((await readDraft(page)).snapshot).toMatchObject({ occasionId: "ky_yeu", styleMode: "remix", backgroundTheme: "occasion" });
   expect(calls).toBe(1);
+});
+
+test("styling questionnaire waits for a slow Gemini fallback and keeps the draft unchanged", async ({ page }) => {
+  await page.clock.install();
+  await mockApi(page);
+  await loginForGeneration(page);
+  let requested = false;
+  let release!: () => void;
+  const pending = new Promise<void>(resolve => { release = resolve; });
+  await page.route("**/api/recommendations/ai", async route => {
+    requested = true;
+    await pending;
+    await route.fulfill({ json: { source: "gemini", model: "gemini-3.5-flash", outfits: [{
+      title: "Gợi ý từ model dự phòng", explanation: "Chọn từ danh mục", items: [{ slot: TEST_GARMENT.slot, item_id: TEST_GARMENT.itemId, item_name: "Trang phục 0" }],
+    }] } });
+  });
+  await page.goto("/studio");
+  const panel = page.getByRole("region", { name: "Gợi ý phối đồ", exact: true });
+  await panel.getByLabel("Dịp sử dụng", { exact: true }).selectOption("ky_yeu");
+  await expect.poll(async () => (await readDraft(page))?.ownerId).toBe("generation-user");
+  const before = await readDraft(page);
+  try {
+    await panel.getByRole("button", { name: "Gợi ý", exact: true }).click();
+    await expect.poll(() => requested).toBe(true);
+    await page.clock.fastForward(90000);
+    await expect(panel.getByRole("status")).toContainText("Đang lấy gợi ý từ Gemini");
+    await expect(panel.getByRole("alert")).toHaveCount(0);
+    release();
+    await expect(panel.getByText("Nguồn: Gemini")).toBeVisible();
+    await expect(panel.getByRole("button", { name: "Áp dụng gợi ý" })).toBeVisible();
+    expect(await readDraft(page)).toEqual(before);
+  } finally {
+    release();
+  }
 });
 
 test("styling questionnaire preserves choices on retry and clears an outdated preview", async ({ page }) => {

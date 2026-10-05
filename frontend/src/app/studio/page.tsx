@@ -1314,7 +1314,7 @@ export default function StudioPage() {
             {isAiLoading && (
               <div role="status" className="flex items-center space-x-2 text-xs text-heritage-red pt-1">
                 <span className="w-2 h-2 rounded-full bg-heritage-red animate-ping shrink-0" />
-                <span className="font-medium animate-pulse">Đang lấy gợi ý từ Gemini, có thể mất khoảng 30 giây…</span>
+                <span className="font-medium animate-pulse">Đang lấy gợi ý từ Gemini… Khi dịch vụ bận, có thể mất đến 2 phút.</span>
               </div>
             )}
             {recommendationError && <p role="alert" className="rounded-lg bg-red-50 p-3 text-xs text-red-800">{recommendationError} Nhấn “Gợi ý” để thử lại.</p>}
@@ -1512,9 +1512,9 @@ export default function StudioPage() {
           setIsTryOnOpen(false);
           setActionNotice("Bản phối vẫn giữ nguyên các món cũ. Chọn món thay thế trong danh mục đã xuất bản rồi thử tạo lại ảnh.");
         }}
-        onExportOutfit={async () => {
+        onExportOutfit={async (options) => {
           if (!canvasRef.current) throw new Error("Canvas chưa sẵn sàng");
-          return canvasRef.current.exportToBlob(snapshot.aspectRatio || "9:16", { neutralBackground: true });
+          return canvasRef.current.exportToBlob(snapshot.aspectRatio || "9:16", options);
         }}
         onSaveOutfit={saveFromTryOn}
         isLoggedIn={isLoggedIn}

@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth/context";
 import { api, ApiError } from "@/lib/api/client";
 import { HeritageArticle, CatalogItem } from "@/lib/types/api";
@@ -44,7 +43,6 @@ const STORY_ERAS = [
 ];
 
 export default function ChuyenCoPhucPage() {
-  const router = useRouter();
   const { user, isLoggedIn, isAdmin, isStylist } = useAuth();
   const { confirm, dialog } = useConfirmDialog();
 
@@ -281,14 +279,6 @@ export default function ChuyenCoPhucPage() {
       setArticleActionError(`Không xóa được câu chuyện: ${err?.message || "Bạn không có quyền hoặc máy chủ không khả dụng."}`);
     } finally {
       setIsDeletingArticle(false);
-    }
-  };
-
-  const handleOpenGarmentInStudio = (garmentId?: string) => {
-    if (garmentId) {
-      router.push(`/?item=${garmentId}`);
-    } else {
-      router.push("/");
     }
   };
 
@@ -626,11 +616,11 @@ export default function ChuyenCoPhucPage() {
               {isLoadingDetail && <p role="status" className="text-sm text-stone-500">Đang tải toàn bộ câu chuyện...</p>}
               {detailError && <div role="alert" className="rounded-xl bg-red-50 p-4 text-sm text-red-700">{detailError}<button type="button" onClick={() => void openArticle(selectedArticle)} className="ml-3 min-h-11 underline">Thử tải lại nội dung</button></div>}
               {selectedArticle.cover_image_url && !selectedArticle.cover_image_url.includes(".example") && (
-                <div className="rounded-xl overflow-hidden shadow-sm border border-stone-200 max-h-80">
+                <div className="rounded-xl overflow-hidden shadow-sm border border-stone-200">
                   <img
                     src={selectedArticle.cover_image_url}
                     alt={selectedArticle.title}
-                    className="w-full h-full object-cover"
+                    className="block w-full h-auto max-h-[70vh] object-contain"
                   />
                 </div>
               )}
@@ -716,25 +706,6 @@ export default function ChuyenCoPhucPage() {
                 </div>
               )}
 
-              {/* Action Banner to Try on in Studio */}
-              <div className="bg-gradient-to-r from-stone-900 to-red-950 text-white rounded-xl p-5 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-md">
-                <div>
-                  <h4 className="font-serif font-bold text-sm text-white">
-                    Cảm hứng với tà áo này?
-                  </h4>
-                  <p className="text-xs text-stone-300 mt-0.5">
-                    Mở trang phục trong Studio 2D để trải nghiệm ướm thử và phối màu Ngũ hành ngay.
-                  </p>
-                </div>
-                <button
-                  onClick={() => handleOpenGarmentInStudio(selectedArticle.related_garment_id)}
-                  className="px-4 py-2 bg-heritage-red hover:bg-white hover:text-stone-900 text-white font-semibold text-xs rounded-xl shadow-sm transition-all whitespace-nowrap flex items-center space-x-1.5 shrink-0"
-                >
-                  <Shirt className="w-4 h-4" />
-                  <span>Phối đồ trong Studio</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </button>
-              </div>
             </div>
           </div>
         </div>
