@@ -91,6 +91,13 @@ def test_prompt_builder_synthesizes_strict_invariants():
     assert "Choose one adult wearer" in without_person
     assert "Image 2 is the person" in with_person
     assert "Preserve this person's identity" in with_person
+    for prompt in (without_person, with_person):
+        assert "both the garments and the background" in prompt
+        assert "Do not replace, redesign or simplify the scene" in prompt
+        assert "If the reference has a plain background, keep it plain" in prompt
+        assert "Keep Image 1's aspect ratio and camera framing" in prompt
+        assert "do not reproduce the board's white background" not in prompt
+    assert "Use Image 2 only for the wearer, never for the background" in with_person
 
 
 def test_completed_job_does_not_imply_cultural_compliance():

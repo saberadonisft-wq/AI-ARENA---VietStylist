@@ -32,7 +32,7 @@ interface GeminiTryOnModalProps {
   onReloadCatalog: () => Promise<void>;
   ownerId?: string;
   onReplaceUnavailableItems: () => void;
-  onExportOutfit: () => Promise<Blob>;
+  onExportOutfit: (options?: { neutralBackground?: boolean }) => Promise<Blob>;
   onSaveOutfit: () => Promise<boolean>;
   isLoggedIn: boolean;
 }
@@ -368,7 +368,7 @@ export default function GeminiTryOnModal({
           <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-900 flex items-start space-x-2">
             <Info className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
             <p className="leading-relaxed">
-              Bản phối sẽ được xuất trên nền trắng để AI nhận diện trang phục rõ hơn. Ảnh nhân vật là tùy chọn; nếu có, hãy chọn ảnh toàn thân, đứng thẳng và đủ sáng. Ảnh tải lên được lưu riêng tư trong tài khoản và gửi đến Gemini khi tạo ảnh.
+              Ảnh bản phối gửi đến Gemini giữ hậu cảnh đã chọn. Prompt yêu cầu giữ cảnh này và đặt người mặc trang phục vào trong cảnh. Ảnh nhân vật là tùy chọn; nếu có, hãy chọn ảnh toàn thân, đứng thẳng và đủ sáng. Ảnh tải lên được lưu riêng tư trong tài khoản và gửi đến Gemini khi tạo ảnh.
             </p>
           </div>
 

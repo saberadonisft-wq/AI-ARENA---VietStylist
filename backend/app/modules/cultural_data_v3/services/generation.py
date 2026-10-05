@@ -112,14 +112,24 @@ class PromptBuilder:
         base = cls.build(grounding)["positive_prompt"]
         reference = (
             "Image 1 is the outfit board and is the authoritative visual reference for "
-            "the garments, colors, layers and accessories. Recreate the clothing on a "
-            "person; do not reproduce the board's white background, captions or layout."
+            "both the garments and the background. Preserve the garments, colors, "
+            "patterns, layers and accessories. Keep Image 1's existing background: "
+            "the same architecture, flowers, drapes, decorations, ground, perspective, "
+            "lighting and colors. Do not replace, redesign or simplify the scene, even "
+            "with another similar Vietnamese setting. If the reference has a plain "
+            "background, keep it plain instead of inventing a location. Change only "
+            "the displayed clothing into one person naturally wearing it in the "
+            "central open space. Show the complete outfit and feet with realistic "
+            "scale, contact shadows and occlusion. Keep Image 1's aspect ratio and "
+            "camera framing. Remove the floating outfit, board captions, branding and "
+            "footer; preserve the scene behind them."
         )
         if has_person_image:
             wearer = (
                 "Image 2 is the person to dress. Preserve this person's identity, face, "
                 "skin tone, body proportions and pose. Replace only clothing as needed "
-                "for natural fit and occlusion. Do not invent a different wearer."
+                "for natural fit and occlusion. Do not invent a different wearer. "
+                "Use Image 2 only for the wearer, never for the background."
             )
         else:
             wearer = (
@@ -128,7 +138,7 @@ class PromptBuilder:
                 "context. Use a natural pose and realistic proportions; do not infer a "
                 "specific real person's identity."
             )
-        return f"{base} {reference} {wearer}"
+        return f"Edit Image 1 into a realistic full-body virtual try-on photograph. {base} {reference} {wearer}"
 
     @classmethod
     def build(cls, grounding: Dict[str, Any]) -> Dict[str, str]:

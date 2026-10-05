@@ -13,7 +13,10 @@ _provider_slots = anyio.CapacityLimiter(4)
 _TEXT_MODEL_CHAIN = (
     "gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash",
 )
-_RECOMMENDATION_TIMEOUT = 30.0
+_MODEL_ATTEMPT_TIMEOUT = 25.0
+# A busy/slow model must not consume the whole budget before the rest of the
+# configured fallback chain gets a chance to answer.
+_RECOMMENDATION_TIMEOUT = 100.0
 
 
 def _retry_after_seconds(response: httpx.Response) -> float:
@@ -120,12 +123,14 @@ class GeminiClient:
             with anyio.fail_after(_RECOMMENDATION_TIMEOUT) as deadline:
                 for index, model in enumerate(models):
                     remaining = deadline.deadline - anyio.current_time()
+                    if remaining <= 0:
+                        raise TimeoutError
                     # Give the selected model its normal timeout. Dividing the
                     # budget by fallback count prematurely cancels valid answers.
-                    # All attempts and Retry-After still share the 30s deadline.
-                    attempt_timeout = min(25.0, remaining)
+                    # The outer scope bounds every attempt and Retry-After. Keep
+                    # distinct deadlines instead of racing two equal cancel scopes.
                     try:
-                        with anyio.fail_after(attempt_timeout):
+                        with anyio.fail_after(_MODEL_ATTEMPT_TIMEOUT):
                             resp = await client.post(
                                 f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
                                 headers={"X-goog-api-key": self.api_key},
