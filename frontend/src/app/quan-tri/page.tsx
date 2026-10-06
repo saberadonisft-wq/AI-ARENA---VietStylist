@@ -76,6 +76,7 @@ export default function QuanTriPage() {
         </p>
       </div>
 
+      <Link href="/lookbook/kiem-duyet" className="inline-flex min-h-11 items-center rounded-xl border border-stone-300 bg-white px-4 py-2 text-sm font-semibold">Kiểm duyệt Lookbook cộng đồng</Link>
       <AdminWorkspace />
     </div>
   );

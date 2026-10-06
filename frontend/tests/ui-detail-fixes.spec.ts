@@ -40,6 +40,7 @@ async function fixtures(page: Page, signedIn = true) {
       { slot: "outerwear", item_a_id: items[0].id, item_a_name: items[0].id, item_b_id: items[0].id, is_changed: false },
       { slot: "headwear", item_a_id: "removed-technical-item", item_a_name: "removed-technical-item", is_changed: true },
     ] });
+    if (path === "/api/lookbook-posts") return send({ items: [], next_cursor: null });
     if (path === "/api/lookbooks") return send([book]);
     if (path === `/api/lookbooks/${book.id}`) return send(book);
     if (path.endsWith("/share")) return send({ share_token: "long-token-".repeat(20), scope: "view_only" });
@@ -256,7 +257,7 @@ test("Lookbook labels, whitespace validation and server errors stay accessible i
     attempts++;
     return attempts === 1 ? route.fulfill({ status: 503, json: fail }) : route.fulfill({ json: book });
   });
-  await page.goto("/lookbook");
+  await page.goto("/lookbook?tab=collections");
   const trigger = page.getByRole("button", { name: "Tạo Lookbook mới" });
   await trigger.click();
   const dialog = page.getByRole("dialog", { name: "Tạo bộ sưu tập Lookbook mới" });
@@ -289,7 +290,7 @@ for (const path of ["/lookbook", `/lookbook/${book.id}`]) {
   test(`long share links keep the copy button inside the mobile viewport on ${path}`, async ({ page }) => {
     await fixtures(page);
     await page.setViewportSize({ width: 320, height: 812 });
-    await page.goto(path);
+    await page.goto(path === "/lookbook" ? "/lookbook?tab=collections" : path);
     await page.getByRole("button", { name: `Tạo liên kết chia sẻ ${path === "/lookbook" ? book.title : "Lookbook"}`, exact: true }).click();
     const copy = page.getByRole("button", { name: "Sao chép" });
     await expect(copy).toBeVisible();

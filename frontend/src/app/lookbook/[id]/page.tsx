@@ -31,6 +31,7 @@ export default function LookbookDetailPage() {
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
+  const [isChangingVisibility, setIsChangingVisibility] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [loadedOwnerId, setLoadedOwnerId] = useState<string | null>(null);
 
@@ -95,6 +96,19 @@ export default function LookbookDetailPage() {
     } finally {
       if (ownerId === currentOwnerId.current) setIsSharing(false);
     }
+  };
+
+  const changeVisibility = async (visibility: string) => {
+    const ownerId = user?.id;
+    if (!ownerId || lookbook?.owner_id !== ownerId || isChangingVisibility) return;
+    setIsChangingVisibility(true);
+    try {
+      const updated = await api.updateLookbook(lookbookId, { visibility });
+      if (ownerId !== currentOwnerId.current) return;
+      setLookbook(updated); setShareUrl(null);
+      setActionMessage(visibility === 'private' ? 'Đã chuyển riêng tư và thu hồi các link chia sẻ.' : 'Đã cập nhật quyền xem bộ sưu tập.');
+    } catch (err: any) { if (ownerId === currentOwnerId.current) setActionMessage(err.message); }
+    finally { if (ownerId === currentOwnerId.current) setIsChangingVisibility(false); }
   };
 
   const handleDelete = async () => {
@@ -231,6 +245,7 @@ export default function LookbookDetailPage() {
 
         <h1 className="font-serif text-2xl sm:text-3xl font-bold text-stone-900">{lookbook.title}</h1>
         <p className="text-stone-600 text-xs leading-relaxed max-w-2xl">{lookbook.description}</p>
+        {lookbook.owner_id === user?.id && <label className="block max-w-sm space-y-2 text-sm"><span className="font-semibold">Quyền xem bộ sưu tập</span><select value={lookbook.visibility} disabled={isChangingVisibility} onChange={event => void changeVisibility(event.target.value)} className="min-h-11 w-full rounded-xl border border-stone-300 bg-white px-3 py-2"><option value="private">Riêng tư — chỉ mình tôi</option><option value="unlisted">Người có liên kết</option><option value="public">Công khai</option></select><span className="block text-xs text-stone-600">Link cũ của bộ sưu tập riêng tư đã được thu hồi. Chọn Người có liên kết để tạo link mới.</span></label>}
       </div>
 
       {/* Danh sách các bộ phối trong Lookbook */}

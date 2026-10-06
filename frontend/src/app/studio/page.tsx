@@ -23,6 +23,8 @@ import { occasionBackgroundPatch, neutralBackground, type BackgroundTheme } from
 import { useAuth } from "@/lib/auth/context";
 import { useCatalog } from "@/lib/catalog/CatalogProvider";
 import Canvas2D, { Canvas2DHandle } from "@/features/studio/Canvas2D";
+import { readStudioDraft } from "@/features/studio/persistence";
+import { Share2 } from "lucide-react";
 import BackgroundFadeControl from "@/features/studio/BackgroundFadeControl";
 import SwatchPicker from "@/features/studio/SwatchPicker";
 import CulturalCheckBadge from "@/features/studio/CulturalCheckBadge";
@@ -154,7 +156,7 @@ export default function StudioPage() {
   const [isExportOpen, setIsExportOpen] = useState(false);
   const [isTryOnOpen, setIsTryOnOpen] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
-  const [pendingAccountAction, setPendingAccountAction] = useState<"save" | "save-new" | "export" | "try-on" | "recommendations" | null>(null);
+  const [pendingAccountAction, setPendingAccountAction] = useState<"save" | "save-new" | "publish" | "export" | "try-on" | "recommendations" | null>(null);
   const [actionNotice, setActionNotice] = useState<string | null>(null);
   const [guestNoticeDismissed, setGuestNoticeDismissed] = useState(false);
   const [dismissedRecoveryList, setDismissedRecoveryList] = useState<string | null>(null);
@@ -231,7 +233,13 @@ export default function StudioPage() {
     setActiveSlot(item.slot);
   }, [requestedCatalogItemId, catalogItems]);
 
-  const requestAccountAction = (action: "save" | "save-new" | "export" | "try-on" | "recommendations") => {
+  const publishSavedOutfit = async () => {
+    if (!await studio.save()) return;
+    const saved = readStudioDraft('viet_stylist_current_draft');
+    if (saved?.ownerId !== user?.id || !saved?.outfitId) return;
+    window.location.assign('/lookbook?dang=1&outfit=' + encodeURIComponent(saved.outfitId));
+  };
+  const requestAccountAction = (action: "save" | "save-new" | "publish" | "export" | "try-on" | "recommendations") => {
     if (studio.accountDraftChoice) return;
     if ((action === "export" || action === "try-on") && equippedItems.length === 0) {
       setActionNotice("Thêm ít nhất một món trang phục trước khi xuất ảnh hoặc thử đồ AI.");
@@ -239,6 +247,7 @@ export default function StudioPage() {
     }
     if (isLoggedIn) {
       if (action === "save" || action === "save-new") void studio.save(action === "save-new");
+      else if (action === "publish") void publishSavedOutfit();
       else if (action === "export") setIsExportOpen(true);
       else if (action === "try-on") setIsTryOnOpen(true);
       else void handleAskAIStylist();
@@ -253,6 +262,7 @@ export default function StudioPage() {
     const action = pendingAccountAction;
     setPendingAccountAction(null);
     if (action === "save" || action === "save-new") void studio.save(action === "save-new");
+    else if (action === "publish") void publishSavedOutfit();
     else if (action === "export") setIsExportOpen(true);
     else if (action === "try-on") setIsTryOnOpen(true);
     else void handleAskAIStylist();
@@ -900,6 +910,10 @@ export default function StudioPage() {
           </button>
 
           {/* Lưu bộ phối */}
+          <button type="button" onClick={() => requestAccountAction("publish")} disabled={isSaving || !studio.hydrated || equippedItems.length === 0}
+            className="flex min-h-11 items-center gap-2 rounded-lg border border-heritage-red bg-white px-3 py-2 text-xs font-semibold text-heritage-red disabled:opacity-50">
+            <Share2 className="h-4 w-4" aria-hidden="true" />Đăng lên Lookbook
+          </button>
           <button
             onClick={handleSaveOutfit}
             disabled={isSaving || !studio.hydrated}

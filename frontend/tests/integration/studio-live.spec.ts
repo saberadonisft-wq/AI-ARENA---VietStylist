@@ -62,10 +62,11 @@ test("real login, two-tab conflict, lookbook creation and revocable anonymous sh
   const latest = await request.get(`http://127.0.0.1:4100/api/outfits/${draft.outfitId}`, { headers });
   expect((await latest.json()).title).toBe("Tab khác đã lưu");
 
-  await otherTab.goto("/lookbook");
+  await otherTab.goto("/lookbook?tab=collections");
   await otherTab.getByRole("button", { name: "Tạo Lookbook Mới" }).click();
   await otherTab.getByPlaceholder("Ví dụ: Kỷ yếu Cố đô Huế 2026...").fill("Lookbook nghiệm thu");
   await otherTab.getByRole("checkbox", { name: "Tab khác đã lưu" }).check();
+  await otherTab.getByLabel("Quyền riêng tư").selectOption("unlisted");
   const created = otherTab.waitForResponse(response => response.url().endsWith("/api/lookbooks") && response.request().method() === "POST");
   await otherTab.getByRole("button", { name: "Xác nhận tạo" }).click();
   const createdResponse = await created;
