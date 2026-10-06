@@ -25,6 +25,9 @@ export const metadata: Metadata = {
   description: "VietStylist - Trải nghiệm phối đồ Việt phục 2D với Áo ngũ thân tay chẽn, Áo tấc, Áo Nhật bình, thẩm định quy tắc di sản văn hóa và chia sẻ Lookbook.",
   keywords: ["VietStylist", "Việt phục", "Cổ phục Việt", "Áo ngũ thân", "Áo tấc", "Áo Nhật bình", "Phối đồ 2D", "Di sản văn hóa"],
   authors: [{ name: "VietStylist Team" }],
+  icons: {
+    icon: { url: "/brand/vietstylist-mark.svg", type: "image/svg+xml", sizes: "any" },
+  },
   openGraph: {
     title: "VietStylist | Phối đồ & Di sản Cổ phục Việt",
     description: "Khám phá vẻ đẹp di sản văn hóa Việt Nam qua nền tảng phối đồ 2D trực quan VietStylist.",
