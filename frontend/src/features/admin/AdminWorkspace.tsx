@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Users, Shirt, Layers, FolderHeart, Plus, RefreshCw, Pencil, Trash2, ClipboardCheck, Eye, Check, X } from "lucide-react";
-import { api, apiFetch } from "@/lib/api/client";
+import { api, apiFetch, ApiError } from "@/lib/api/client";
 import { adminApi, AdminSection, AdminUser, AdminRow, AdminOverview, ManagedOutfit, ManagedLookbook, StylistSubmission } from "@/lib/api/admin";
 import { useAuth } from "@/lib/auth/context";
 import { useCatalog } from "@/lib/catalog/CatalogProvider";
@@ -38,6 +38,17 @@ export default function AdminWorkspace({ onOverview }: { onOverview?: (value: Ad
   const [book, setBook] = useState<ManagedLookbook | null>(null);
   const [submissionPreviews, setSubmissionPreviews] = useState<Record<string, string>>({});
   const [submissionNotes, setSubmissionNotes] = useState<Record<string, string>>({});
+  const [bulkProgress, setBulkProgress] = useState<{ completed: number; total: number } | null>(null);
+  const [bulkFailures, setBulkFailures] = useState<{ id: string; name: string; message: string }[]>([]);
+  const bulkLock = useRef(false);
+  const currentActor = useRef(user?.id);
+  currentActor.current = user?.id;
+  const mounted = useRef(true);
+
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; };
+  }, []);
 
   useEffect(() => {
     if (!isAdmin) { setRows([]); setOverview(null); return; }
@@ -55,6 +66,7 @@ export default function AdminWorkspace({ onOverview }: { onOverview?: (value: Ad
   if (!isAdmin) return null;
 
   const mutate = async (action: () => Promise<unknown>, message: string) => {
+    if (busy || bulkLock.current) return false;
     setBusy(true); setError(""); setNotice("");
     try {
       await action(); setNotice(message); setVersion(v => v + 1);
@@ -66,6 +78,78 @@ export default function AdminWorkspace({ onOverview }: { onOverview?: (value: Ad
 
   const confirmMutation = (options: Parameters<typeof confirm>[0], action: () => Promise<unknown>, message: string) => {
     void confirm(options).then(accepted => { if (accepted) void mutate(action, message); });
+  };
+
+  const approveAll = async () => {
+    if (busy || loading || bulkLock.current || section !== "submissions") return;
+    bulkLock.current = true;
+    setBusy(true); setError(""); setNotice(""); setBulkFailures([]);
+    const actor = user?.id;
+    const token = localStorage.getItem("viet_stylist_auth_token");
+    const sessionIsCurrent = () => mounted.current && currentActor.current === actor && localStorage.getItem("viet_stylist_auth_token") === token;
+    let reviewed = false;
+    let approved = 0;
+    try {
+      // Collect every page before publishing: approvals remove rows from this list.
+      const pending = new Map<string, StylistSubmission>();
+      let nextOffset = 0;
+      let remaining = true;
+      while (remaining) {
+        if (!sessionIsCurrent()) return;
+        const page = await adminApi.listSubmissions(search, nextOffset, 100);
+        for (const item of page.items) if (item.status === "pending") pending.set(item.id, item);
+        if (!page.items.length && nextOffset < page.total) throw new Error("Chưa tải đủ các mẫu chờ duyệt. Hãy tải lại rồi thử lại.");
+        nextOffset += page.items.length;
+        remaining = nextOffset < page.total;
+      }
+      if (!sessionIsCurrent()) return;
+      const submissions = [...pending.values()];
+      if (!submissions.length) { setNotice("Không còn mẫu đang chờ duyệt."); setOffset(0); setVersion(v => v + 1); return; }
+      const accepted = await confirm({
+        title: "Duyệt tất cả mẫu đang chờ?",
+        description: `Bạn sắp duyệt và công khai ${submissions.length} mẫu${search.trim() ? ` trong kết quả tìm kiếm “${search.trim()}”` : ""}, bao gồm các trang sau. Các mẫu này sẽ xuất hiện trong thư viện trang phục.`,
+        confirmLabel: `Duyệt ${submissions.length} mẫu`,
+        tone: "primary",
+      });
+      if (!accepted || !sessionIsCurrent()) return;
+      let completed = 0;
+      let skipped = 0;
+      const failures: { id: string; name: string; message: string }[] = [];
+      setBulkProgress({ completed, total: submissions.length });
+      for (const submission of submissions) {
+        if (!sessionIsCurrent()) break;
+        let stop = false;
+        reviewed = true;
+        try {
+          await adminApi.reviewSubmission(submission.id, "approve");
+          approved += 1;
+        } catch (e) {
+          if (e instanceof ApiError && (e.code === "SUBMISSION_ALREADY_REVIEWED" || e.code === "SUBMISSION_NOT_FOUND")) skipped += 1;
+          else {
+            failures.push({ id: submission.id, name: submission.name, message: e instanceof Error ? e.message : "Không duyệt được mẫu. Hãy thử lại." });
+            stop = e instanceof ApiError && [401, 403, 429].includes(e.statusCode);
+          }
+        }
+        completed += 1;
+        if (sessionIsCurrent()) setBulkProgress({ completed, total: submissions.length });
+        if (stop) break;
+      }
+      if (sessionIsCurrent()) {
+        const unprocessed = submissions.length - completed;
+        setBulkFailures(failures);
+        setNotice(`Đã duyệt ${approved}/${submissions.length} mẫu.${skipped ? ` ${skipped} mẫu đã được xử lý ở phiên khác hoặc không còn chờ duyệt.` : ""}${failures.length ? ` ${failures.length} mẫu duyệt thất bại.` : ""}${unprocessed ? ` Đã dừng; ${unprocessed} mẫu chưa được xử lý.` : ""}`);
+      }
+    } catch (e) {
+      if (sessionIsCurrent()) setError(e instanceof Error ? e.message : "Không thực hiện được thao tác. Hãy thử lại.");
+    } finally {
+      if (reviewed && sessionIsCurrent()) { setOffset(0); setVersion(v => v + 1); }
+      try {
+        if (approved && sessionIsCurrent()) await refreshCatalog();
+      } finally {
+        bulkLock.current = false;
+        if (mounted.current) { setBulkProgress(null); setBusy(false); }
+      }
+    }
   };
 
   const remove = (id: string, name: string) => {
@@ -87,16 +171,18 @@ export default function AdminWorkspace({ onOverview }: { onOverview?: (value: Ad
       <button className={button} onClick={() => setVersion(v => v + 1)} disabled={loading || busy}><RefreshCw size={16} />Tải lại</button>
     </div>
     <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">{tabs.filter(t => t.stat).map(t => <div key={t.id} className="rounded-xl border border-stone-200 bg-white p-4"><p className="text-sm text-stone-600">{t.label}</p><p className="mt-1 text-2xl font-semibold text-heritage-red">{overview?.[t.stat as keyof AdminOverview] ?? "—"}</p></div>)}</div>
-    <div className="flex flex-wrap gap-2" aria-label="Danh mục quản lý">{tabs.map(t => <button key={t.id} aria-pressed={section === t.id} className={`${button} ${section === t.id ? "!bg-heritage-red !text-white !border-heritage-red" : ""}`} disabled={busy} onClick={() => { setSection(t.id); setOffset(0); setSearch(""); setEditing(null); setBook(null); setNotice(""); }}><t.icon size={17} />{t.label}</button>)}</div>
+    <div className="flex flex-wrap gap-2" aria-label="Danh mục quản lý">{tabs.map(t => <button key={t.id} aria-pressed={section === t.id} className={`${button} ${section === t.id ? "!bg-heritage-red !text-white !border-heritage-red" : ""}`} disabled={busy} onClick={() => { setSection(t.id); setOffset(0); setSearch(""); setEditing(null); setBook(null); setNotice(""); setBulkFailures([]); }}><t.icon size={17} />{t.label}</button>)}</div>
     <div className="flex flex-wrap items-end gap-3">
-      <label className="flex-1 min-w-0"><span className="mb-1 block text-sm font-medium">{section === "users" ? "Tìm theo tên hoặc email" : "Tìm theo tên"}</span><input className={input} value={search} onChange={e => { setSearch(e.target.value); setOffset(0); }} /></label>
+      <label className="flex-1 min-w-0"><span className="mb-1 block text-sm font-medium">{section === "users" ? "Tìm theo tên hoặc email" : "Tìm theo tên"}</span><input className={input} disabled={busy} value={search} onChange={e => { setSearch(e.target.value); setOffset(0); setNotice(""); setBulkFailures([]); }} /></label>
+      {section === "submissions" && <button type="button" className={`${button} !border-emerald-700 !bg-emerald-700 !text-white`} disabled={busy || loading || loadedSection !== "submissions" || !rows.length || !total} onClick={() => void approveAll()}><ClipboardCheck size={16} />Duyệt tất cả ({total})</button>}
       {section === "items" && <button className={button} disabled={busy} onClick={() => setEditing("new")}><Plus size={16} />Thêm trang phục</button>}
       {section === "outfits" && <Link className={button} href="/studio"><Plus size={16} />Tạo bộ phối trong Studio</Link>}
       {section === "lookbooks" && <Link className={button} href="/lookbook"><Plus size={16} />Tạo lookbook</Link>}
     </div>
     {error && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-800">{error}</p>}
     {notice && <p role="status" className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800">{notice}</p>}
-    {busy && <p role="status" aria-live="polite" className="text-sm text-stone-600">Đang xử lý thao tác…</p>}
+    {!!bulkFailures.length && <div role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-800"><p className="font-medium">Các mẫu chưa duyệt thành công:</p><ul className="mt-2 list-disc space-y-1 pl-5">{bulkFailures.map(failure => <li key={failure.id}><strong>{failure.name}</strong>: {failure.message}</li>)}</ul></div>}
+    {busy && <p role="status" aria-live="polite" className="text-sm text-stone-600">{bulkProgress ? `Đang duyệt ${bulkProgress.completed}/${bulkProgress.total} mẫu…` : "Đang xử lý thao tác…"}</p>}
     {editing && <ItemEditor key={editing === "new" ? "new" : editing.id} item={editing === "new" ? null : editing} busy={busy} onCancel={() => setEditing(null)} onSave={async payload => { if (await mutate(() => adminApi.saveItem(payload, editing !== "new"), "Đã lưu trang phục.")) setEditing(null); }} />}
     {book && <form className="rounded-xl border border-stone-300 bg-white p-5 space-y-3" onSubmit={async e => { e.preventDefault(); if (await mutate(() => adminApi.updateLookbook(book.id, { title: book.title, description: book.description, visibility: book.visibility, entries: book.entries.map(x => ({ outfit_version_id: x.outfit_version_id, sort_order: x.sort_order, notes: x.notes })) }), "Đã cập nhật lookbook.")) setBook(null); }}>
       <h3 className="font-semibold">Sửa lookbook · {book.owner_name || book.owner_id}</h3>

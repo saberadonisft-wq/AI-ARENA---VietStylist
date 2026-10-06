@@ -37,8 +37,8 @@ export const adminApi = {
   overview: () => apiFetch<AdminOverview>("/api/admin/overview"),
   list: <T,>(section: AdminSection, search = "", offset = 0) =>
     apiFetch<Page<T>>(`/api/admin/${section}?${new URLSearchParams({ search, offset: String(offset), limit: "20" })}`),
-  listSubmissions: (search = "", offset = 0) =>
-    apiFetch<Page<StylistSubmission>>(`/api/admin/stylist-submissions?${new URLSearchParams({ search, offset: String(offset), limit: "20" })}`),
+  listSubmissions: (search = "", offset = 0, limit = 20) =>
+    apiFetch<Page<StylistSubmission>>(`/api/admin/stylist-submissions?${new URLSearchParams({ search, offset: String(offset), limit: String(limit) })}`),
   submissionPreview: (id: string) =>
     apiFetch<{ access_url: string; expires_in: number }>(`/api/admin/stylist-submissions/${encodeURIComponent(id)}/preview`),
   reviewSubmission: (id: string, action: "approve" | "reject", note?: string) =>
