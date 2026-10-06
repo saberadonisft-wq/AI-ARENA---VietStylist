@@ -31,7 +31,7 @@ export default function Logo({
         className={`${current.box} flex items-center justify-center flex-shrink-0`}
       >
         <Image
-          src="/brand/vietstylist-mark.svg"
+          src="/brand/vietstylist-mark.svg?v=2"
           alt={showText ? "" : "VietStylist"}
           width={192}
           height={192}

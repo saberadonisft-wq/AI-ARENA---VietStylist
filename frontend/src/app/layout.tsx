@@ -26,7 +26,7 @@ export const metadata: Metadata = {
   keywords: ["VietStylist", "Việt phục", "Cổ phục Việt", "Áo ngũ thân", "Áo tấc", "Áo Nhật bình", "Phối đồ 2D", "Di sản văn hóa"],
   authors: [{ name: "VietStylist Team" }],
   icons: {
-    icon: { url: "/brand/vietstylist-mark.svg", type: "image/svg+xml", sizes: "any" },
+    icon: { url: "/brand/vietstylist-mark.svg?v=2", type: "image/svg+xml", sizes: "any" },
   },
   openGraph: {
     title: "VietStylist | Phối đồ & Di sản Cổ phục Việt",
