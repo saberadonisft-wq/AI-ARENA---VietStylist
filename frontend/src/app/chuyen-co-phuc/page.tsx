@@ -511,23 +511,18 @@ export default function ChuyenCoPhucPage() {
                   <div className="pt-3 border-t border-stone-100 flex items-center justify-between">
                     <div className="flex items-center space-x-2 min-w-0">
                       <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-heritage-red to-amber-600 text-white flex items-center justify-center text-[10px] font-bold shrink-0">
-                        {article.author_name ? article.author_name.charAt(0) : "S"}
+                        {article.author_role === "admin" ? "Q" : "S"}
                       </div>
-                      <div className="min-w-0">
-                        <div className="text-[11px] font-semibold text-stone-800 truncate">
-                          {article.author_name || "Stylist Di sản"}
-                        </div>
-                        <div className="text-[9px] text-stone-400 flex items-center gap-1">
-                          {article.author_role === "admin" ? (
-                            <span className="text-heritage-red font-semibold flex items-center gap-0.5">
-                              <ShieldCheck className="w-2.5 h-2.5" /> Quản trị viên
-                            </span>
-                          ) : (
-                            <span className="text-amber-700 font-semibold flex items-center gap-0.5">
-                              <Palette className="w-2.5 h-2.5" /> Chuyên gia Stylist
-                            </span>
-                          )}
-                        </div>
+                      <div className="min-w-0 text-[11px] font-semibold">
+                        {article.author_role === "admin" ? (
+                          <span className="text-heritage-red flex items-center gap-1">
+                            <ShieldCheck className="w-3 h-3" aria-hidden="true" /> Quản trị viên
+                          </span>
+                        ) : (
+                          <span className="text-amber-700 flex items-center gap-1">
+                            <Palette className="w-3 h-3" aria-hidden="true" /> Stylist
+                          </span>
+                        )}
                       </div>
                     </div>
 
@@ -579,14 +574,14 @@ export default function ChuyenCoPhucPage() {
                 <div className="flex items-center justify-between flex-wrap gap-2 text-xs text-stone-600">
                   <div className="flex items-center space-x-2.5">
                     <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-heritage-red to-amber-600 text-white flex items-center justify-center font-bold text-xs">
-                      {selectedArticle.author_name ? selectedArticle.author_name.charAt(0) : "S"}
+                      {selectedArticle.author_role === "admin" ? "Q" : "S"}
                     </div>
                     <div>
                       <div className="font-bold text-stone-900">
-                        {selectedArticle.author_name || "Stylist Di sản"}
+                        {selectedArticle.author_role === "admin" ? "Quản trị viên" : "Stylist"}
                       </div>
                       <div className="text-[10px] text-stone-500">
-                        {selectedArticle.author_role === "admin" ? "Ban Quản trị Di sản" : "Chuyên gia Stylist"} • {selectedArticle.read_time_minutes || 5} phút đọc
+                        {selectedArticle.read_time_minutes || 5} phút đọc
                       </div>
                     </div>
                   </div>
