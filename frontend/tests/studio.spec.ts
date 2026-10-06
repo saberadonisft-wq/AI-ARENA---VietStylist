@@ -1632,3 +1632,62 @@ test("styling questionnaire fits phone widths and keeps selections separate from
   await page.setViewportSize({ width: 1440, height: 1000 });
   await panel.screenshot({ path: test.info().outputPath("styling-questionnaire-desktop.png") });
 });
+
+for (const handoff of [
+  { button: "Xuất ảnh", dialog: "Xuất ảnh bản phối", close: "Đóng xuất ảnh", escape: false },
+  { button: "Thử đồ AI", dialog: "Thử đồ bằng Gemini", close: "Đóng thử đồ AI", escape: true },
+] as const) {
+  test(`login handoff preserves page scrolling after ${handoff.button}`, async ({ page }) => {
+    await page.setViewportSize({ width: 1366, height: 768 });
+    await mockApi(page);
+    await seedDraft(page);
+    const account = { id: "scroll-handoff-user", email: "scroll-handoff@example.invalid", display_name: "Kiểm tra cuộn", roles: ["user"] };
+    await page.route("http://127.0.0.1:4100/api/auth/login", route => route.fulfill({
+      json: { access_token: "scroll-handoff-token", token_type: "bearer", user: account },
+    }));
+    await page.route("http://127.0.0.1:4100/api/auth/me", route => route.fulfill({ json: account }));
+    await page.route("https://accounts.google.com/**", route => route.abort());
+    await page.route("http://127.0.0.1:4100/api/heritage/articles", route => route.fulfill({
+      json: Array.from({ length: 18 }, (_, index) => ({
+        id: `scroll-story-${index}`, slug: `scroll-story-${index}`, title: `Câu chuyện kiểm thử ${index + 1}`,
+        short_summary: "Tư liệu giả lập để kiểm tra cuộn trang sau khi đóng cửa sổ.",
+        status: "published", version: 1, author_role: "stylist", category: "Nghiên cứu Cổ phong", era: "Triều Nguyễn",
+      })),
+    }));
+    await page.goto("/studio");
+    await expect(page.locator("#content-outerwear image")).toBeVisible();
+    const originalItems = (await readDraft(page)).snapshot.items;
+    await page.getByRole("button", { name: handoff.button, exact: true }).click();
+    const auth = page.locator('dialog[aria-label="Đăng nhập hoặc tạo tài khoản"]');
+    await expect(auth).toBeVisible();
+    await auth.locator('input[type="email"]').fill(account.email);
+    await auth.locator('input[type="password"]').fill("test-password");
+    await auth.locator('form button[type="submit"]').click();
+    const nextDialog = page.locator(`dialog[aria-label="${handoff.dialog}"]`);
+    await expect(nextDialog).toBeVisible();
+    // Auth closes after its success message; the next dialog must retain the lock.
+    await expect(auth).toHaveCount(0);
+    await expect(nextDialog).toBeVisible();
+    expect(await page.evaluate(() => document.body.style.overflow)).toBe("hidden");
+    if (handoff.escape) await page.keyboard.press("Escape");
+    else await nextDialog.getByRole("button", { name: handoff.close, exact: true }).click();
+    await expect(nextDialog).toHaveCount(0);
+    await expect(page.locator("dialog[open]")).toHaveCount(0);
+    expect(await page.evaluate(() => document.body.style.overflow)).not.toBe("hidden");
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
+    await page.mouse.move(20, 350);
+    await page.mouse.wheel(0, 600);
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+    expect((await readDraft(page)).snapshot.items).toEqual(originalItems);
+    // Client navigation retains the same body, so it also catches a leaked lock.
+    await page.locator("header").getByRole("link", { name: "Chuyện Cổ phục", exact: true }).click();
+    await expect(page).toHaveURL(/\/chuyen-co-phuc$/);
+    await expect(page.getByRole("article")).toHaveCount(18);
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
+    await page.mouse.move(20, 350);
+    await page.mouse.wheel(0, 600);
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+  });
+}

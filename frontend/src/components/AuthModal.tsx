@@ -1,5 +1,6 @@
 "use client";
 
+import { lockBodyScroll } from "@/lib/ui/bodyScrollLock";
 import React, { useEffect, useState, useRef } from "react";
 import { useAuth } from "@/lib/auth/context";
 import Logo from "@/components/Logo";
@@ -56,12 +57,11 @@ export default function AuthModal({
     if (!isOpen) return;
     const dialog = dialogRef.current;
     const previousFocus = document.activeElement as HTMLElement | null;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    dialog?.showModal();
+    if (dialog && !dialog.open) dialog.showModal();
+    const releaseScrollLock = lockBodyScroll();
     return () => {
       dialog?.close();
-      document.body.style.overflow = previousOverflow;
+      releaseScrollLock();
       if (previousFocus?.isConnected) previousFocus.focus({ preventScroll: true });
     };
   }, [isOpen]);
