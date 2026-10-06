@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { DRAFT_KEY, INITIAL_DOCUMENT } from "../src/features/studio/state";
+import { openStudioProperties, closeStudioPanels } from "./helpers/studio-ui";
 
 test.use({ viewport: { width: 375, height: 812 }, isMobile: true, hasTouch: true });
 
@@ -71,6 +72,7 @@ test("a tap with small finger jitter selects without modifying the draft", async
 
 test("mobile controls select covered garments, rotate, resize, nudge and reset with large touch targets", async ({ page }) => {
   await openStudio(page);
+  await openStudioProperties(page);
   const controls = page.getByRole("region", { name: "Điều chỉnh trang phục" });
   await controls.getByLabel("Trang phục đang điều chỉnh").selectOption("headwear");
   await expect(page.locator("#selection-overlay-headwear")).toBeVisible();
@@ -116,16 +118,21 @@ test("lifting a second finger cannot end or jump the active drag", async ({ page
   expect((await placement(page)).dy).toBe(0);
 });
 
-test("swiping the blank artboard scrolls the page without changing the outfit", async ({ page }) => {
+test("swiping the blank zoomed artboard pans the viewport without changing the outfit", async ({ page }) => {
   await openStudio(page);
-  const box = (await page.getByTestId("outfit-artboard").boundingBox())!;
-  const point = { x: box.x + 10, y: Math.min(box.y + box.height - 30, 650), id: 1 };
-  const before = await page.evaluate(() => scrollY);
+  await page.getByRole("button", { name: "Phóng to bảng phối", exact: true }).tap();
+  await page.getByRole("button", { name: "Phóng to bảng phối", exact: true }).tap();
+  await page.getByRole("button", { name: "Phóng to bảng phối", exact: true }).tap();
+  const viewport = page.getByRole("region", { name: "Vùng xem bảng phối", exact: true });
+  const before = await viewport.evaluate(element => element.scrollTop);
+  const box = (await viewport.boundingBox())!;
+  const point = { x: box.x + 20, y: box.y + box.height - 30, id: 1 };
   const touch = await page.context().newCDPSession(page);
   await touch.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [point] });
   for (let i = 1; i <= 6; i++) await touch.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ ...point, y: point.y - i * 15 }] });
   await touch.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
-  await expect.poll(() => page.evaluate(() => scrollY)).toBeGreaterThan(before + 20);
+  await expect.poll(() => viewport.evaluate(element => element.scrollTop)).toBeGreaterThan(before + 20);
+  expect(await page.evaluate(() => scrollY)).toBe(0);
   expect(await placement(page)).toBeUndefined();
 });
 
@@ -149,16 +156,18 @@ test("choosing a garment returns to the board, zoom preserves the outfit and mob
   await openStudio(page);
   await page.getByRole("tab", { name: "Chọn trang phục", exact: true }).tap();
   await page.getByRole("button", { name: "Chọn Áo mobile", exact: true }).tap();
-  await expect(page.locator(".studio-board-toolbar")).toBeInViewport();
-  await expect(page.getByRole("tab", { name: "Món đang chọn", exact: true })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("button", { name: "Món đang chọn", exact: true })).toHaveAttribute("aria-expanded", "true");
+  await closeStudioPanels(page);
   const snapshot = (await draft(page)).snapshot;
   await page.getByRole("button", { name: "Phóng to bảng phối", exact: true }).tap();
   await expect(page.getByLabel("Mức thu phóng bảng phối", { exact: true })).toHaveText("125%");
   expect((await draft(page)).snapshot).toEqual(snapshot);
   await page.getByRole("button", { name: "Vừa khung", exact: true }).tap();
   await expect(page.getByLabel("Mức thu phóng bảng phối", { exact: true })).toHaveText("100%");
+  await openStudioProperties(page);
   await page.getByRole("region", { name: "Điều chỉnh trang phục" }).getByRole("button", { name: "Xóa trang phục khỏi bảng" }).tap();
   await expect.poll(async () => (await draft(page)).snapshot.items.length).toBe(1);
+  await closeStudioPanels(page);
   await page.getByTitle("Hoàn tác (Ctrl+Z)").tap();
   await expect.poll(async () => (await draft(page)).snapshot.items).toEqual(snapshot.items);
 });

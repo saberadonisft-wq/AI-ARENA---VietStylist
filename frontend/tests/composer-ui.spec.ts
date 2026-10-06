@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { openStudioPanel } from "./helpers/studio-ui";
 import { DRAFT_KEY, INITIAL_DOCUMENT } from "../src/features/studio/state";
 
 const COMPOSER_DOCUMENT = {
@@ -19,6 +20,7 @@ test("V3 flag off keeps the legacy Studio and sends no V3 requests", async ({ pa
   page.on("request", request => { if (request.url().includes("/api/v3/")) requests.push(request.url()); });
   await page.route("http://127.0.0.1:4100/**", route => route.fulfill(new URL(route.request().url()).pathname.startsWith("/api/catalog/") ? { json: [] } : { status: 503, json: { error: { code: "UNAVAILABLE", message: "unavailable" } } }));
   await page.goto("/studio");
+  await openStudioPanel(page, "Văn hóa");
   await expect(page.getByRole("button", { name: "Lưu bộ phối", exact: true })).toBeVisible();
   await expect(page.getByTestId("studio-composer")).toHaveCount(0);
   expect(requests).toEqual([]);
@@ -67,6 +69,7 @@ test("V3 shows API validation and per-entity sources, clears stale results and r
     }
   }, { key: DRAFT_KEY, document: COMPOSER_DOCUMENT });
   await page.goto("/studio");
+  await openStudioPanel(page, "Văn hóa");
   const panel = page.getByTestId("studio-composer");
   await expect(panel.getByText("Chưa thể kết luận với dữ liệu hiện có")).toBeVisible();
   await expect(panel.getByText("Nguồn entity_0; trang 5")).toBeVisible();
@@ -111,6 +114,7 @@ test("V3 shows API validation and per-entity sources, clears stale results and r
   await expect(panel.getByLabel("Bộ dữ liệu", { exact: true })).toHaveValue("ds_fixture");
   await page.reload();
   await page.getByRole("button", { name: "Tiếp tục bản nháp", exact: true }).click();
+  await openStudioPanel(page, "Văn hóa");
   await expect(panel.getByLabel("Bộ dữ liệu", { exact: true })).toHaveValue("ds_fixture");
   await expect(panel.getByLabel("Thời kỳ", { exact: true })).toHaveValues(["period_fixture"]);
 });
@@ -126,6 +130,7 @@ test("incomplete mappings keep the V1 editor usable without validating a partial
   });
   await page.addInitScript(({ key, document }) => localStorage.setItem(key, JSON.stringify(document)), { key: DRAFT_KEY, document: COMPOSER_DOCUMENT });
   await page.goto("/studio");
+  await openStudioPanel(page, "Văn hóa");
   await expect(page.getByTestId("studio-composer").getByText(/chưa có ánh xạ đầy đủ/)).toBeVisible();
   await page.locator("input").first().fill("Bộ phối vẫn sửa được");
   await expect(page.locator("input").first()).toHaveValue("Bộ phối vẫn sửa được");

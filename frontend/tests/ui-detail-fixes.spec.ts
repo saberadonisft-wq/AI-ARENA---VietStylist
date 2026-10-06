@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { openStudioPanel, openStudioProperties, closeStudioPanels, chooseStudioGarment, clickStudioAction } from "./helpers/studio-ui";
 import { DRAFT_KEY } from "../src/features/studio/state";
 
 // These workflows include navigation and PNG generation after a cold dev compile.
@@ -53,13 +54,13 @@ async function draft(page: Page) {
 }
 async function chooseGarment(page: Page) {
   await page.goto("/studio");
-  await page.getByText(items[0].name, { exact: true }).click();
+  await chooseStudioGarment(page, items[0].name);
   await expect(page.locator("#content-outerwear image")).toBeVisible();
-  const mobile = (page.viewportSize()?.width || 1280) < 1024;
-  if (mobile) await page.getByRole("tab", { name: "Chọn trang phục", exact: true }).click();
+  await openStudioPanel(page, "Chọn trang phục");
   await expect(page.getByRole("button", { name: "Áo ngoài", exact: true })).toHaveAttribute("aria-pressed", "true");
-  if (mobile) await page.getByRole("tab", { name: "Món đang chọn", exact: true }).click();
+  await openStudioPanel(page, "Bối cảnh");
   await expect(page.getByRole("button", { name: "9:16", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await closeStudioPanels(page);
 }
 async function focusStaysInside(page: Page) {
   for (let i = 0; i < 14; i++) {
@@ -82,9 +83,10 @@ test("export resets after editing and stays scrollable in landscape with keyboar
   await page.keyboard.press("Escape");
   await expect(dialog).toHaveCount(0);
   await expect(trigger).toBeFocused();
+  await openStudioPanel(page, "Bối cảnh");
   await page.getByRole("button", { name: "Giấy Dó", exact: true }).click();
   await page.setViewportSize({ width: 844, height: 390 });
-  await trigger.click();
+  await clickStudioAction(page, "Xuất ảnh");
   dialog = page.getByRole("dialog", { name: "Xuất ảnh bản phối", exact: true });
   await expect(dialog.getByAltText("Bản phối xuất")).toHaveCount(0);
   await expect(dialog.getByRole("button", { name: "Tải ảnh PNG" })).toBeDisabled();
@@ -112,7 +114,7 @@ test("AI model select and other modal controls cannot undo the Studio draft behi
   await expect(page.getByRole("button", { name: "Cách tân hiện đại", exact: true })).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByRole("button", { name: "Truyền thống", exact: true })).toHaveAttribute("aria-pressed", "false");
   const before = await draft(page);
-  await page.getByRole("button", { name: "Thử đồ AI", exact: true }).click();
+  await clickStudioAction(page, "Thử đồ AI");
   const dialog = page.getByRole("dialog", { name: "Thử đồ bằng Gemini" });
   await dialog.locator("select").focus();
   await page.keyboard.press("Control+z");
@@ -135,13 +137,14 @@ test("a late PNG from a closed export cannot populate the reopened dialog", asyn
     await route.fallback();
   });
   try {
-    await page.getByRole("button", { name: "Xuất ảnh", exact: true }).click();
+    await clickStudioAction(page, "Xuất ảnh");
     const dialog = page.getByRole("dialog", { name: "Xuất ảnh bản phối", exact: true });
     await dialog.getByRole("button", { name: "Nhấn để tạo ảnh xem trước" }).click();
     await expect.poll(() => pending).toBe(true);
     await dialog.getByRole("button", { name: "Đóng xuất ảnh" }).click();
-    await page.getByRole("button", { name: "Giấy Dó", exact: true }).click();
-    await page.getByRole("button", { name: "Xuất ảnh", exact: true }).click();
+    await openStudioPanel(page, "Bối cảnh");
+  await page.getByRole("button", { name: "Giấy Dó", exact: true }).click();
+    await clickStudioAction(page, "Xuất ảnh");
     release!();
     await expect(page.locator("#selection-overlay-outerwear")).toHaveCount(1);
     await expect(dialog.getByAltText("Bản phối xuất")).toHaveCount(0);
@@ -162,6 +165,7 @@ test("weather errors remove stale city data and retry restores the selected city
     return route.fulfill({ json: { location: { name: "Huế" }, weather: { temperature_c: 19, humidity_percent: 75, wind_speed_kmh: 5, weather_condition: "Mưa nhẹ", is_rainy: true }, recommendation: { suggested_accessories: [], reason: "", layer_advice: "Mang áo ấm", fabric_advice: "Vải dày" }, cached: false } });
   });
   await page.goto("/studio");
+  await openStudioPanel(page, "Bối cảnh");
   const weather = page.getByRole("region", { name: "Thời tiết và bối cảnh" });
   await expect(weather.getByText("26°C")).toBeVisible();
   await weather.getByLabel("Thành phố xem thời tiết").selectOption("hue");
@@ -179,7 +183,9 @@ test("color-analysis failure is recoverable and dominant/accent dots have their 
   await page.route("**/api/color-analysis", route => ++attempts === 1
     ? route.fulfill({ status: 503, json: fail }) : route.fallback());
   await chooseGarment(page);
+  await openStudioProperties(page);
   await expect(page.getByRole("button", { name: "Xanh", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await openStudioPanel(page, "Màu sắc");
   await expect(page.getByRole("region", { name: "Hài hòa Màu sắc" }).getByRole("alert")).toBeVisible();
   await page.getByRole("button", { name: "Thử lại phân tích màu" }).click();
   for (const color of ["#1A365D", "#ffffff"]) {
@@ -197,9 +203,9 @@ test("compare translates long names, retries errors, and permits repinning/unpin
   let attempts = 0;
   await page.route("**/api/outfits/compare", route => ++attempts === 1 ? route.fulfill({ status: 503, json: fail }) : route.fallback());
   await chooseGarment(page);
-  await page.getByRole("button", { name: "Lưu bản A để so sánh", exact: true }).click();
+  await clickStudioAction(page, "Lưu bản A để so sánh");
   await page.getByRole("button", { name: "Cách tân hiện đại", exact: true }).click();
-  await page.getByRole("button", { name: "So sánh hai bản", exact: true }).click();
+  await clickStudioAction(page, "So sánh hai bản");
   const dialog = page.getByRole("dialog", { name: "So sánh hai phương án phối đồ" });
   await expect(dialog.getByRole("alert")).toBeVisible();
   await dialog.getByRole("button", { name: "Thử lại so sánh" }).click();
@@ -213,37 +219,45 @@ test("compare translates long names, retries errors, and permits repinning/unpin
   await focusStaysInside(page);
   await page.screenshot({ path: test.info().outputPath("compare-320.png") });
   await dialog.getByRole("button", { name: "Đóng so sánh" }).click();
-  await page.getByRole("button", { name: "Ghim lại bản A" }).click();
-  await page.getByRole("button", { name: "So sánh hai bản", exact: true }).click();
+  await clickStudioAction(page, "Ghim lại bản A");
+  await clickStudioAction(page, "So sánh hai bản");
   await expect(dialog.getByRole("region", { name: "Phương án A" })).toContainText("Cách tân hiện đại");
   await page.keyboard.press("Escape");
-  await page.getByRole("button", { name: "Bỏ ghim bản A" }).click();
-  await expect(page.getByRole("button", { name: "Lưu bản A để so sánh", exact: true })).toBeVisible();
+  await clickStudioAction(page, "Bỏ ghim bản A");
+  await page.getByLabel("Thao tác bộ phối", { exact: true }).click();
+  await expect(page.getByRole("button", { name: "Lưu bản A để so sánh", exact: true }).filter({ visible: true })).toBeVisible();
 });
 
 test("slot locks are keyboard buttons and weather can add headwear without replacing locked/current pieces silently", async ({ page }) => {
   await fixtures(page);
   await chooseGarment(page);
+  await openStudioPanel(page, "Bối cảnh");
   const weather = page.getByRole("region", { name: "Thời tiết và bối cảnh" });
   const add = weather.getByRole("button", { name: "Thêm phụ kiện phù hợp" });
+  await openStudioPanel(page, "Chọn trang phục");
   const lock = page.getByRole("button", { name: "Khóa vị trí khăn vấn", exact: true });
   await lock.focus();
   await page.keyboard.press("Enter");
   await expect(page.getByRole("button", { name: "Mở khóa vị trí khăn vấn", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await openStudioPanel(page, "Bối cảnh");
   await add.click();
   expect((await draft(page)).snapshot.items.map((item: any) => item.slot)).toEqual(["outerwear"]);
+  await openStudioPanel(page, "Chọn trang phục");
   await page.getByRole("button", { name: "Mở khóa vị trí khăn vấn", exact: true }).click();
   await page.getByRole("button", { name: "Khăn vấn", exact: true }).click();
   await page.getByText("Mũ cũ", { exact: true }).click();
   const original = (await draft(page)).snapshot.items;
+  await openStudioPanel(page, "Bối cảnh");
   await add.click();
   const confirm = page.getByRole("alertdialog", { name: "Thay phụ kiện theo thời tiết?" });
   await confirm.getByRole("button", { name: "Giữ bộ phối" }).click();
   expect((await draft(page)).snapshot.items).toEqual(original);
+  await openStudioPanel(page, "Bối cảnh");
   await add.click();
   await confirm.getByRole("button", { name: "Thay phụ kiện", exact: true }).click();
   await expect.poll(async () => (await draft(page)).snapshot.items.find((item: any) => item.slot === "headwear")?.itemId).toBe(items[2].id);
   expect((await draft(page)).snapshot.items.find((item: any) => item.slot === "outerwear")).toEqual(original.find((item: any) => item.slot === "outerwear"));
+  await closeStudioPanels(page);
   await page.getByTitle("Hoàn tác (Ctrl+Z)").click();
   await expect.poll(async () => (await draft(page)).snapshot.items).toEqual(original);
 });

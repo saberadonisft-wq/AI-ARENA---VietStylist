@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { DRAFT_KEY, INITIAL_DOCUMENT } from "../src/features/studio/state";
+import { clickStudioAction } from "./helpers/studio-ui";
 
 async function openDraft(page: Page) {
   await page.addInitScript(({ key, draft }) => {
@@ -60,7 +61,7 @@ test("starting fresh from the draft toast keeps the previous draft recoverable",
   await notices.getByRole("button", { name: "Đóng thông báo thành công" }).click();
   await expect(notices).toHaveCount(0);
   expect((await title.boundingBox())!.y).toBe(beforeDismiss);
-  await page.getByRole("button", { name: "Xem bản khôi phục trên thiết bị", exact: true }).click();
+  await clickStudioAction(page, "Xem bản khôi phục trên thiết bị");
   for (const width of [375, 1440]) {
     await page.setViewportSize({ width, height: 900 });
     expect(await notices.evaluate(element => getComputedStyle(element).position)).toBe("fixed");

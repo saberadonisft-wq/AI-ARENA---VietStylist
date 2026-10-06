@@ -3,6 +3,7 @@
 import "@/features/studio/studio-workspace.css";
 
 import dynamic from "next/dynamic";
+import StudioWorkbench, { type StudioPanelId } from "@/features/studio/StudioWorkbench";
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
   GarmentType,
@@ -65,6 +66,8 @@ import {
   Compass,
   X,
   Info,
+  Search,
+  MoreHorizontal,
 } from "lucide-react";
 
 type ColorPatchResult = { supported: true; patch: Partial<SnapshotItem> } | { supported: false; reason: string };
@@ -114,7 +117,20 @@ export default function StudioPage() {
   } = useCatalog();
   const currentAvatar = avatars.find(a => a.id === snapshot.avatarId) || null;
   const [selectedGarmentType, setSelectedGarmentType] = useState("all");
-  const [mobilePanel, setMobilePanel] = useState<"catalog" | "properties" | "tools">("catalog");
+  const [workspacePanel, setWorkspacePanel] = useState<StudioPanelId | null>(null);
+  const [inspectorOpen, setInspectorOpen] = useState(false);
+  const [controlsHost, setControlsHost] = useState<HTMLDivElement | null>(null);
+  const [catalogSearch, setCatalogSearch] = useState("");
+  const openWorkspacePanel = (panel: StudioPanelId | null) => setWorkspacePanel(panel);
+  const setMobilePanel = (panel: "catalog" | "properties" | "tools") => {
+    if (panel === "properties") {
+      setInspectorOpen(true);
+      if (window.matchMedia("(max-width: 1399px)").matches) setWorkspacePanel(null);
+    } else {
+      setWorkspacePanel(panel === "catalog" ? "catalog" : "culture");
+      if (window.matchMedia("(max-width: 1399px)").matches) setInspectorOpen(false);
+    }
+  };
   const [activeSlot, setActiveSlot] = useState("outerwear");
   const outfitTitle = document.title;
   const selectedOccasion = snapshot.occasionId;
@@ -677,9 +693,10 @@ export default function StudioPage() {
       if (activeSlot && ci.slot !== activeSlot) {
         return false;
       }
+      if (catalogSearch.trim() && !ci.name.toLocaleLowerCase("vi").includes(catalogSearch.trim().toLocaleLowerCase("vi"))) return false;
       return true;
     });
-  }, [catalogItems, selectedGarmentType, activeSlot]);
+  }, [catalogItems, selectedGarmentType, activeSlot, catalogSearch]);
 
   const handleWeatherSuggestion = async (accessories: string[]) => {
     const normalize = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d").toLowerCase().replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
@@ -755,8 +772,66 @@ export default function StudioPage() {
   });
   if (actionNotice) notifications.push({ id: "action", message: actionNotice, type: "info" });
 
+  const workspaceNotices = (<>
+      {requestedCatalogItem && <div role="status" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-heritage-red/20 bg-white p-4 text-sm"><span>Đã mở <strong>{requestedCatalogItem.name}</strong>. Thêm món này vào vị trí {slotLabel(requestedCatalogItem.slot)} trong bản phối?</span><div className="flex gap-2"><button type="button" disabled={lockedSlots.has(requestedCatalogItem.slot)} onClick={addRequestedCatalogItem} className="rounded-lg bg-heritage-red px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">{lockedSlots.has(requestedCatalogItem.slot) ? "Mở khóa vị trí trước" : "Thêm vào bản phối"}</button><button type="button" onClick={() => setRequestedCatalogItemId(null)} className="rounded-lg border border-stone-300 px-3 py-2 text-xs font-semibold">Để sau</button></div></div>}
+      {studio.isManaging && <div role="status" className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">Bạn đang chỉnh sửa bộ phối với quyền quản trị. Khi lưu, thay đổi được áp dụng vào bộ phối của chủ sở hữu.</div>}
+      {studio.error && <div role="alert" aria-label="Lưu bộ phối" className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm">
+        <p>{studio.error}</p>
+        {studio.conflict && <div className="mt-3 flex gap-3">
+          <button onClick={() => studio.loadServerCopy()} className="underline">Tải bản máy chủ</button>
+          <button onClick={() => studio.save(true)} disabled={isSaving} className="underline">Lưu thành bộ mới</button>
+        </div>}
+      </div>}
+      {studio.requestedOutfit && !studio.conflict && <div role="status" className="rounded-xl border border-stone-200 bg-white p-4 text-sm">
+        <p>Bạn đang có bản nháp chưa lưu. Liên kết vừa mở yêu cầu tải bộ phối trên máy chủ.</p>
+        <div className="mt-3 flex gap-3">
+          <button onClick={() => studio.loadServerCopy()} className="underline">Mở bộ phối từ liên kết</button>
+          <button onClick={studio.keepLocal} className="underline">Tiếp tục bản nháp</button>
+        </div>
+      </div>}
+
+
+
+
+      {studio.externalDraft && <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-sky-200 bg-sky-50 p-4 text-sm text-sky-950">
+        <span>Tab khác đã cập nhật bản nháp này. Bản đang mở được giữ nguyên cho đến khi bạn chọn.</span>
+        <div className="flex gap-2"><button type="button" onClick={studio.acceptExternalDraft} className="rounded-lg bg-sky-800 px-3 py-2 text-xs font-semibold text-white">Tiếp tục bản từ tab khác</button><button type="button" onClick={studio.keepCurrentDraft} className="rounded-lg border border-sky-300 bg-white px-3 py-2 text-xs font-semibold">Giữ bản đang mở</button></div>
+      </div>}
+      {catalogItemsError && <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900"><span>{catalogItemsError}</span><button type="button" onClick={() => void refreshCatalog()} disabled={isInitialLoading} className="rounded-lg border border-rose-300 bg-white px-3 py-2 text-xs font-semibold disabled:opacity-50">Tải lại kho trang phục</button></div>}
+      {unavailableSnapshotItems.length > 0 && <div role="alert" className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
+        <p className="font-semibold">Một số món trong bản phối không còn được xuất bản. Bản nháp vẫn giữ nguyên các món đó.</p>
+        <ul className="mt-2 space-y-2">{unavailableSnapshotItems.map(item => <li key={`${item.slot}:${item.itemId}`} className="flex flex-wrap items-center justify-between gap-2">
+          <span>{itemLabel(item.itemId, catalogItems)} · vị trí {slotLabel(item.slot)}</span>
+          <button type="button" onClick={() => { setActiveSlot(item.slot); setSelectedGarmentType("all"); setMobilePanel("catalog"); }} className="rounded-lg border border-amber-400 bg-white px-3 py-1.5 text-xs font-semibold text-amber-950">Chọn món thay thế</button>
+        </li>)}</ul>
+      </div>}
+
+</>);
+
+  const compareActions = (<div className="studio-compare-action"><button
+            onClick={() => {
+              if (!pinnedSnapshotA) {
+                setPinnedSnapshotA(structuredClone(snapshot));
+              } else {
+                setIsCompareOpen(true);
+              }
+            }}
+            className={`flex items-center space-x-1 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all ${
+              pinnedSnapshotA
+                ? "border-heritage-indigo bg-heritage-indigo/10 text-heritage-indigo"
+                : "border-stone-300 text-stone-700 hover:bg-stone-50"
+            }`}
+          >
+            <ArrowRightLeft className="w-3.5 h-3.5" />
+            <span>{pinnedSnapshotA ? "So sánh hai bản" : "Lưu bản A để so sánh"}</span>
+          </button>
+{pinnedSnapshotA && <>
+            <button type="button" onClick={() => { setPinnedSnapshotA(structuredClone(snapshot)); setActionNotice("Đã ghim bản hiện tại làm phương án A."); }} className="min-h-11 rounded-lg border border-stone-300 bg-white px-3 text-xs font-semibold">Ghim lại bản A</button>
+            <button type="button" onClick={() => { setPinnedSnapshotA(null); setIsCompareOpen(false); }} className="min-h-11 rounded-lg border border-stone-300 bg-white px-3 text-xs font-semibold">Bỏ ghim bản A</button>
+          </>}</div>);
+
   return (
-    <div className="studio-workspace w-full mx-auto px-3 sm:px-5 py-4 space-y-4">
+    <div className="studio-workspace">
       <ToastContainer toasts={notifications} onDismiss={id => {
         if (id === "draft") studio.dismissDraft();
         else if (id === "guest") setGuestNoticeDismissed(true);
@@ -783,26 +858,13 @@ export default function StudioPage() {
           {studio.error && <p role="alert" className="text-sm text-red-700">{studio.error}</p>}
         </section>
       </Modal>}
-      {requestedCatalogItem && <div role="status" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-heritage-red/20 bg-white p-4 text-sm"><span>Đã mở <strong>{requestedCatalogItem.name}</strong>. Thêm món này vào vị trí {slotLabel(requestedCatalogItem.slot)} trong bản phối?</span><div className="flex gap-2"><button type="button" disabled={lockedSlots.has(requestedCatalogItem.slot)} onClick={addRequestedCatalogItem} className="rounded-lg bg-heritage-red px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">{lockedSlots.has(requestedCatalogItem.slot) ? "Mở khóa vị trí trước" : "Thêm vào bản phối"}</button><button type="button" onClick={() => setRequestedCatalogItemId(null)} className="rounded-lg border border-stone-300 px-3 py-2 text-xs font-semibold">Để sau</button></div></div>}
-      {studio.isManaging && <div role="status" className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">Bạn đang chỉnh sửa bộ phối với quyền quản trị. Khi lưu, thay đổi được áp dụng vào bộ phối của chủ sở hữu.</div>}
-      {studio.error && <div role="alert" aria-label="Lưu bộ phối" className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm">
-        <p>{studio.error}</p>
-        {studio.conflict && <div className="mt-3 flex gap-3">
-          <button onClick={() => studio.loadServerCopy()} className="underline">Tải bản máy chủ</button>
-          <button onClick={() => studio.save(true)} disabled={isSaving} className="underline">Lưu thành bộ mới</button>
-        </div>}
-      </div>}
-      {studio.requestedOutfit && !studio.conflict && <div role="status" className="rounded-xl border border-stone-200 bg-white p-4 text-sm">
-        <p>Bạn đang có bản nháp chưa lưu. Liên kết vừa mở yêu cầu tải bộ phối trên máy chủ.</p>
-        <div className="mt-3 flex gap-3">
-          <button onClick={() => studio.loadServerCopy()} className="underline">Mở bộ phối từ liên kết</button>
-          <button onClick={studio.keepLocal} className="underline">Tiếp tục bản nháp</button>
-        </div>
-      </div>}
-
       {/* Top Toolbar: Tên bộ phối, Chế độ, Undo/Redo, Nút Lưu & Xuất */}
-      <div className="studio-toolbar bg-white rounded-xl border border-stone-200 p-3 flex flex-wrap items-center justify-between gap-3">
-        <div className="studio-document flex min-w-0 flex-wrap items-center gap-2 sm:gap-3">
+      <StudioWorkbench
+        notices={workspaceNotices}
+        panel={workspacePanel} onPanelChange={openWorkspacePanel}
+        inspectorOpen={inspectorOpen} onInspectorChange={setInspectorOpen}
+        controlsRef={setControlsHost} loggedIn={isLoggedIn} onLogin={() => setShowAuthModal(true)}
+        header={<><div className="studio-document">
           <input
             type="text"
             aria-label="Tên bản phối"
@@ -812,94 +874,17 @@ export default function StudioPage() {
           />
 
           <div role="group" aria-label="Phong cách bản phối" className="flex max-w-full flex-wrap items-center gap-1 bg-stone-100 p-1 rounded-xl border border-stone-200 text-xs font-semibold">
-            {Object.entries(STYLE_LABELS).map(([mode, label]) => <button key={mode} type="button"
+            {Object.entries(STYLE_LABELS).map(([mode, label]) => <button key={mode} type="button" aria-label={label} title={label}
               aria-pressed={styleMode === mode} onClick={() => setStyleMode(mode as OutfitSnapshot["styleMode"])}
               className={`px-3 py-1 rounded-lg transition-all ${styleMode === mode ? "bg-white text-stone-900 shadow-xs" : "text-stone-500 hover:text-stone-800"}`}>
-              {label}
+              {mode === "remix" ? "Remix" : mode === "modern_fusion" ? "Cách tân" : label}
             </button>)}
           </div>
-        </div>
 
-        {/* Nút thao tác nhanh: Undo, Redo, Mở đầu, So sánh, Thử đồ, Lưu, Xuất */}
-        <div className="studio-actions flex items-center flex-wrap gap-2">
-          {studio.recoveryDrafts.length > 0 && <button type="button" onClick={() => setDismissedRecoveryList(null)}
-            aria-label="Xem bản khôi phục trên thiết bị"
-            className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-xs font-semibold text-stone-700 hover:bg-stone-50">
-            Bản khôi phục ({studio.recoveryDrafts.length})
-          </button>}
-          {/* Undo / Redo & Phím tắt */}
-          <div className="flex items-center space-x-1.5">
-            <div className="flex items-center bg-stone-100 rounded-lg p-0.5 border border-stone-200">
-              <button
-                onClick={handleUndo}
-                disabled={!studio.history.past.length}
-                className="p-1.5 rounded-md hover:bg-white text-stone-700 disabled:opacity-30 transition-all"
-                title="Hoàn tác (Ctrl+Z)"
-              >
-                <Undo2 className="w-4 h-4" />
-              </button>
-              <button
-                onClick={handleRedo}
-                disabled={!studio.history.future.length}
-                className="p-1.5 rounded-md hover:bg-white text-stone-700 disabled:opacity-30 transition-all"
-                title="Làm lại (Ctrl+Y)"
-              >
-                <Redo2 className="w-4 h-4" />
-              </button>
-            </div>
-            <span
-              className="sr-only"
-              title="Phím tắt: Ctrl+Z (Undo), Ctrl+Y (Redo), 1-6 (Đổi slot trang phục), Esc (Đóng bảng)"
-            >
-              ⌨️ Ctrl+Z / 1-6
-            </span>
-          </div>
-
-          {starterState === "available" && <button
-            onClick={() => setIsStarterOpen(true)}
-            className="flex items-center space-x-1 px-3 py-1.5 rounded-lg border border-stone-300 hover:bg-stone-50 text-xs font-semibold text-stone-700 transition-colors"
-          >
-            <Sparkles className="w-3.5 h-3.5 text-heritage-gold" />
-            <span>Mẫu phối có sẵn</span>
-          </button>}
-          {starterState === "error" && <button type="button" onClick={refreshStarterOutfits} className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-900">Không tải được mẫu phối · Thử lại</button>}
-
-          {/* Ghim / So sánh A/B */}
-          <button
-            onClick={() => {
-              if (!pinnedSnapshotA) {
-                setPinnedSnapshotA(structuredClone(snapshot));
-              } else {
-                setIsCompareOpen(true);
-              }
-            }}
-            className={`flex items-center space-x-1 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all ${
-              pinnedSnapshotA
-                ? "border-heritage-indigo bg-heritage-indigo/10 text-heritage-indigo"
-                : "border-stone-300 text-stone-700 hover:bg-stone-50"
-            }`}
-          >
-            <ArrowRightLeft className="w-3.5 h-3.5" />
-            <span>{pinnedSnapshotA ? "So sánh hai bản" : "Lưu bản A để so sánh"}</span>
-          </button>
-
-          {pinnedSnapshotA && <>
-            <button type="button" onClick={() => { setPinnedSnapshotA(structuredClone(snapshot)); setActionNotice("Đã ghim bản hiện tại làm phương án A."); }} className="min-h-11 rounded-lg border border-stone-300 bg-white px-3 text-xs font-semibold">Ghim lại bản A</button>
-            <button type="button" onClick={() => { setPinnedSnapshotA(null); setIsCompareOpen(false); }} className="min-h-11 rounded-lg border border-stone-300 bg-white px-3 text-xs font-semibold">Bỏ ghim bản A</button>
-          </>}
-          {/* Thử đồ AI */}
-          <button
-            onClick={() => requestAccountAction("try-on")}
-            disabled={equippedItems.length === 0}
-            title={equippedItems.length === 0 ? "Thêm ít nhất một món trang phục trước" : undefined}
-            className="flex items-center space-x-1 px-3 py-1.5 rounded-lg border border-heritage-gold bg-amber-50/50 hover:bg-amber-100/60 text-xs font-semibold text-amber-900 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <Camera className="w-3.5 h-3.5 text-heritage-gold" />
-            <span>Thử đồ AI</span>
-          </button>
-
-          {/* Xuất ảnh 2D */}
-          <button
+          <p className="studio-save-status" role="status">{isSaving ? "Đang lưu…" : studio.error ? "Chưa lưu được" : studio.isDirty ? "Có thay đổi · nháp trên thiết bị" : "Bản phối đang mở"}</p></div>
+        <div className="studio-actions">
+          {compareActions}
+          <div className="studio-desktop-action"><button
             onClick={() => requestAccountAction("export")}
             disabled={equippedItems.length === 0}
             title={equippedItems.length === 0 ? "Thêm ít nhất một món trang phục trước" : undefined}
@@ -907,13 +892,11 @@ export default function StudioPage() {
           >
             <Download className="w-3.5 h-3.5" />
             <span>Xuất ảnh</span>
-          </button>
-
-          {/* Lưu bộ phối */}
-          <button type="button" onClick={() => requestAccountAction("publish")} disabled={isSaving || !studio.hydrated || equippedItems.length === 0}
+          </button></div>
+          <div className="studio-desktop-action"><button type="button" onClick={() => requestAccountAction("publish")} disabled={isSaving || !studio.hydrated || equippedItems.length === 0}
             className="flex min-h-11 items-center gap-2 rounded-lg border border-heritage-red bg-white px-3 py-2 text-xs font-semibold text-heritage-red disabled:opacity-50">
             <Share2 className="h-4 w-4" aria-hidden="true" />Đăng lên Lookbook
-          </button>
+          </button></div>
           <button
             onClick={handleSaveOutfit}
             disabled={isSaving || !studio.hydrated}
@@ -922,7 +905,40 @@ export default function StudioPage() {
             <Save className="w-3.5 h-3.5" />
             <span>{isSaving ? "Đang lưu..." : "Lưu bộ phối"}</span>
           </button>
-          <button
+          <details className="studio-document-menu"><summary aria-label="Thao tác bộ phối" title="Thao tác bộ phối"><MoreHorizontal size={20} /></summary><div className="studio-action-menu" onClick={event => {
+            if (!(event.target instanceof Element) || !event.target.closest("button:not(:disabled)")) return;
+            const menu = event.currentTarget.closest("details");
+            if (!menu) return;
+            menu.open = false;
+            menu.querySelector("summary")?.focus({ preventScroll: true });
+          }}>
+            <div className="studio-mobile-action">{compareActions}<button
+            onClick={() => requestAccountAction("export")}
+            disabled={equippedItems.length === 0}
+            title={equippedItems.length === 0 ? "Thêm ít nhất một món trang phục trước" : undefined}
+            className="flex items-center space-x-1 px-3.5 py-1.5 rounded-lg bg-stone-800 hover:bg-stone-900 text-white text-xs font-semibold transition-all shadow-xs disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>Xuất ảnh</span>
+          </button><button type="button" onClick={() => requestAccountAction("publish")} disabled={isSaving || !studio.hydrated || equippedItems.length === 0}
+            className="flex min-h-11 items-center gap-2 rounded-lg border border-heritage-red bg-white px-3 py-2 text-xs font-semibold text-heritage-red disabled:opacity-50">
+            <Share2 className="h-4 w-4" aria-hidden="true" />Đăng lên Lookbook
+          </button></div>
+            {studio.recoveryDrafts.length > 0 && <button type="button" onClick={() => setDismissedRecoveryList(null)}
+            aria-label="Xem bản khôi phục trên thiết bị"
+            className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-xs font-semibold text-stone-700 hover:bg-stone-50">
+            Bản khôi phục ({studio.recoveryDrafts.length})
+          </button>}
+<button
+            onClick={() => requestAccountAction("try-on")}
+            disabled={equippedItems.length === 0}
+            title={equippedItems.length === 0 ? "Thêm ít nhất một món trang phục trước" : undefined}
+            className="flex items-center space-x-1 px-3 py-1.5 rounded-lg border border-heritage-gold bg-amber-50/50 hover:bg-amber-100/60 text-xs font-semibold text-amber-900 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Camera className="w-3.5 h-3.5 text-heritage-gold" />
+            <span>Thử đồ AI</span>
+          </button>
+<button
             type="button"
             onClick={() => requestAccountAction("save-new")}
             disabled={isSaving || !studio.hydrated}
@@ -932,69 +948,11 @@ export default function StudioPage() {
             <BookmarkPlus className="w-3.5 h-3.5" />
             <span>Lưu thành bản mới</span>
           </button>
-        </div>
-      </div>
-
-
-      {studio.externalDraft && <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-sky-200 bg-sky-50 p-4 text-sm text-sky-950">
-        <span>Tab khác đã cập nhật bản nháp này. Bản đang mở được giữ nguyên cho đến khi bạn chọn.</span>
-        <div className="flex gap-2"><button type="button" onClick={studio.acceptExternalDraft} className="rounded-lg bg-sky-800 px-3 py-2 text-xs font-semibold text-white">Tiếp tục bản từ tab khác</button><button type="button" onClick={studio.keepCurrentDraft} className="rounded-lg border border-sky-300 bg-white px-3 py-2 text-xs font-semibold">Giữ bản đang mở</button></div>
-      </div>}
-      {catalogItemsError && <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900"><span>{catalogItemsError}</span><button type="button" onClick={() => void refreshCatalog()} disabled={isInitialLoading} className="rounded-lg border border-rose-300 bg-white px-3 py-2 text-xs font-semibold disabled:opacity-50">Tải lại kho trang phục</button></div>}
-      {unavailableSnapshotItems.length > 0 && <div role="alert" className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
-        <p className="font-semibold">Một số món trong bản phối không còn được xuất bản. Bản nháp vẫn giữ nguyên các món đó.</p>
-        <ul className="mt-2 space-y-2">{unavailableSnapshotItems.map(item => <li key={`${item.slot}:${item.itemId}`} className="flex flex-wrap items-center justify-between gap-2">
-          <span>{itemLabel(item.itemId, catalogItems)} · vị trí {slotLabel(item.slot)}</span>
-          <button type="button" onClick={() => { setActiveSlot(item.slot); setSelectedGarmentType("all"); setMobilePanel("catalog"); }} className="rounded-lg border border-amber-400 bg-white px-3 py-1.5 text-xs font-semibold text-amber-950">Chọn món thay thế</button>
-        </li>)}</ul>
-      </div>}
-
-      {/* Main Studio 3-Column Layout: Trái (Danh mục & Sự kiện) | Giữa (Canvas 2D) | Phải (Màu sắc, Cảnh báo văn hóa, Thời tiết) */}
-      <div className="studio-panels grid min-w-0 grid-cols-1 gap-3 items-start">
-        <div role="tablist" aria-label="Bảng Studio trên điện thoại" className="sticky top-16 z-30 order-2 grid grid-cols-3 gap-2 rounded-xl border border-stone-200 bg-white p-1 shadow-sm lg:hidden">
-          {([{ id: "catalog", label: "Chọn trang phục" }, { id: "properties", label: "Món đang chọn" }, { id: "tools", label: "Công cụ" }] as const).map(tab => <button key={tab.id} type="button" role="tab" aria-selected={mobilePanel === tab.id} onClick={() => setMobilePanel(tab.id)} className={`min-h-11 rounded-lg px-2 py-2 text-xs font-semibold touch-manipulation ${mobilePanel === tab.id ? "bg-stone-900 text-white" : "text-stone-600 hover:bg-stone-100"}`}>{tab.label}</button>)}
-        </div>
-        {/* CỘT TRÁI (3 cols): Bối cảnh sự kiện & Kho đồ */}
-        <div aria-label="Kho trang phục và hoàn cảnh" role="region" tabIndex={0} className={`studio-rail studio-library ${mobilePanel === "catalog" ? "" : "hidden"} order-3 min-w-0 space-y-3 lg:order-1 lg:block`}>
-          {/* Lọc Sự Kiện & Bối Cảnh (F01) */}
-          <div className="studio-occasions bg-white p-4 rounded-xl border border-stone-200 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-stone-500 uppercase tracking-wider">
-                Hoàn cảnh sử dụng
-              </span>
-              {selectedOccasion && <button type="button" onClick={() => setSelectedOccasion(undefined)} className="text-xs text-stone-500 underline hover:text-heritage-red">Bỏ chọn hoàn cảnh</button>}
-            </div>
-            {isInitialLoading ? (
-              <OccasionGridSkeleton />
-            ) : occasions.length === 0 ? (
-              catalogError ? <div className="space-y-2 text-xs text-amber-900"><p>Không tải được danh sách hoàn cảnh. Bạn vẫn có thể phối trang phục.</p><button type="button" onClick={() => void refreshCatalog()} className="rounded border border-amber-300 bg-white px-2 py-1 font-semibold">Thử lại</button></div> :
-              <p className="text-xs text-stone-500">Chưa có lựa chọn hoàn cảnh. Bạn vẫn có thể lưu bộ phối.</p>
-            ) : (
-              <div className="grid grid-cols-2 gap-2">
-                {occasions.map((occ) => (
-                  <button
-                    key={occ.id}
-                    type="button"
-                    aria-pressed={selectedOccasion === occ.id}
-                    aria-label={occ.name}
-                    onClick={() => setSelectedOccasion(occ.id)}
-                    className={`p-2.5 rounded-xl border text-left transition-all ${
-                      selectedOccasion === occ.id
-                        ? "border-heritage-red bg-heritage-red/10 text-heritage-red font-semibold shadow-xs"
-                        : "border-stone-200 hover:border-stone-300 text-stone-700 bg-stone-50/50"
-                    }`}
-                  >
-                    <div className="font-semibold text-xs text-stone-900 break-words">{occ.name}</div>
-                    <div className="text-[11px] text-stone-500 font-normal mt-0.5">{({ all: "Quanh năm", spring: "Mùa xuân", summer: "Mùa hè", autumn: "Mùa thu", fall: "Mùa thu", winter: "Mùa đông" } as Record<string, string>)[occ.season] || "Theo dịp sử dụng"}</div>
-                  </button>
-                ))}
-              </div>
-            )}
-            {occasions.find(occasion => occasion.id === selectedOccasion)?.description && <p className="text-xs leading-relaxed text-stone-600" role="status">{occasions.find(occasion => occasion.id === selectedOccasion)?.description}</p>}
-          </div>
-
-          {/* Lọc Nhóm Áo & Slot */}
-          <div className="studio-catalog bg-white p-4 rounded-xl border border-stone-200 space-y-3">
+          </div></details>
+        </div></>}
+        panels={{
+          catalog: <><div className="studio-catalog bg-white p-4 rounded-xl border border-stone-200 space-y-3">
+            <label className="studio-search"><Search size={16} aria-hidden="true" /><input type="search" aria-label="Tìm trang phục" placeholder="Tìm trang phục..." value={catalogSearch} onChange={event => setCatalogSearch(event.target.value)} /></label>
             {/* Tiêu đề mục phân loại */}
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-stone-700 uppercase tracking-wider">
@@ -1026,7 +984,7 @@ export default function StudioPage() {
               {[
                 { slot: "outerwear", label: "Áo ngoài" },
                 { slot: "undergarment", label: "Áo lót trong" },
-                { slot: "bottom", label: "Quần" },
+                { slot: "bottom", label: "Quần / Váy" },
                 { slot: "headwear", label: "Khăn vấn" },
                 { slot: "accessory_front", label: "Phụ kiện" },
                 { slot: "footwear", label: "Giày/Guốc" },
@@ -1050,42 +1008,7 @@ export default function StudioPage() {
             </div>
 
             {/* Structural closure data is recorded for checks/prompts; it never flips the source image. */}
-            <div className="studio-closure space-y-2 rounded-xl border border-stone-200/80 bg-stone-50/80 px-3 py-2 text-xs">
-              <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center space-x-1.5">
-                <Compass className="w-3.5 h-3.5 text-heritage-red shrink-0" />
-                <span className="font-semibold text-stone-700">Cấu trúc · hướng khép vạt</span>
-                <button
-                  type="button"
-                  onClick={() => setShowHuuNhamInfo(true)}
-                  className="text-stone-400 hover:text-heritage-red transition-colors inline-flex items-center"
-                  aria-label="Tìm hiểu quy chuẩn Hữu nhậm"
-                  title="Tìm hiểu ý nghĩa quy chuẩn Hữu nhậm cổ truyền"
-                >
-                  <span className="w-3.5 h-3.5 rounded-full border border-stone-300 text-[9px] flex items-center justify-center font-bold text-stone-500 hover:border-heritage-red hover:text-heritage-red">?</span>
-                </button>
-              </div>
-              <button
-                type="button"
-                aria-label={`Đổi hướng khép vạt sang ${overlapDirection === "right_over_left" ? "Tả nhậm" : "Hữu nhậm"}`}
-                aria-pressed={overlapDirection === "right_over_left"}
-                onClick={() =>
-                  setOverlapDirection(
-                    overlapDirection === "right_over_left" ? "left_over_right" : "right_over_left"
-                  )
-                }
-                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all flex items-center space-x-1.5 border shadow-2xs ${
-                  overlapDirection === "right_over_left"
-                    ? "bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100"
-                    : "bg-red-50 text-red-800 border-red-200 hover:bg-red-100"
-                }`}
-              >
-                <span className={`w-1.5 h-1.5 rounded-full ${overlapDirection === "right_over_left" ? "bg-emerald-600" : "bg-red-600"}`} />
-                <span>{overlapDirection === "right_over_left" ? "Hữu nhậm (Phải)" : "Tả nhậm (Trái)"}</span>
-              </button>
-              </div>
-              <p className="pl-5 text-[11px] leading-relaxed text-stone-600">Dùng cho kiểm tra văn hóa và gợi ý AI. Ảnh trên bảng phối không đổi hướng; ứng dụng không lật ảnh để giả lập cài vạt.</p>
-            </div>
+
 
             {/* Danh sách items có sẵn theo slot */}
             {isInitialLoading ? (
@@ -1190,13 +1113,58 @@ export default function StudioPage() {
                 })}
               </div>
             )}
-          </div>
-        </div>
-
-        {/* CỘT GIỮA (6 cols): Vùng Artboard Canvas 2D (F03) - Trọng tâm thiết kế */}
-        <div id="studio-board" className="studio-center order-1 min-w-0 scroll-mt-20 space-y-3 lg:order-2">
-          {/* Thanh công cụ Artboard: Chế độ Flat-lay, Nền, Tỉ lệ */}
-          <div className="studio-board-toolbar bg-white p-3 rounded-xl border border-stone-200 space-y-2">
+          </div></>,
+          starters: <div className="studio-starters space-y-4"><p className="text-sm text-stone-600">Bắt đầu từ một mẫu phối có sẵn. Bản phối hiện tại được giữ trong mục khôi phục khi mở mẫu khác.</p>{starterState === "available" && <button
+            onClick={() => setIsStarterOpen(true)}
+            className="flex items-center space-x-1 px-3 py-1.5 rounded-lg border border-stone-300 hover:bg-stone-50 text-xs font-semibold text-stone-700 transition-colors"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-heritage-gold" />
+            <span>Mẫu phối có sẵn</span>
+          </button>}
+{starterState === "error" && <button type="button" onClick={refreshStarterOutfits} className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-900">Không tải được mẫu phối · Thử lại</button>}{starterState === "empty" && <p role="status">Chưa có mẫu phối được xuất bản.</p>}{starterState === "loading" && <p role="status">Đang tải mẫu phối…</p>}</div>,
+          colors: <div className="space-y-4"><ColorAnalysisPanel
+            equippedColors={currentColorsForAnalysis}
+            onApplyColorVariant={async (sug) => {
+              const targetCatalogItem = catalogItems.find(ci => ci.id === sug.item_id);
+              const targetSlot = targetCatalogItem?.slot;
+              if (targetSlot && lockedSlots.has(targetSlot)) { setActionNotice("Vị trí này đang khóa nên chưa áp dụng gợi ý màu."); return; }
+              const currentItem = equippedItems.find(item => item.slot === targetSlot);
+              if (!targetCatalogItem || !targetSlot || !currentItem) return;
+              try {
+                const resolved = await resolveColorPatch(targetCatalogItem, sug.hex_color, sug.variant_id);
+                if (!resolved.supported) { setActionNotice(resolved.reason || "Ảnh không hỗ trợ đổi màu an toàn; họa tiết được giữ nguyên."); return; }
+                const applied = applyColorPatches([{ slot: targetSlot, itemId: currentItem.itemId,
+                  previousColor: currentItem.colorHex, patch: { ...resolved.patch, itemId: sug.item_id } }]);
+                setActionNotice(applied ? `Đã áp dụng gợi ý màu ${sug.color_name}.` : "Bản phối vừa được chỉnh ở nơi khác; gợi ý chưa được áp dụng.");
+              } catch (error: any) { setActionNotice(error?.message || "Không kiểm tra được ảnh đổi màu."); }
+            }}
+          /><div className={`bg-white p-4 rounded-2xl border border-stone-200/80 shadow-xs space-y-2.5`}>
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-stone-500 uppercase tracking-wider flex items-center space-x-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-heritage-gold" />
+                <span>Phối màu ngũ hành</span>
+              </span>
+              <span className="shrink-0 text-xs text-stone-500">1 chạm</span>
+            </div>
+            <div className="grid grid-cols-5 gap-1.5">
+              {NGU_HANH_PALETTES.map((pal) => (
+                <button
+                  key={pal.name}
+                  disabled={isApplyingColor}
+                  onClick={() => void applyNguHanhPalette(pal)}
+                  className={`p-2 rounded-xl border text-center transition-all hover:scale-105 disabled:opacity-60 ${pal.badge}`}
+                  title={`${pal.name} (${pal.desc}) - chỉ đổi màu khi ảnh giữ được chi tiết`}
+                >
+                  <div
+                    className="w-4 h-4 rounded-full mx-auto mb-1 border border-black/10 shadow-xs"
+                    style={{ backgroundColor: pal.colors.outerwear }}
+                  ></div>
+                  <div className="text-xs font-bold">{pal.name}</div>
+                </button>
+              ))}
+            </div>
+          </div></div>,
+          context: <div className="space-y-4"><div className="studio-board-toolbar bg-white p-3 rounded-xl border border-stone-200 space-y-2">
             <div className="flex flex-wrap items-center justify-between gap-2">
               {/* Tiêu đề Bảng phối Flat-lay OOTD */}
               <div className="flex items-center space-x-2">
@@ -1275,48 +1243,92 @@ export default function StudioPage() {
                 <span>Căn lại vị trí ban đầu</span>
               </button>
             </div>
-          </div>
-
-          {canvasBackgroundTheme === "occasion" && (
+          </div>{canvasBackgroundTheme === "occasion" && (
             <BackgroundFadeControl value={snapshot.backgroundFade ?? 0}
               onPreview={value => canvasRef.current?.previewBackgroundFade(value)}
               onCommit={backgroundFade => studio.updateSnapshot({ backgroundFade })} />
-          )}
-
-          <Canvas2D
-            ref={canvasRef}
-            avatar={currentAvatar}
-            layers={layers}
-            equippedItems={equippedItems}
-            catalogItems={catalogItems}
-            aspectRatio={displayRatio}
-            viewMode="flatlay"
-            backgroundTheme={canvasBackgroundTheme}
-            neutralBackgroundTheme={neutralBackground(snapshot)}
-            backgroundFade={snapshot.backgroundFade ?? 0}
-            occasionId={selectedOccasion}
-            selectedSlot={activeSlot}
-            onSelectItem={(slot) => setActiveSlot(slot)}
-            onRemoveItem={(slot) => {
-              if (lockedSlots.has(slot)) return;
-              pushHistory(equippedItems.filter(item => item.slot !== slot));
-            }}
-            onBrowseCatalog={() => {
-              setMobilePanel("catalog");
-              requestAnimationFrame(() => {
-                catalogListRef.current?.focus({ preventScroll: true });
-                catalogListRef.current?.scrollIntoView({ block: "center" });
-              });
-            }}
-            onToggleLock={toggleLockSlot}
-            lockedSlots={[...lockedSlots]}
-            onColorLoadFailure={handleColorLoadFailure}
-            onTransformsCommit={(changes) => studio.dispatch({ type: "commit", update: doc => ({ ...doc, snapshot: { ...doc.snapshot, items: doc.snapshot.items.map(item => item.slot in changes ? { ...item, transform: changes[item.slot] } : item) } }) })}
-            className="w-full"
-          />
-
-          {/* Trợ lý Gemini gợi ý nhanh */}
-          <section aria-label="Gợi ý phối đồ" className="bg-white p-4 rounded-xl border border-stone-200 space-y-3">
+          )}<div className="studio-occasions bg-white p-4 rounded-xl border border-stone-200 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-stone-500 uppercase tracking-wider">
+                Hoàn cảnh sử dụng
+              </span>
+              {selectedOccasion && <button type="button" onClick={() => setSelectedOccasion(undefined)} className="text-xs text-stone-500 underline hover:text-heritage-red">Bỏ chọn hoàn cảnh</button>}
+            </div>
+            {isInitialLoading ? (
+              <OccasionGridSkeleton />
+            ) : occasions.length === 0 ? (
+              catalogError ? <div className="space-y-2 text-xs text-amber-900"><p>Không tải được danh sách hoàn cảnh. Bạn vẫn có thể phối trang phục.</p><button type="button" onClick={() => void refreshCatalog()} className="rounded border border-amber-300 bg-white px-2 py-1 font-semibold">Thử lại</button></div> :
+              <p className="text-xs text-stone-500">Chưa có lựa chọn hoàn cảnh. Bạn vẫn có thể lưu bộ phối.</p>
+            ) : (
+              <div className="grid grid-cols-2 gap-2">
+                {occasions.map((occ) => (
+                  <button
+                    key={occ.id}
+                    type="button"
+                    aria-pressed={selectedOccasion === occ.id}
+                    aria-label={occ.name}
+                    onClick={() => setSelectedOccasion(occ.id)}
+                    className={`p-2.5 rounded-xl border text-left transition-all ${
+                      selectedOccasion === occ.id
+                        ? "border-heritage-red bg-heritage-red/10 text-heritage-red font-semibold shadow-xs"
+                        : "border-stone-200 hover:border-stone-300 text-stone-700 bg-stone-50/50"
+                    }`}
+                  >
+                    <div className="font-semibold text-xs text-stone-900 break-words">{occ.name}</div>
+                    <div className="text-[11px] text-stone-500 font-normal mt-0.5">{({ all: "Quanh năm", spring: "Mùa xuân", summer: "Mùa hè", autumn: "Mùa thu", fall: "Mùa thu", winter: "Mùa đông" } as Record<string, string>)[occ.season] || "Theo dịp sử dụng"}</div>
+                  </button>
+                ))}
+              </div>
+            )}
+            {occasions.find(occasion => occasion.id === selectedOccasion)?.description && <p className="text-xs leading-relaxed text-stone-600" role="status">{occasions.find(occasion => occasion.id === selectedOccasion)?.description}</p>}
+          </div>
+          {/* Dự báo Thời tiết & Lời khuyên bối cảnh (F06) */}
+          <WeatherWidget
+            onApplyWeatherSuggestion={handleWeatherSuggestion}
+          /></div>,
+          culture: <div className="space-y-4"><div className="studio-closure space-y-2 rounded-xl border border-stone-200/80 bg-stone-50/80 px-3 py-2 text-xs">
+              <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center space-x-1.5">
+                <Compass className="w-3.5 h-3.5 text-heritage-red shrink-0" />
+                <span className="font-semibold text-stone-700">Cấu trúc · hướng khép vạt</span>
+                <button
+                  type="button"
+                  onClick={() => setShowHuuNhamInfo(true)}
+                  className="text-stone-400 hover:text-heritage-red transition-colors inline-flex items-center"
+                  aria-label="Tìm hiểu quy chuẩn Hữu nhậm"
+                  title="Tìm hiểu ý nghĩa quy chuẩn Hữu nhậm cổ truyền"
+                >
+                  <span className="w-3.5 h-3.5 rounded-full border border-stone-300 text-[9px] flex items-center justify-center font-bold text-stone-500 hover:border-heritage-red hover:text-heritage-red">?</span>
+                </button>
+              </div>
+              <button
+                type="button"
+                aria-label={`Đổi hướng khép vạt sang ${overlapDirection === "right_over_left" ? "Tả nhậm" : "Hữu nhậm"}`}
+                aria-pressed={overlapDirection === "right_over_left"}
+                onClick={() =>
+                  setOverlapDirection(
+                    overlapDirection === "right_over_left" ? "left_over_right" : "right_over_left"
+                  )
+                }
+                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all flex items-center space-x-1.5 border shadow-2xs ${
+                  overlapDirection === "right_over_left"
+                    ? "bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100"
+                    : "bg-red-50 text-red-800 border-red-200 hover:bg-red-100"
+                }`}
+              >
+                <span className={`w-1.5 h-1.5 rounded-full ${overlapDirection === "right_over_left" ? "bg-emerald-600" : "bg-red-600"}`} />
+                <span>{overlapDirection === "right_over_left" ? "Hữu nhậm (Phải)" : "Tả nhậm (Trái)"}</span>
+              </button>
+              </div>
+              <p className="pl-5 text-[11px] leading-relaxed text-stone-600">Dùng cho kiểm tra văn hóa và gợi ý AI. Ảnh trên bảng phối không đổi hướng; ứng dụng không lật ảnh để giả lập cài vạt.</p>
+            </div>{process.env.NEXT_PUBLIC_STUDIO_V3 === "true" ? <StudioComposerPanel snapshot={snapshot} onSettingsChange={culturalSettings => studio.dispatch({ type: "commit", update: doc => ({ ...doc, snapshot: { ...doc.snapshot, culturalSettings } }) })} /> : <CulturalCheckBadge
+            checkData={culturalCheck}
+            status={culturalCheckStatus}
+            error={culturalCheckError}
+            onRetry={() => setCulturalCheckRetry(value => value + 1)}
+            onApplyFix={handleApplyCulturalFix}
+          />}</div>,
+          assistant: <><section aria-label="Gợi ý phối đồ" className="bg-white p-4 rounded-xl border border-stone-200 space-y-3">
             <div className="flex items-center space-x-1.5 text-xs font-semibold text-stone-900">
               <Sparkles className="w-3.5 h-3.5 text-heritage-red" />
               <span>Gợi ý phối đồ</span>
@@ -1339,15 +1351,9 @@ export default function StudioPage() {
               <ul className="space-y-1 text-stone-700">{pendingRecommendation.items.map(item => <li key={item.slot}>{slotLabel(item.slot)}: {itemLabel(item.itemId, catalogItems)}</li>)}</ul>
               <div className="flex gap-2"><button type="button" disabled={isApplyingRecommendation} onClick={applyPendingRecommendation} className="rounded-lg bg-heritage-red px-3 py-1.5 font-semibold text-white">{isApplyingRecommendation ? "Đang áp dụng…" : "Áp dụng gợi ý"}</button><button type="button" disabled={isApplyingRecommendation} onClick={() => setPendingRecommendation(null)} className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 font-semibold">Bỏ qua</button></div>
             </div>}
-          </section>
-
-
-        </div>
-
-        {/* CỘT PHẢI (3 cols): Swatch Màu (F02), Cảnh báo văn hóa (F10), Hài hòa màu (F07), Thời tiết (F06) */}
-        <div aria-label="Thuộc tính và gợi ý" role="region" tabIndex={0} className="studio-rail studio-inspector order-4 min-w-0 space-y-3 lg:order-3">
-          {/* Bộ chọn Biến thể màu sắc & Chất liệu cho món đang chọn (F02) */}
-          <div className={mobilePanel === "properties" ? "" : "hidden lg:block"}>{isInitialLoading ? (
+          </section><button type="button" disabled={equippedItems.length === 0} onClick={() => requestAccountAction("try-on")} className="studio-primary w-full mt-4"><Camera size={16} />Thử đồ AI</button></>,
+        }}
+        properties={<>{isInitialLoading ? (
             <div className="bg-white p-4 rounded-2xl border border-stone-200/80 shadow-xs space-y-3">
               <div className="flex items-center justify-between">
                 <Skeleton className="h-4 w-32 rounded-md" />
@@ -1384,74 +1390,68 @@ export default function StudioPage() {
                 ? "Món này chưa có biến thể màu để chỉnh."
                 : `Chọn một món ở mục “Chọn trang phục” để xem thuộc tính của vị trí ${slotLabel(activeSlot)}.`}
             </div>
-          )}</div>
-
-          {/* Cảnh báo Quy Chuẩn Văn Hóa (F10) */}
-          <div className={mobilePanel === "tools" ? "" : "hidden lg:block"}>{process.env.NEXT_PUBLIC_STUDIO_V3 === "true" ? <StudioComposerPanel snapshot={snapshot} onSettingsChange={culturalSettings => studio.dispatch({ type: "commit", update: doc => ({ ...doc, snapshot: { ...doc.snapshot, culturalSettings } }) })} /> : <CulturalCheckBadge
-            checkData={culturalCheck}
-            status={culturalCheckStatus}
-            error={culturalCheckError}
-            onRetry={() => setCulturalCheckRetry(value => value + 1)}
-            onApplyFix={handleApplyCulturalFix}
-          />}</div>
-
-          {/* Phân tích Hài hòa Màu sắc & Độ tương phản (F07) */}
-          <div className={mobilePanel === "properties" ? "" : "hidden lg:block"}><ColorAnalysisPanel
-            equippedColors={currentColorsForAnalysis}
-            onApplyColorVariant={async (sug) => {
-              const targetCatalogItem = catalogItems.find(ci => ci.id === sug.item_id);
-              const targetSlot = targetCatalogItem?.slot;
-              if (targetSlot && lockedSlots.has(targetSlot)) { setActionNotice("Vị trí này đang khóa nên chưa áp dụng gợi ý màu."); return; }
-              const currentItem = equippedItems.find(item => item.slot === targetSlot);
-              if (!targetCatalogItem || !targetSlot || !currentItem) return;
-              try {
-                const resolved = await resolveColorPatch(targetCatalogItem, sug.hex_color, sug.variant_id);
-                if (!resolved.supported) { setActionNotice(resolved.reason || "Ảnh không hỗ trợ đổi màu an toàn; họa tiết được giữ nguyên."); return; }
-                const applied = applyColorPatches([{ slot: targetSlot, itemId: currentItem.itemId,
-                  previousColor: currentItem.colorHex, patch: { ...resolved.patch, itemId: sug.item_id } }]);
-                setActionNotice(applied ? `Đã áp dụng gợi ý màu ${sug.color_name}.` : "Bản phối vừa được chỉnh ở nơi khác; gợi ý chưa được áp dụng.");
-              } catch (error: any) { setActionNotice(error?.message || "Không kiểm tra được ảnh đổi màu."); }
+          )}</>}
+      >
+        <Canvas2D
+            ref={canvasRef}
+            avatar={currentAvatar}
+            layers={layers}
+            equippedItems={equippedItems}
+            catalogItems={catalogItems}
+            aspectRatio={displayRatio}
+            viewMode="flatlay"
+            backgroundTheme={canvasBackgroundTheme}
+            neutralBackgroundTheme={neutralBackground(snapshot)}
+            backgroundFade={snapshot.backgroundFade ?? 0}
+            occasionId={selectedOccasion}
+            selectedSlot={activeSlot}
+            onSelectItem={setActiveSlot}
+            onRemoveItem={(slot) => {
+              if (lockedSlots.has(slot)) return;
+              pushHistory(equippedItems.filter(item => item.slot !== slot));
             }}
-          /></div>
-
-          {/* Bảng phối màu Ngũ Hành 1 chạm (Tối ưu trải nghiệm F02/F07) */}
-          <div className={`${mobilePanel === "tools" ? "" : "hidden lg:block"} bg-white p-4 rounded-2xl border border-stone-200/80 shadow-xs space-y-2.5`}>
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-stone-500 uppercase tracking-wider flex items-center space-x-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-heritage-gold" />
-                <span>Phối màu ngũ hành</span>
-              </span>
-              <span className="shrink-0 text-xs text-stone-500">1 chạm</span>
+            onBrowseCatalog={() => {
+              setMobilePanel("catalog");
+              requestAnimationFrame(() => {
+                catalogListRef.current?.focus({ preventScroll: true });
+                catalogListRef.current?.scrollIntoView({ block: "center" });
+              });
+            }}
+            onToggleLock={toggleLockSlot}
+            lockedSlots={[...lockedSlots]}
+            onColorLoadFailure={handleColorLoadFailure}
+            onTransformsCommit={(changes) => studio.dispatch({ type: "commit", update: doc => ({ ...doc, snapshot: { ...doc.snapshot, items: doc.snapshot.items.map(item => item.slot in changes ? { ...item, transform: changes[item.slot] } : item) } }) })}
+            controlsContainer={controlsHost}
+            toolbarLeading={<div className="flex items-center space-x-1.5">
+            <div className="flex items-center bg-stone-100 rounded-lg p-0.5 border border-stone-200">
+              <button
+                onClick={handleUndo}
+                disabled={!studio.history.past.length}
+                className="p-1.5 rounded-md hover:bg-white text-stone-700 disabled:opacity-30 transition-all"
+                title="Hoàn tác (Ctrl+Z)"
+              >
+                <Undo2 className="w-4 h-4" />
+              </button>
+              <button
+                onClick={handleRedo}
+                disabled={!studio.history.future.length}
+                className="p-1.5 rounded-md hover:bg-white text-stone-700 disabled:opacity-30 transition-all"
+                title="Làm lại (Ctrl+Y)"
+              >
+                <Redo2 className="w-4 h-4" />
+              </button>
             </div>
-            <div className="grid grid-cols-5 gap-1.5">
-              {NGU_HANH_PALETTES.map((pal) => (
-                <button
-                  key={pal.name}
-                  disabled={isApplyingColor}
-                  onClick={() => void applyNguHanhPalette(pal)}
-                  className={`p-2 rounded-xl border text-center transition-all hover:scale-105 disabled:opacity-60 ${pal.badge}`}
-                  title={`${pal.name} (${pal.desc}) - chỉ đổi màu khi ảnh giữ được chi tiết`}
-                >
-                  <div
-                    className="w-4 h-4 rounded-full mx-auto mb-1 border border-black/10 shadow-xs"
-                    style={{ backgroundColor: pal.colors.outerwear }}
-                  ></div>
-                  <div className="text-xs font-bold">{pal.name}</div>
-                </button>
-              ))}
-            </div>
-          </div>
-
-
-
-          <div className={mobilePanel === "properties" ? "" : "hidden lg:block"}>
-          {/* Dự báo Thời tiết & Lời khuyên bối cảnh (F06) */}
-          <WeatherWidget
-            onApplyWeatherSuggestion={handleWeatherSuggestion}
-          /></div>
-        </div>
-      </div>
-
+            <span
+              className="sr-only"
+              title="Phím tắt: Ctrl+Z (Undo), Ctrl+Y (Redo), 1-6 (Đổi slot trang phục), Esc (Đóng bảng)"
+            >
+              ⌨️ Ctrl+Z / 1-6
+            </span>
+          </div>}
+            toolbarTrailing={<button type="button" className="studio-board-fit" onClick={() => openWorkspacePanel("context")}>Nền · {displayRatio}</button>}
+            className="w-full"
+          />
+      </StudioWorkbench>
       {/* MODALS */}
       {isStarterOpen && <StarterOutfitModal
         isOpen={isStarterOpen}

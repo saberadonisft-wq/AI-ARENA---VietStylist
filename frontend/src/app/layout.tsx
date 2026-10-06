@@ -3,8 +3,7 @@ import { Be_Vietnam_Pro, Noto_Serif } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/lib/auth/context";
 import { CatalogProvider } from "@/lib/catalog/CatalogProvider";
-import Navbar from "@/components/Navbar";
-import Footer from "@/components/Footer";
+import SiteFrame from "@/components/SiteFrame";
 
 const beVietnamPro = Be_Vietnam_Pro({
   subsets: ["vietnamese", "latin"],
@@ -47,9 +46,7 @@ export default function RootLayout({
       <body className="flex flex-col min-h-screen bg-[#FAF8F5] text-stone-800 font-sans">
         <AuthProvider>
           <CatalogProvider>
-            <Navbar />
-            <main className="flex-1">{children}</main>
-            <Footer />
+            <SiteFrame>{children}</SiteFrame>
           </CatalogProvider>
         </AuthProvider>
       </body>

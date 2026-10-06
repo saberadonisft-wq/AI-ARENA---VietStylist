@@ -1,5 +1,6 @@
 "use client";
 
+import { createPortal } from "react-dom";
 import React, { useRef, useImperativeHandle, forwardRef, useState, useEffect, useLayoutEffect } from "react";
 import { Avatar, AssetLayer, SnapshotItem, CatalogItem } from "@/lib/types/api";
 import { API_ORIGIN } from "@/lib/api/client";
@@ -55,6 +56,9 @@ export interface Canvas2DProps {
   onTransformsCommit?: (changes: Record<string, ItemTransform | undefined>) => void;
   onColorLoadFailure?: (itemId: string, colorHex: string) => void;
   className?: string;
+  controlsContainer?: HTMLElement | null;
+  toolbarLeading?: React.ReactNode;
+  toolbarTrailing?: React.ReactNode;
 }
 
 interface ItemGeometry {
@@ -351,6 +355,9 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
       onTransformsCommit,
       onColorLoadFailure,
       className = "",
+      controlsContainer,
+      toolbarLeading,
+      toolbarTrailing,
     },
     ref
   ) => {
@@ -1092,6 +1099,50 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
     };
     const controlButton = "flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-lg border border-stone-200 bg-white px-2 text-sm font-medium text-stone-800 hover:bg-stone-100 active:bg-stone-200 disabled:opacity-40 touch-manipulation";
 
+    const transformControls = viewMode === "flatlay" && equippedItems.length > 0 ? (<section aria-label="Điều chỉnh trang phục" className="studio-transform-controls space-y-2 rounded-xl border border-stone-200 bg-white p-3">
+          <div className="studio-selection-row flex items-center gap-2">
+            <select aria-label="Trang phục đang điều chỉnh" value={selectedEq?.slot || ""}
+              onChange={event => { setActiveSlot(event.target.value); onSelectItem?.(event.target.value); }}
+              className="min-h-11 min-w-0 flex-1 rounded-lg border border-stone-300 bg-white px-2 text-base">
+              <option value="" disabled>Chọn món để điều chỉnh</option>
+              {equippedItems.map(item => <option key={item.slot} value={item.slot}>{getItemInfo(item.itemId)?.name || getItemGeometry(item).label}{lockedSlots.includes(item.slot) ? " · Đã khóa" : ""}</option>)}
+            </select>
+            {onToggleLock && <button type="button" disabled={!selectedEq} className={controlButton}
+              aria-label={selectedLocked ? "Mở khóa món đang chọn" : "Khóa món đang chọn"} aria-pressed={selectedLocked}
+              onClick={() => selectedEq && onToggleLock(selectedEq.slot)}>{selectedLocked ? <Lock size={18} /> : <Unlock size={18} />}</button>}
+            {onRemoveItem && <button type="button" disabled={!selectedEq || selectedLocked || !!dragSession}
+              className={`${controlButton}`} aria-label="Xóa trang phục khỏi bảng"
+              onClick={() => selectedEq && removeItem(selectedEq.slot)}><X size={18} /></button>}
+          </div>
+          <p data-locked={selectedLocked} className="studio-gesture-hint text-xs leading-relaxed text-stone-600">{selectedLocked ? "Món này đã khóa. Mở khóa để di chuyển, đổi cỡ hoặc xoay." : <><span className="lg:hidden">Kéo một ngón trên món đồ để di chuyển. Phóng to bảng rồi vuốt vùng trống để xem phần khác.</span><span className="hidden lg:inline">Kéo để di chuyển · Kéo góc để đổi cỡ · Giữ nút tròn để xoay</span></>}</p>
+          <fieldset disabled={!selectedEq || selectedLocked || !!dragSession} className="studio-transform-fields space-y-2">
+            <legend className="sr-only">Vị trí, kích thước và góc xoay</legend>
+            <div className="studio-transform-values grid grid-cols-2 gap-3">
+              <div className="studio-transform-cluster grid grid-cols-[44px_1fr_44px] items-center gap-1">
+                <span className="studio-transform-label">Kích thước</span>
+                <button type="button" className={controlButton} aria-label="Thu nhỏ trang phục" onClick={() => adjustSelected({ scale: Math.max(0.05, Math.round((selectedTransform!.scale / 1.25) * 100) / 100) })}><ZoomOut size={18} /></button>
+                <span aria-label="Mức phóng trang phục" className="text-center text-xs tabular-nums">{selectedTransform ? `${Math.round(selectedTransform.scale * 100)}%` : "—"}</span>
+                <button type="button" className={controlButton} aria-label="Phóng to trang phục" onClick={() => adjustSelected({ scale: Math.min(20, Math.round((selectedTransform!.scale * 1.25) * 100) / 100) })}><ZoomIn size={18} /></button>
+              </div>
+              <div className="studio-transform-cluster grid grid-cols-[44px_1fr_44px] items-center gap-1">
+                <span className="studio-transform-label">Góc xoay</span>
+                <button type="button" className={controlButton} aria-label="Xoay trái 15 độ" onClick={() => adjustSelected({ rotation: (selectedTransform!.rotation - 15) % 360 })}><RotateCcw size={18} /></button>
+                <span aria-label="Góc xoay trang phục" className="text-center text-xs tabular-nums">{selectedTransform ? `${selectedTransform.rotation}°` : "—"}</span>
+                <button type="button" className={controlButton} aria-label="Xoay phải 15 độ" onClick={() => adjustSelected({ rotation: (selectedTransform!.rotation + 15) % 360 })}><RotateCw size={18} /></button>
+              </div>
+            </div>
+            <div className="studio-position-actions flex flex-wrap items-center gap-2">
+              <div role="group" aria-label="Dịch chuyển từng bước" className="flex gap-2">
+                <button type="button" className={controlButton} aria-label="Dịch trái" onClick={() => adjustSelected({ dx: selectedTransform!.dx - 10 })}><ArrowLeft size={18} /></button>
+                <button type="button" className={controlButton} aria-label="Dịch lên" onClick={() => adjustSelected({ dy: selectedTransform!.dy - 10 })}><ArrowUp size={18} /></button>
+                <button type="button" className={controlButton} aria-label="Dịch xuống" onClick={() => adjustSelected({ dy: selectedTransform!.dy + 10 })}><ArrowDown size={18} /></button>
+                <button type="button" className={controlButton} aria-label="Dịch phải" onClick={() => adjustSelected({ dx: selectedTransform!.dx + 10 })}><ArrowRight size={18} /></button>
+              </div>
+              <button type="button" className={`${controlButton} ml-auto`} aria-label="Đặt lại món đang chọn" onClick={() => selectedEq && resetSlotTransform(selectedEq.slot)}><RefreshCw size={16} /><span>Đặt lại</span></button>
+            </div>
+          </fieldset>
+        </section>) : null;
+
     return (
       <div className={`studio-canvas min-w-0 space-y-2 ${className}`}>
       <div className="studio-artboard-stage" style={{
@@ -1099,12 +1150,14 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
         "--studio-board-zoom": boardZoom,
       } as React.CSSProperties}>
       <div role="group" aria-label="Thu phóng bảng phối" className="studio-board-zoom">
+        {toolbarLeading}
         <button type="button" aria-label="Thu nhỏ bảng phối" disabled={boardZoom <= 0.5 || !!dragSession}
           onClick={() => changeBoardZoom(boardZoom - 0.25)}><ZoomOut size={16} /></button>
         <output aria-label="Mức thu phóng bảng phối" aria-live="polite">{Math.round(boardZoom * 100)}%</output>
         <button type="button" aria-label="Phóng to bảng phối" disabled={boardZoom >= 4 || !!dragSession}
           onClick={() => changeBoardZoom(boardZoom + 0.25)}><ZoomIn size={16} /></button>
         <button type="button" disabled={!!dragSession} onClick={() => changeBoardZoom(1)} className="studio-board-fit">Vừa khung</button>
+        {toolbarTrailing}
       </div>
       <div ref={viewportRef} className="studio-artboard-viewport" data-zoomed={boardZoom > 1}
         role="region" aria-label="Vùng xem bảng phối" tabIndex={0}>
@@ -1232,49 +1285,7 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
       </div>
       </div>
       </div>
-      {viewMode === "flatlay" && equippedItems.length > 0 && (
-        <section aria-label="Điều chỉnh trang phục" className="studio-transform-controls space-y-2 rounded-xl border border-stone-200 bg-white p-3">
-          <div className="studio-selection-row flex items-center gap-2">
-            <select aria-label="Trang phục đang điều chỉnh" value={selectedEq?.slot || ""}
-              onChange={event => { setActiveSlot(event.target.value); onSelectItem?.(event.target.value); }}
-              className="min-h-11 min-w-0 flex-1 rounded-lg border border-stone-300 bg-white px-2 text-base">
-              <option value="" disabled>Chọn món để điều chỉnh</option>
-              {equippedItems.map(item => <option key={item.slot} value={item.slot}>{getItemInfo(item.itemId)?.name || getItemGeometry(item).label}{lockedSlots.includes(item.slot) ? " · Đã khóa" : ""}</option>)}
-            </select>
-            {onToggleLock && <button type="button" disabled={!selectedEq} className={controlButton}
-              aria-label={selectedLocked ? "Mở khóa món đang chọn" : "Khóa món đang chọn"} aria-pressed={selectedLocked}
-              onClick={() => selectedEq && onToggleLock(selectedEq.slot)}>{selectedLocked ? <Lock size={18} /> : <Unlock size={18} />}</button>}
-            {onRemoveItem && <button type="button" disabled={!selectedEq || selectedLocked || !!dragSession}
-              className={`${controlButton} lg:hidden`} aria-label="Xóa trang phục khỏi bảng"
-              onClick={() => selectedEq && removeItem(selectedEq.slot)}><X size={18} /></button>}
-          </div>
-          <p data-locked={selectedLocked} className="studio-gesture-hint text-xs leading-relaxed text-stone-600">{selectedLocked ? "Món này đã khóa. Mở khóa để di chuyển, đổi cỡ hoặc xoay." : <><span className="lg:hidden">Kéo một ngón trên món đồ để di chuyển. Vuốt vùng trống để cuộn trang.</span><span className="hidden lg:inline">Kéo để di chuyển · Kéo góc để đổi cỡ · Giữ nút tròn để xoay</span></>}</p>
-          <fieldset disabled={!selectedEq || selectedLocked || !!dragSession} className="studio-transform-fields space-y-2">
-            <legend className="sr-only">Vị trí, kích thước và góc xoay</legend>
-            <div className="studio-transform-values grid grid-cols-2 gap-3">
-              <div className="studio-transform-cluster grid grid-cols-[44px_1fr_44px] items-center gap-1">
-                <button type="button" className={controlButton} aria-label="Thu nhỏ trang phục" onClick={() => adjustSelected({ scale: Math.max(0.05, Math.round((selectedTransform!.scale / 1.25) * 100) / 100) })}><ZoomOut size={18} /></button>
-                <span aria-label="Mức phóng trang phục" className="text-center text-xs tabular-nums">{selectedTransform ? `${Math.round(selectedTransform.scale * 100)}%` : "—"}</span>
-                <button type="button" className={controlButton} aria-label="Phóng to trang phục" onClick={() => adjustSelected({ scale: Math.min(20, Math.round((selectedTransform!.scale * 1.25) * 100) / 100) })}><ZoomIn size={18} /></button>
-              </div>
-              <div className="studio-transform-cluster grid grid-cols-[44px_1fr_44px] items-center gap-1">
-                <button type="button" className={controlButton} aria-label="Xoay trái 15 độ" onClick={() => adjustSelected({ rotation: (selectedTransform!.rotation - 15) % 360 })}><RotateCcw size={18} /></button>
-                <span aria-label="Góc xoay trang phục" className="text-center text-xs tabular-nums">{selectedTransform ? `${selectedTransform.rotation}°` : "—"}</span>
-                <button type="button" className={controlButton} aria-label="Xoay phải 15 độ" onClick={() => adjustSelected({ rotation: (selectedTransform!.rotation + 15) % 360 })}><RotateCw size={18} /></button>
-              </div>
-            </div>
-            <div className="studio-position-actions flex flex-wrap items-center gap-2">
-              <div role="group" aria-label="Dịch chuyển từng bước" className="flex gap-2">
-                <button type="button" className={controlButton} aria-label="Dịch trái" onClick={() => adjustSelected({ dx: selectedTransform!.dx - 10 })}><ArrowLeft size={18} /></button>
-                <button type="button" className={controlButton} aria-label="Dịch lên" onClick={() => adjustSelected({ dy: selectedTransform!.dy - 10 })}><ArrowUp size={18} /></button>
-                <button type="button" className={controlButton} aria-label="Dịch xuống" onClick={() => adjustSelected({ dy: selectedTransform!.dy + 10 })}><ArrowDown size={18} /></button>
-                <button type="button" className={controlButton} aria-label="Dịch phải" onClick={() => adjustSelected({ dx: selectedTransform!.dx + 10 })}><ArrowRight size={18} /></button>
-              </div>
-              <button type="button" className={`${controlButton} ml-auto`} aria-label="Đặt lại món đang chọn" onClick={() => selectedEq && resetSlotTransform(selectedEq.slot)}><RefreshCw size={16} /><span>Đặt lại</span></button>
-            </div>
-          </fieldset>
-        </section>
-      )}
+      {controlsContainer ? createPortal(transformControls, controlsContainer) : transformControls}
       </div>
     );
   }
