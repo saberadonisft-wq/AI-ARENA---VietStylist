@@ -158,6 +158,8 @@ class MediaRepository:
 
     @staticmethod
     def _mark_unused(conn, media_id, owner_id):
+        if conn.execute('SELECT 1 FROM lookbook_posts WHERE cover_media_id=? AND is_deleted=0 LIMIT 1', (media_id,)).fetchone():
+            return 'in_use'
         media = conn.execute("SELECT public_url FROM media_assets WHERE id=?", (media_id,)).fetchone()
         url = media["public_url"] if media else None
         # Existing gallery JSON is the canonical link, including legacy

@@ -26,6 +26,7 @@ from app.modules.weather.router import router as weather_router
 from app.modules.recommendations.router import router as recommendations_router
 from app.modules.outfits.router import router as outfits_router
 from app.modules.lookbooks.router import router as lookbooks_router
+from app.modules.community.router import router as community_router
 from app.modules.shares.router import router as shares_router
 from app.modules.media.router import router as media_router, local_router
 from app.modules.try_on.router import router as try_on_router
@@ -211,6 +212,7 @@ def create_app():
     app.include_router(recommendations_router, prefix=api_prefix)
     app.include_router(outfits_router, prefix=api_prefix)
     app.include_router(lookbooks_router, prefix=api_prefix)
+    app.include_router(community_router, prefix=api_prefix)
     app.include_router(shares_router, prefix=api_prefix)
     app.include_router(media_router, prefix=api_prefix)
     if settings.is_local_media_enabled():

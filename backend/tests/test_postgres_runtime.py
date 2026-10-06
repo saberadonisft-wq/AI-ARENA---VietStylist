@@ -16,7 +16,7 @@ from fastapi.testclient import TestClient
 from app.core.config import settings
 from app.core.database import Database, init_database
 from app.core import postgres
-from app.core.postgres_migrations import schema_source, schema_checksum, VERSION, verify_postgres_schema, STORY_IMAGES_SQL, STORY_IMAGES_VERSION
+from app.core.postgres_migrations import schema_source, schema_checksum, VERSION, verify_postgres_schema, STORY_IMAGES_SQL, STORY_IMAGES_VERSION, install_community
 from app.main import app
 
 
@@ -39,10 +39,12 @@ def test_postgres_runtime_rollback_only(monkeypatch, png_bytes):
                 raw.execute(sql.SQL("CREATE SCHEMA {}").format(sql.Identifier(schema)))
                 raw.execute(schema_source(), prepare=False)
                 raw.execute("INSERT INTO schema_migrations(version,description,checksum) VALUES(%s,%s,%s)", (VERSION, "rollback-only probe", schema_checksum()))
-                assert verify_postgres_schema(raw, with_story_images=False)
+                assert verify_postgres_schema(raw, with_story_images=False, with_community=False)
                 import hashlib
                 raw.execute(STORY_IMAGES_SQL)
                 raw.execute("INSERT INTO schema_migrations(version,description,checksum) VALUES(%s,%s,%s)", (STORY_IMAGES_VERSION, "story images", hashlib.sha256(STORY_IMAGES_SQL.encode()).hexdigest()))
+                assert verify_postgres_schema(raw, with_community=False)
+                install_community(raw)
                 assert verify_postgres_schema(raw)
 
                 class RollbackPool:
@@ -123,6 +125,19 @@ def test_postgres_runtime_rollback_only(monkeypatch, png_bytes):
                 assert stored['status'] == 'ready' and stored['staging_key'] is None
                 assert len(MediaRepository.objects(image.id)) == 1
                 assert MediaService.probe_image(stored)
+
+                publication = {'title': 'Áo tấc PostgreSQL', 'visibility': 'public',
+                               'outfit_version_id': changed.json()['current_version_id'], 'cover_media_id': image.id}
+                published = client.post('/api/lookbook-posts', headers={**headers, 'Idempotency-Key': 'pg-publication'}, json=publication)
+                assert published.status_code == 200, published.text
+                post_id = published.json()['id']
+                assert client.post('/api/lookbook-posts', headers={**headers, 'Idempotency-Key': 'pg-publication'}, json=publication).json()['id'] == post_id
+                assert len(client.get('/api/lookbook-posts?q=ÁO&style=traditional').json()['items']) == 1
+                assert client.put('/api/lookbook-posts/' + post_id + '/favorite', headers=admin_headers).status_code == 200
+                assert len(client.get('/api/lookbook-posts/favorites', headers=admin_headers).json()['items']) == 1
+                assert client.put('/api/lookbook-posts/' + post_id, headers=headers, json={**publication, 'visibility': 'private', 'revision': 1}).status_code == 200
+                assert client.get('/api/lookbook-posts/favorites', headers=admin_headers).json()['items'][0]['post'] is None
+                assert client.get('/api/lookbook-posts').json()['items'] == []
 
                 from app.modules.try_on.repository import TryOnRepository
                 TryOnRepository.create_job("pg_job", owner, "try_on", "hash", "pg-key", "mock", "{}")

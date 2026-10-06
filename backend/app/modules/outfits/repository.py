@@ -148,7 +148,15 @@ class OutfitRepository:
 
     @staticmethod
     def soft_delete_outfit(outfit_id: str, owner_id: str) -> int:
-        return Database.execute(
-            "UPDATE outfits SET is_deleted = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND owner_id = ? AND is_deleted = 0",
-            (outfit_id, owner_id),
-        )
+        with db_transaction() as conn:
+            changed = conn.execute(
+                "UPDATE outfits SET is_deleted = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND owner_id = ? AND is_deleted = 0",
+                (outfit_id, owner_id),
+            ).rowcount
+            if changed:
+                from app.modules.community.service import now
+                stamp = now()
+                ids = 'SELECT p.id FROM lookbook_posts p JOIN outfit_versions v ON v.id=p.outfit_version_id WHERE v.outfit_id=? AND p.owner_id=?'
+                conn.execute('UPDATE lookbook_post_shares SET revoked_at=? WHERE post_id IN (' + ids + ') AND revoked_at IS NULL', (stamp, outfit_id, owner_id))
+                conn.execute('UPDATE lookbook_posts SET is_deleted=1,revision=revision+1,updated_at=? WHERE id IN (' + ids + ') AND is_deleted=0', (stamp, outfit_id, owner_id))
+            return changed

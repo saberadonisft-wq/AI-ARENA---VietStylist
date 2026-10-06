@@ -447,6 +447,13 @@ def heritage_images(conn):
         conn.execute("ALTER TABLE heritage_articles ADD COLUMN images_json TEXT NOT NULL DEFAULT '[]'")
 
 
+def lookbook_community(conn):
+    from importlib.resources import files
+    from app.core.database import split_sql_statements
+    for statement in split_sql_statements(files('app.data').joinpath('lookbook_community.sql').read_text(encoding='utf-8')):
+        conn.execute(statement)
+
+
 MIGRATIONS = [
     ("001_initial_schema", initial),
     ("002_add_blog_articles_fields", blog),
@@ -461,6 +468,7 @@ MIGRATIONS = [
     ("011_dataset_replace_guard_v3", dataset_replace_guard_v3),
     ("012_performance_indexes_v3", performance_indexes_v3),
     ("013_heritage_images", heritage_images),
+    ("014_lookbook_community", lookbook_community),
 ]
 
 
@@ -470,6 +478,9 @@ def checksum(fn):
         from app.core.database import SQLITE_INIT_DDL
 
         source += SQLITE_INIT_DDL
+    if fn is lookbook_community:
+        from importlib.resources import files
+        source += files('app.data').joinpath('lookbook_community.sql').read_text(encoding='utf-8')
     return hashlib.sha256(source.encode()).hexdigest()
 
 
@@ -529,6 +540,11 @@ def verify_schema(conn):
         conn.execute("SELECT key_hash,count,resets_at FROM rate_limits LIMIT 0")
         conn.execute("SELECT * FROM quarantined_lookbook_entries LIMIT 0")
         conn.execute("SELECT * FROM media_objects LIMIT 0")
+        conn.execute("SELECT outfit_version_id,cover_media_id,search_title,moderation_status FROM lookbook_posts LIMIT 0")
+        conn.execute("SELECT token_hash,revoked_at FROM lookbook_post_shares LIMIT 0")
+        conn.execute("SELECT user_id,post_id FROM lookbook_favorites LIMIT 0")
+        conn.execute("SELECT reporter_id,status FROM lookbook_reports LIMIT 0")
+        conn.execute("SELECT owner_id,bio FROM lookbook_public_profiles LIMIT 0")
         index = conn.execute(
             "SELECT sql FROM sqlite_master WHERE name='uq_solution_forms_owner'"
         ).fetchone()

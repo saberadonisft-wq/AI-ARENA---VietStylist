@@ -41,6 +41,7 @@ def test_r11_share_link_origin_and_ttl_validation(isolated_runtime):
         "/api/lookbooks",
         json={
             "title": "Shareable Lookbook",
+            "visibility": "unlisted",
             "entries": [{"outfit_version_id": v_id, "sort_order": 1}],
         },
         headers={"Authorization": f"Bearer {token}"},
@@ -102,6 +103,7 @@ def test_r11_share_link_resolution_and_revocation(isolated_runtime):
         "/api/lookbooks",
         json={
             "title": "Public Exhibition",
+            "visibility": "unlisted",
             "entries": [{"outfit_version_id": v_id, "sort_order": 1}],
         },
         headers={"Authorization": f"Bearer {owner_token}"},
