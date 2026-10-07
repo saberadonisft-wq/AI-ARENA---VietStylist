@@ -21,7 +21,7 @@ test("account retries a lost create response with the persisted idempotency key 
     const method = request.method();
     const send = (body: unknown, status = 200) => route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
     if (path === "/api/auth/me") return send(user);
-    if (path === "/api/outfits" && method === "GET") return send([]);
+    if (path === "/api/outfits/page" && method === "GET") return send({ items: [], next_cursor: null });
     if (path === "/api/outfits" && method === "POST") {
       const key = request.headers()["idempotency-key"];
       const body = request.postDataJSON();

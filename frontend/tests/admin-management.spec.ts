@@ -18,6 +18,8 @@ async function setup(page: Page, role = "admin") {
     requests.push({ method, path, body });
     const send = (data: unknown, status = 200) => route.fulfill({ status, contentType: "application/json", body: JSON.stringify(data) });
     if (path === "/api/auth/me") return send(admin);
+    if (path === "/api/outfits/page") return send({ items: [], next_cursor: null });
+    if (path === "/api/outfits/count") return send({ count: 0 });
     if (path === "/api/admin/overview") return send({ users: 2, items: 1, outfits: 1, lookbooks: 0, rules: 0 });
     if (path === "/api/admin/users/student-1") { student = { ...student, ...(body.is_active === undefined ? {} : { is_active: body.is_active }), ...(body.is_stylist === undefined ? {} : { roles: body.is_stylist ? ["user", "stylist"] : ["user"] }) }; return send({ status: "updated" }); }
     if (path === "/api/admin/users") return send({ items: [student], total: 1 });

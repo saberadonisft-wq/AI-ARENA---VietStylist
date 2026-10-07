@@ -13,6 +13,7 @@ async function setup(page: Page, loggedIn = false, mine = false) {
     if (path === '/api/lookbook-posts/post-1') return route.fulfill({ json: post });
     if (path === '/api/lookbook-posts/post-1/favorite' || path === '/api/lookbook-posts/missing/favorite') return route.fulfill({ json: { saved: route.request().method() === 'PUT' } });
     if (path === '/api/lookbook-posts/post-1/shares') return route.fulfill({ json: [] });
+    if (path === '/api/outfits/page') return route.fulfill({ json: { items: [], next_cursor: null } });
     if (path === '/api/outfits' || path.startsWith('/api/catalog/')) return route.fulfill({ json: [] });
     return route.fulfill({ status: 404, json: { error: { code: 'NOT_FOUND', message: 'Không khả dụng.' } } });
   });
@@ -138,7 +139,7 @@ test('admin reviews reported posts and restores hidden posts with a reason', asy
 test('uncertain publication can be checked or explicitly retried as a new post without losing its form', async ({ page }) => {
   await setup(page, true, true);
   await page.addInitScript(() => { sessionStorage.setItem('viet_lookbook_post:author:new', JSON.stringify({ title: 'Nháp cần kiểm tra', description: 'Nội dung được giữ', visibility: 'private', version: 'version-1', media: 'cover-1', requestKey: 'uncertain-key' })); });
-  await page.route('**/api/outfits', route => route.fulfill({ json: [{ id: 'outfit-1', title: 'Bộ phối', current_version_id: 'version-1', current_snapshot: post.snapshot }] }));
+  await page.route('**/api/outfits/page?*', route => route.fulfill({ json: { items: [{ id: 'outfit-1', title: 'Bộ phối', current_version_id: 'version-1', current_snapshot: post.snapshot }], next_cursor: null } }));
   const keys: string[] = [];
   await page.route('**/api/lookbook-posts', route => {
     if (route.request().method() !== 'POST') return route.fallback();

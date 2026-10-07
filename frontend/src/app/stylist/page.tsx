@@ -4,7 +4,6 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth/context";
 import { api } from "@/lib/api/client";
-import type { OutfitResponse } from "@/lib/types/api";
 import AuthModal from "@/components/AuthModal";
 import StylistWorkspace from "@/features/stylist/StylistWorkspace";
 import { ArrowLeft, Lock, Palette, Sparkles } from "lucide-react";
@@ -12,19 +11,20 @@ import { ArrowLeft, Lock, Palette, Sparkles } from "lucide-react";
 export default function StylistWorkspacePage() {
   const { user, isLoggedIn, isStylist, isAdmin } = useAuth();
   const [showAuthModal, setShowAuthModal] = useState(false);
-  const [outfits, setOutfits] = useState<OutfitResponse[]>([]);
+  const [outfitCount, setOutfitCount] = useState(0);
   const [outfitsLoading, setOutfitsLoading] = useState(false);
 
   useEffect(() => {
     if (!isLoggedIn || (!isStylist && !isAdmin)) {
-      setOutfits([]);
+      setOutfitCount(0);
       return;
     }
     let active = true;
     setOutfitsLoading(true);
-    api.listUserOutfits()
-      .then(items => { if (active) setOutfits(items || []); })
-      .catch(() => { if (active) setOutfits([]); })
+    setOutfitCount(0);
+    api.countUserOutfits()
+      .then(result => { if (active) setOutfitCount(result.count); })
+      .catch(() => { if (active) setOutfitCount(0); })
       .finally(() => { if (active) setOutfitsLoading(false); });
     return () => { active = false; };
   }, [isLoggedIn, isStylist, isAdmin, user?.id]);
@@ -58,7 +58,7 @@ export default function StylistWorkspacePage() {
         </div>
       </header>
       {outfitsLoading && <p role="status" className="text-sm text-stone-500">Đang tải số liệu bộ phối…</p>}
-      <StylistWorkspace outfitCount={outfits.length} />
+      <StylistWorkspace outfitCount={outfitCount} />
     </div>
   </main>;
 }

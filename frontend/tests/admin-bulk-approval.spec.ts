@@ -30,6 +30,7 @@ async function setup(page: Page, entries: StylistSubmission[], options: {
     const send = (data: unknown, status = 200) => route.fulfill({ status, contentType: "application/json", body: JSON.stringify(data) });
     events.push({ method, path, ...(method === "POST" ? { body: request.postDataJSON() } : {}) });
     if (path === "/api/auth/me") return send(account);
+    if (path === "/api/outfits/page") return send({ items: [], next_cursor: null });
     if (path === "/api/admin/overview") return send({ users: 1, items: entries.filter(x => x.status === "approved").length, outfits: 0, lookbooks: 0, rules: 0 });
     if (path === "/api/admin/stylist-submissions") {
       const search = url.searchParams.get("search") || "";

@@ -18,6 +18,8 @@ export default function CollectionWorkspace() {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [lookbooks, setLookbooks] = useState<Lookbook[]>([]);
   const [userOutfits, setUserOutfits] = useState<OutfitResponse[]>([]);
+  const [outfitsCursor, setOutfitsCursor] = useState<string | null>(null);
+  const [loadingMoreOutfits, setLoadingMoreOutfits] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
@@ -62,6 +64,8 @@ export default function CollectionWorkspace() {
     setLoadError(null);
     setLookbooks([]);
     setUserOutfits([]);
+    setOutfitsCursor(null);
+    setLoadingMoreOutfits(false);
     setLoadedOwnerId(null);
     if (!isReady) {
       setIsLoading(true);
@@ -74,10 +78,11 @@ export default function CollectionWorkspace() {
     const ownerId = user.id;
     setIsLoading(true);
     try {
-      const [lbs, outfits] = await Promise.all([api.listLookbooks(), api.listUserOutfits()]);
+      const [lbs, outfits] = await Promise.all([api.listLookbooks(), api.listUserOutfitsPage()]);
       if (generation === requestGeneration.current && ownerId === currentOwnerId.current) {
         setLookbooks(lbs);
-        setUserOutfits(outfits);
+        setUserOutfits(outfits.items);
+        setOutfitsCursor(outfits.next_cursor);
         setLoadedOwnerId(ownerId);
       }
     } catch (err: any) {
@@ -95,6 +100,24 @@ export default function CollectionWorkspace() {
     void fetchLookbooks();
     return () => { requestGeneration.current++; };
   }, [fetchLookbooks]);
+
+  const loadMoreOutfits = async () => {
+    const ownerId = user?.id;
+    const generation = requestGeneration.current;
+    if (!ownerId || !outfitsCursor || loadingMoreOutfits) return;
+    setLoadingMoreOutfits(true);
+    setCreateError(null);
+    try {
+      const page = await api.listUserOutfitsPage(outfitsCursor);
+      if (ownerId !== currentOwnerId.current || generation !== requestGeneration.current) return;
+      setUserOutfits(current => [...current.filter(outfit => !page.items.some(row => row.id === outfit.id)), ...page.items]);
+      setOutfitsCursor(page.next_cursor);
+    } catch (err: any) {
+      if (ownerId === currentOwnerId.current && generation === requestGeneration.current) setCreateError(err.message || "Không tải được bộ phối tiếp theo.");
+    } finally {
+      if (ownerId === currentOwnerId.current && generation === requestGeneration.current) setLoadingMoreOutfits(false);
+    }
+  };
 
   const handleCreateLookbook = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -426,6 +449,7 @@ export default function CollectionWorkspace() {
                       );
                     })}
                   </div>
+                  {outfitsCursor && <button type="button" disabled={isCreating || loadingMoreOutfits} onClick={() => void loadMoreOutfits()} className="min-h-11 rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-700 disabled:opacity-50">{loadingMoreOutfits ? "Đang tải bộ phối…" : "Tải thêm bộ phối"}</button>}
                 </div>
               )}
 

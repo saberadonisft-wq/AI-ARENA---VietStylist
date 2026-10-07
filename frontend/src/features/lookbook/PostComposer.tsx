@@ -22,6 +22,8 @@ export default function PostComposer({ post, initialOutfitId, onClose, onPublish
   const catalog = useCatalog();
   const canvas = useRef<Canvas2DHandle>(null);
   const [outfits, setOutfits] = useState<OutfitResponse[]>([]);
+  const [outfitsCursor, setOutfitsCursor] = useState<string | null>(null);
+  const [loadingMoreOutfits, setLoadingMoreOutfits] = useState(false);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [stage, setStage] = useState('');
@@ -41,8 +43,14 @@ export default function PostComposer({ post, initialOutfitId, onClose, onPublish
       else setDraft(d => ({ ...d, requestKey: crypto.randomUUID() }));
     } catch { setDraft(d => ({ ...d, requestKey: crypto.randomUUID() })); }
     setRestored(true);
-    api.listUserOutfits().then(data => {
+    api.listUserOutfitsPage().then(async page => {
       if (!live) return;
+      const data = [...page.items];
+      setOutfitsCursor(page.next_cursor);
+      if (initialOutfitId && !post && !data.some(outfit => outfit.id === initialOutfitId)) {
+        data.push(await api.getOutfit(initialOutfitId));
+        if (!live) return;
+      }
       setOutfits(data);
       if (initialOutfitId && !post) {
         const selected = data.find(o => o.id === initialOutfitId);
@@ -54,6 +62,21 @@ export default function PostComposer({ post, initialOutfitId, onClose, onPublish
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draftKey]);
   useEffect(() => { if (restored) { try { sessionStorage.setItem(draftKey, JSON.stringify(draft)); } catch { /* The in-memory form remains available. */ } } }, [draft, draftKey, restored]);
+  const loadMoreOutfits = async () => {
+    if (!outfitsCursor || loadingMoreOutfits) return;
+    setLoadingMoreOutfits(true);
+    setError('');
+    try {
+      const page = await api.listUserOutfitsPage(outfitsCursor);
+      if (activeOwner.current !== owner) return;
+      setOutfits(previous => [...previous.filter(outfit => !page.items.some(row => row.id === outfit.id)), ...page.items]);
+      setOutfitsCursor(page.next_cursor);
+    } catch (e: any) {
+      if (activeOwner.current === owner) setError(e.message || 'Không tải được bộ phối tiếp theo.');
+    } finally {
+      if (activeOwner.current === owner) setLoadingMoreOutfits(false);
+    }
+  };
   const selected = outfits.find(o => o.current_version_id === draft.version);
   const frozen = post?.outfit_version_id === draft.version;
   const snapshot: OutfitSnapshot | undefined = frozen ? post.snapshot : selected?.current_snapshot;
@@ -110,6 +133,7 @@ export default function PostComposer({ post, initialOutfitId, onClose, onPublish
           {!loading && outfits.length === 0 && !post && <p className="text-sm">Bạn chưa lưu bộ phối. <Link href="/studio" className="font-semibold text-heritage-red underline">Tạo trong Studio</Link></p>}
           <label className="block space-y-2"><span className="font-semibold">Tiêu đề</span><input className={field} maxLength={160} value={draft.title} disabled={busy} onChange={e => patch({ title: e.target.value })} /></label>
           <label className="block space-y-2"><span className="font-semibold">Mô tả</span><textarea className={field} rows={4} maxLength={3000} value={draft.description} disabled={busy} onChange={e => patch({ description: e.target.value })} /></label>
+          {outfitsCursor && <button type="button" className={control} disabled={busy || loading || loadingMoreOutfits} onClick={() => void loadMoreOutfits()}>{loadingMoreOutfits ? "Đang tải bộ phối…" : "Tải thêm bộ phối"}</button>}
           <label className="block space-y-2"><span className="font-semibold">Ai có thể xem?</span><select className={field} value={draft.visibility} disabled={busy} onChange={e => patch({ visibility: e.target.value as Visibility })}><option value="private">Riêng tư — chỉ mình tôi</option><option value="unlisted">Người có liên kết</option><option value="public">Công khai — xuất hiện ở Khám phá</option></select></label>
           <p className="text-sm text-stone-600">{draft.visibility === 'private' ? 'Chỉ bạn xem được. Chuyển về riêng tư sẽ thu hồi các link chia sẻ.' : draft.visibility === 'unlisted' ? 'Không xuất hiện ở Khám phá. Bất kỳ ai nhận được link hợp lệ đều có thể xem và chuyển tiếp link.' : 'Mọi người có thể xem và lưu bài vào Yêu thích. Ảnh đã tải xuống bên ngoài không thể thu hồi.'}</p>
           {preview && <div role="status" className="rounded-xl border border-red-200 bg-white p-4"><p className="font-serif text-lg font-bold">{draft.title}</p><p className="whitespace-pre-wrap break-words text-sm">{draft.description || 'Chưa có mô tả.'}</p><p className="mt-2 text-sm">Tác giả: {user?.displayName}</p></div>}

@@ -63,6 +63,7 @@ export default function TaiKhoanPage() {
   // Dynamic initial tab based on role
   const [activeTab, setActiveTab] = useState<string>("outfits");
   const [outfits, setOutfits] = useState<OutfitResponse[]>([]);
+  const [outfitsCursor, setOutfitsCursor] = useState<string | null>(null);
   const [loadingOutfits, setLoadingOutfits] = useState(false);
   const [localDraft, setLocalDraft] = useState<any | null>(null);
   const [backendHealth, setBackendHealth] = useState<any | null>(null);
@@ -126,21 +127,27 @@ export default function TaiKhoanPage() {
     setTimeout(() => setStatusMessage(null), 4000);
   };
 
-  const fetchOutfits = async () => {
+  const fetchOutfits = async (append = false) => {
     const ownerId = user?.id;
     const requestId = ++outfitsRequestId.current;
     if (!ownerId) {
       setOutfits([]);
+      setOutfitsCursor(null);
       setOutfitLoadError(null);
       setLoadingOutfits(false);
       return;
     }
     setLoadingOutfits(true);
     setOutfitLoadError(null);
+    if (!append) {
+      setOutfits([]);
+      setOutfitsCursor(null);
+    }
     try {
-      const data = await api.listUserOutfits();
+      const data = await api.listUserOutfitsPage(append ? outfitsCursor : null);
       if (currentOwnerId.current !== ownerId || requestId !== outfitsRequestId.current) return;
-      setOutfits(data || []);
+      setOutfits(current => append ? [...current.filter(outfit => !data.items.some(row => row.id === outfit.id)), ...data.items] : data.items);
+      setOutfitsCursor(data.next_cursor);
     } catch (err: any) {
       if (currentOwnerId.current !== ownerId || requestId !== outfitsRequestId.current) return;
       console.warn("Không thể tải danh sách outfit:", err?.message);
@@ -599,7 +606,7 @@ export default function TaiKhoanPage() {
               <>
                 <div className="bg-white/90 p-3.5 rounded-xl border border-amber-200 shadow-xs">
                   <span className="text-[11px] text-stone-500 uppercase tracking-wider font-semibold block">Tác phẩm Sáng tạo</span>
-                  <span className="text-xl font-bold text-amber-800 font-serif mt-0.5 block">{loadingOutfits ? "Đang tải…" : outfitLoadError ? "Chưa tải được" : `${outfits.length} bộ phối`}</span>
+                  <span className="text-xl font-bold text-amber-800 font-serif mt-0.5 block">{loadingOutfits ? "Đang tải…" : outfitLoadError ? "Chưa tải được" : `${outfits.length}${outfitsCursor ? "+" : ""} bộ phối`}</span>
                 </div>
                 <div className="bg-white/90 p-3.5 rounded-xl border border-amber-200 shadow-xs">
                   <span className="text-[11px] text-stone-500 uppercase tracking-wider font-semibold block">Bộ sưu tập Lookbook</span>
@@ -622,7 +629,7 @@ export default function TaiKhoanPage() {
                   <span className="text-[11px] text-stone-500 uppercase tracking-wider font-semibold block">{roleType === "guest" ? "Bộ phối đã lưu" : "Tủ đồ của bạn"}</span>
                   {roleType === "guest"
                     ? <button type="button" onClick={() => setShowAuthModal(true)} className="mt-1 text-left text-sm font-bold text-heritage-red hover:underline">Đăng nhập để xem</button>
-                    : <span className="text-xl font-bold text-heritage-red font-serif mt-0.5 block">{loadingOutfits ? "Đang tải…" : outfitLoadError ? "Chưa tải được" : `${outfits.length} bộ đã lưu`}</span>}
+                    : <span className="text-xl font-bold text-heritage-red font-serif mt-0.5 block">{loadingOutfits ? "Đang tải…" : outfitLoadError ? "Chưa tải được" : `${outfits.length}${outfitsCursor ? "+" : ""} bộ đã lưu`}</span>}
                 </div>
                 <div className="bg-white/90 p-3.5 rounded-xl border border-emerald-200/80 shadow-xs">
                   <span className="text-[11px] text-stone-500 uppercase tracking-wider font-semibold block">Bản nháp đang thử</span>
@@ -675,10 +682,10 @@ export default function TaiKhoanPage() {
             <Layers className="w-4 h-4" />
             <span>
               {roleType === "admin"
-                ? `Bộ phối của tôi (${outfits.length})`
+                ? `Bộ phối của tôi (${outfits.length}${outfitsCursor ? "+" : ""})`
                 : roleType === "stylist"
-                ? `Tác phẩm Sáng tạo (${outfits.length})`
-                : `Tủ đồ Cổ phục của tôi (${outfits.length})`}
+                ? `Tác phẩm Sáng tạo (${outfits.length}${outfitsCursor ? "+" : ""})`
+                : `Tủ đồ Cổ phục của tôi (${outfits.length}${outfitsCursor ? "+" : ""})`}
             </span>
           </button>
           )}
@@ -884,7 +891,7 @@ export default function TaiKhoanPage() {
               </div>
               <div className="flex items-center space-x-3">
                 <button
-                  onClick={fetchOutfits}
+                  onClick={() => void fetchOutfits()}
                   disabled={loadingOutfits}
                   className="p-2 text-stone-500 hover:text-stone-800 bg-white border border-stone-200 rounded-lg hover:bg-stone-50 transition-colors"
                   title="Tải lại danh sách"
@@ -901,15 +908,15 @@ export default function TaiKhoanPage() {
               </div>
             </div>
 
-            {loadingOutfits ? (
+            {loadingOutfits && outfits.length === 0 ? (
               <div className="bg-white rounded-2xl border border-stone-200 p-12 text-center">
                 <div className="w-8 h-8 border-2 border-heritage-red border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
                 <p className="text-sm text-stone-500">Đang tải danh sách bộ phối...</p>
               </div>
-            ) : outfitLoadError ? (
+            ) : outfitLoadError && outfits.length === 0 ? (
               <div role="alert" className="bg-rose-50 rounded-2xl border border-rose-200 p-6 text-center">
                 <p className="text-sm text-rose-800">{outfitLoadError}</p>
-                <button type="button" onClick={fetchOutfits} className="mt-3 rounded-lg border border-rose-300 bg-white px-4 py-2 text-sm font-semibold text-rose-800">Thử tải lại</button>
+                <button type="button" onClick={() => void fetchOutfits()} className="mt-3 rounded-lg border border-rose-300 bg-white px-4 py-2 text-sm font-semibold text-rose-800">Thử tải lại</button>
               </div>
             ) : outfits.length === 0 ? (
               <div className="bg-white rounded-2xl border border-stone-200 p-12 text-center max-w-lg mx-auto">
@@ -1013,6 +1020,8 @@ export default function TaiKhoanPage() {
                 })}
               </div>
             )}
+            {outfits.length > 0 && outfitLoadError && <p role="alert" className="mt-4 text-sm text-rose-800">{outfitLoadError}</p>}
+            {outfitsCursor && <div className="mt-6 flex justify-center"><button type="button" disabled={loadingOutfits} onClick={() => void fetchOutfits(true)} className="min-h-11 rounded-lg border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-stone-700 disabled:opacity-50">{loadingOutfits ? "Đang tải bộ phối…" : outfitLoadError ? "Thử tải thêm bộ phối" : "Tải thêm bộ phối"}</button></div>}
           </div>
         )}
 

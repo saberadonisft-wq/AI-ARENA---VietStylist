@@ -26,6 +26,7 @@ async function fixtures(page: Page, signedIn = true) {
     const path = new URL(route.request().url()).pathname;
     const send = (json: unknown) => route.fulfill({ json });
     if (path === "/api/auth/me") return send({ id: "ui-details", email: "ui@example.invalid", display_name: "Kiểm chứng", roles: ["user"] });
+    if (path === "/api/outfits/page") return send({ items: [], next_cursor: null });
     if (path.endsWith("/studio-image")) return route.fulfill({ contentType: "image/png", body: png, headers: { "Access-Control-Allow-Origin": "*" } });
     if (path === "/api/catalog/items") return send(items);
     if (path.startsWith("/api/catalog/items/")) return send(items.find(item => item.id === path.split("/").pop()));
@@ -333,7 +334,7 @@ test("library uses catalog-media images and detail omits fabricated era, authent
 test("account and Lookbook show catalog names, occasion labels and modern-fusion style consistently", async ({ page }) => {
   await fixtures(page);
   const snapshot = { styleMode: "modern_fusion", items: [{ slot: "outerwear", itemId: items[0].id, assetVersion: 1, colorHex: "#1A365D" }] };
-  await page.route("**/api/outfits", route => route.fulfill({ json: [{ id: "outfit-details", title: "Bản phối cách tân", occasion_id: "ky_yeu", style_mode: "modern_fusion", revision: 1, updated_at: "2026-10-04T00:00:00Z", current_version_id: "version-details", current_snapshot: snapshot }] }));
+  await page.route("**/api/outfits/page?*", route => route.fulfill({ json: { items: [{ id: "outfit-details", title: "Bản phối cách tân", occasion_id: "ky_yeu", style_mode: "modern_fusion", revision: 1, updated_at: "2026-10-04T00:00:00Z", current_version_id: "version-details", current_snapshot: snapshot }], next_cursor: null } }));
   await page.route(`**/api/lookbooks/${book.id}`, route => route.fulfill({ json: { ...book, entries: [{ id: "entry-details", outfit_id: "outfit-details", outfit_title: "Bản phối cách tân", version_number: 1, snapshot }] } }));
   await page.goto("/tai-khoan");
   await expect(page.getByText("Cách tân hiện đại", { exact: true })).toBeVisible();

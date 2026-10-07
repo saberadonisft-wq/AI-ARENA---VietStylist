@@ -6,6 +6,8 @@ import {
   StarterOutfit,
   OutfitSnapshot,
   OutfitResponse,
+  OutfitVersionResponse,
+  CursorPage,
   CulturalCheckResponse,
   ColorAnalysisResponse,
   WeatherResponse,
@@ -256,6 +258,11 @@ export const api = {
 
   // Outfits & Versions
   listUserOutfits: () => apiFetch<OutfitResponse[]>("/api/outfits"),
+  listUserOutfitsPage: (cursor?: string | null, signal?: AbortSignal) => apiFetch<CursorPage<OutfitResponse>>(
+    `/api/outfits/page?limit=30${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`, { signal }),
+  countUserOutfits: (signal?: AbortSignal) => apiFetch<{ count: number }>("/api/outfits/count", { signal }),
+  listOutfitVersions: (id: string, cursor?: string | null, signal?: AbortSignal) => apiFetch<CursorPage<OutfitVersionResponse>>(
+    `/api/outfits/${encodeURIComponent(id)}/versions?limit=30${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`, { signal }),
   createOutfit: (payload: {
     title: string;
     occasion_id?: string;

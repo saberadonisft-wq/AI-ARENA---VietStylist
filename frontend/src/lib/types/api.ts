@@ -143,6 +143,11 @@ export interface OutfitSnapshot {
   } | null;
 }
 
+export interface CursorPage<T> {
+  items: T[];
+  next_cursor: string | null;
+}
+
 export interface OutfitResponse {
   id: string;
   owner_id?: string;
@@ -356,4 +361,13 @@ export interface AuthResponse {
   access_token: string;
   token_type: string;
   user: AuthUser;
+}
+
+export interface OutfitVersionResponse {
+  id: string;
+  outfit_id: string;
+  version_number: number;
+  snapshot: OutfitSnapshot;
+  preview_image_url?: string | null;
+  created_at: string;
 }
