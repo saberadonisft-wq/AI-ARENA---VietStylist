@@ -28,7 +28,7 @@ export default function BackgroundFadeControl({ value, onPreview, onCommit }: {
     window.addEventListener("pagehide", flush);
     return () => { window.removeEventListener("pagehide", flush); flush(); };
   }, []);
-  return <label className="flex min-h-11 flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs font-medium text-stone-700">
+  return <label className="studio-background-fade studio-panel-section flex min-h-11 flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs font-medium text-stone-700">
     <span>Độ mờ ảnh nền</span>
     <input type="range" min={0} max={100} step={1} value={preview}
       onPointerDown={event => { gesturing.current = true; event.currentTarget.setPointerCapture(event.pointerId); }}

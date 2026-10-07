@@ -30,14 +30,19 @@ class OutfitRepository:
         )
 
     @staticmethod
-    def get_outfits_by_owner(owner_id: str) -> List[Dict[str, Any]]:
+    def get_outfits_by_owner(owner_id: str, limit: int = 50, after=None) -> List[Dict[str, Any]]:
+        where = " AND (o.updated_at, o.id) < (?, ?)" if after else ""
+        params = (owner_id, *after, limit) if after else (owner_id, limit)
         return Database.fetch_all("""
             SELECT o.*, v.snapshot_json, v.preview_image_url
             FROM outfits o
             LEFT JOIN outfit_versions v ON o.current_version_id = v.id
             WHERE o.owner_id = ? AND o.is_deleted = 0
-            ORDER BY o.updated_at DESC
-        """, (owner_id,))
+        """ + where + " ORDER BY o.updated_at DESC, o.id DESC LIMIT ?", params)
+
+    @staticmethod
+    def count_outfits_by_owner(owner_id: str) -> int:
+        return Database.fetch_one("SELECT COUNT(*) AS n FROM outfits WHERE owner_id=? AND is_deleted=0", (owner_id,))["n"]
 
     @staticmethod
     def get_outfit_by_id(outfit_id: str) -> Optional[Dict[str, Any]]:
@@ -49,13 +54,22 @@ class OutfitRepository:
         """, (outfit_id,))
 
     @staticmethod
-    def get_outfit_by_id_and_owner(outfit_id: str, owner_id: str) -> Optional[Dict[str, Any]]:
+    def get_outfit_by_id_and_owner(outfit_id: str, owner_id: str, *, include_deleted: bool = False) -> Optional[Dict[str, Any]]:
         return Database.fetch_one("""
             SELECT o.*, v.snapshot_json, v.preview_image_url
             FROM outfits o
             LEFT JOIN outfit_versions v ON o.current_version_id = v.id
-            WHERE o.id = ? AND o.owner_id = ? AND o.is_deleted = 0
-        """, (outfit_id, owner_id))
+            WHERE o.id = ? AND o.owner_id = ? AND (o.is_deleted = 0 OR ? = 1)
+        """, (outfit_id, owner_id, int(include_deleted)))
+
+    @staticmethod
+    def get_version_by_id_and_owner(version_id: str, owner_id: str) -> Optional[Dict[str, Any]]:
+        return Database.fetch_one("""
+            SELECT v.*
+            FROM outfit_versions v
+            JOIN outfits o ON o.id = v.outfit_id
+            WHERE v.id = ? AND o.owner_id = ? AND o.is_deleted = 0
+        """, (version_id, owner_id))
 
     @staticmethod
     def create_outfit_atomic(
@@ -141,14 +155,22 @@ class OutfitRepository:
         return row["max_v"] if row and row.get("max_v") else 0
 
     @staticmethod
-    def get_outfit_versions(outfit_id: str) -> List[Dict[str, Any]]:
-        return Database.fetch_all("""
-            SELECT * FROM outfit_versions WHERE outfit_id = ? ORDER BY version_number DESC
-        """, (outfit_id,))
+    def get_outfit_versions(outfit_id: str, limit: int = 50, after=None) -> List[Dict[str, Any]]:
+        where = " AND version_number < ?" if after else ""
+        params = (outfit_id, after[0], limit) if after else (outfit_id, limit)
+        return Database.fetch_all("SELECT * FROM outfit_versions WHERE outfit_id = ?" + where + " ORDER BY version_number DESC LIMIT ?", params)
 
     @staticmethod
     def soft_delete_outfit(outfit_id: str, owner_id: str) -> int:
-        return Database.execute(
-            "UPDATE outfits SET is_deleted = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND owner_id = ? AND is_deleted = 0",
-            (outfit_id, owner_id),
-        )
+        with db_transaction() as conn:
+            changed = conn.execute(
+                "UPDATE outfits SET is_deleted = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND owner_id = ? AND is_deleted = 0",
+                (outfit_id, owner_id),
+            ).rowcount
+            if changed:
+                from app.modules.community.service import now
+                stamp = now()
+                ids = 'SELECT p.id FROM lookbook_posts p JOIN outfit_versions v ON v.id=p.outfit_version_id WHERE v.outfit_id=? AND p.owner_id=?'
+                conn.execute('UPDATE lookbook_post_shares SET revoked_at=? WHERE post_id IN (' + ids + ') AND revoked_at IS NULL', (stamp, outfit_id, owner_id))
+                conn.execute('UPDATE lookbook_posts SET is_deleted=1,revision=revision+1,updated_at=? WHERE id IN (' + ids + ') AND is_deleted=0', (stamp, outfit_id, owner_id))
+            return changed

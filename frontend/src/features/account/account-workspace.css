@@ -1,0 +1,53 @@
+/* Hallmark · pre-emit critique: P4 H4 E4 S4 R5 V4 */
+.account-workspace {
+  --account-surface: #ffffff;
+  --account-rule: #e4e6eb;
+  --account-accent: #b83232;
+  --account-selected: #fce8e8;
+  min-height: calc(100dvh - 58px);
+  padding-block: 24px 48px;
+}
+
+.account-wrap { width: 100%; max-width: 1152px; margin-inline: auto; padding-inline: 16px; min-width: 0; }
+.account-workspace :is(h1, h2, h3, h4) { font-family: var(--font-sans), Arial, sans-serif; letter-spacing: normal; }
+.account-workspace :is(a, button, input, textarea, select):focus-visible { box-shadow: none !important; }
+.account-panel { min-width: 0; border: 1px solid var(--account-rule); border-radius: 12px; background: var(--account-surface); }
+.account-profile { display: flex; align-items: center; gap: 16px; padding: 20px; }
+.account-avatar { flex-shrink: 0; }
+.account-avatar > span { width: 56px; height: 56px; font-size: 22px; }
+.account-navigation { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 16px; padding: 6px; }
+.account-nav-item { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 10px 14px; border-radius: 8px; font-size: 14px; font-weight: 600; white-space: nowrap; }
+.account-nav-item[aria-pressed='true'] { background: var(--account-selected); color: var(--account-accent); }
+.account-nav-item svg { flex-shrink: 0; }
+.account-count { font-size: 12px; font-weight: 500; opacity: 0.8; }
+.account-workspace .account-action { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-width: 44px; min-height: 44px; padding: 8px 14px; border-radius: 8px; font-size: 14px; font-weight: 600; white-space: nowrap; }
+.account-outfit-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
+.account-workspace [data-testid='saved-outfit-card'] { min-width: 0; }
+.account-workspace [data-testid='saved-outfit-card'] :is(h3, summary) { overflow-wrap: anywhere; }
+.account-system-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+.account-system-row code { overflow-wrap: anywhere; min-width: 0; }
+
+@media (hover: hover) {
+  .account-nav-item:hover { background: var(--app-background); }
+  .account-nav-item[aria-pressed='true']:hover { background: var(--account-selected); }
+}
+
+@media (max-width: 639px) {
+  .account-workspace { padding-top: 16px; }
+  .account-wrap { padding-inline: 12px; }
+  .account-profile { align-items: flex-start; padding: 16px; gap: 12px; }
+  .account-navigation { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 2px; padding: 4px; }
+  .account-admin-navigation { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .account-guest-navigation { grid-template-columns: minmax(0, 1fr); }
+  .account-nav-item { padding: 8px 4px; font-size: 12px; gap: 4px; }
+  .account-nav-item svg, .account-count { display: none; }
+}
+
+@media (min-width: 640px) {
+  .account-wrap { padding-inline: 24px; }
+  .account-outfit-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (min-width: 1024px) {
+  .account-outfit-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}

@@ -12,6 +12,9 @@ import { ArrowLeft, Share2, Trash2, Globe, Lock, Sparkles, Check } from "lucide-
 import { slotLabel, styleLabel, itemLabel } from "@/lib/catalog/display";
 import AuthModal from "@/components/AuthModal";
 import { useConfirmDialog } from "@/components/ui/ConfirmDialog";
+import LookbookShell from "@/features/lookbook/LookbookShell";
+import { control, primary } from "@/features/lookbook/PostCard";
+import OutfitPreview from "@/features/studio/OutfitPreview";
 
 export default function LookbookDetailPage() {
   const { confirm, dialog } = useConfirmDialog();
@@ -19,7 +22,8 @@ export default function LookbookDetailPage() {
   const router = useRouter();
   const lookbookId = params.id as string;
   const { user, isLoggedIn, isReady } = useAuth();
-  const { catalogItems } = useCatalog();
+  const catalog = useCatalog();
+  const { catalogItems, ensureLoaded } = catalog;
   const currentOwnerId = useRef(user?.id);
   currentOwnerId.current = user?.id;
   const requestGeneration = useRef(0);
@@ -31,8 +35,10 @@ export default function LookbookDetailPage() {
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
+  const [isChangingVisibility, setIsChangingVisibility] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [loadedOwnerId, setLoadedOwnerId] = useState<string | null>(null);
+  useEffect(() => { if (lookbook?.entries.length) void ensureLoaded(); }, [lookbook, ensureLoaded]);
 
   const loadLookbook = useCallback(async () => {
     const generation = ++requestGeneration.current;
@@ -97,6 +103,19 @@ export default function LookbookDetailPage() {
     }
   };
 
+  const changeVisibility = async (visibility: string) => {
+    const ownerId = user?.id;
+    if (!ownerId || lookbook?.owner_id !== ownerId || isChangingVisibility) return;
+    setIsChangingVisibility(true);
+    try {
+      const updated = await api.updateLookbook(lookbookId, { visibility });
+      if (ownerId !== currentOwnerId.current) return;
+      setLookbook(updated); setShareUrl(null);
+      setActionMessage(visibility === 'private' ? 'Đã chuyển riêng tư và thu hồi các link chia sẻ.' : 'Đã cập nhật quyền xem bộ sưu tập.');
+    } catch (err: any) { if (ownerId === currentOwnerId.current) setActionMessage(err.message); }
+    finally { if (ownerId === currentOwnerId.current) setIsChangingVisibility(false); }
+  };
+
   const handleDelete = async () => {
     if (!isLoggedIn) {
       setShowAuthModal(true);
@@ -131,42 +150,42 @@ export default function LookbookDetailPage() {
     } catch { setActionMessage("Trình duyệt không cho phép sao chép. Bôi đen liên kết bên dưới để sao chép thủ công."); }
   };
 
-  if (!isReady || isLoading || (isLoggedIn && loadedOwnerId !== user?.id)) {
-    return <div className="py-24 text-center text-xs text-stone-500">Đang tải chi tiết Lookbook...</div>;
+  if (!isReady || isLoading || (isLoggedIn && lookbook && loadedOwnerId !== user?.id)) {
+    return <LookbookShell activeTab="collections"><p role="status" className="lookbook-panel p-5 text-sm text-stone-500">Đang tải chi tiết Lookbook...</p></LookbookShell>;
   }
 
   if (!isLoggedIn) {
     return (
-      <div className="max-w-3xl mx-auto px-4 py-20 text-center space-y-4">
-        <h1 className="text-xl font-serif font-bold text-stone-900">Đăng nhập để xem Lookbook của bạn</h1>
+      <LookbookShell activeTab="collections"><div className="lookbook-panel space-y-4 p-6 text-center">
+        <h2 className="text-xl font-semibold text-stone-900">Đăng nhập để xem Lookbook của bạn</h2>
         <p className="text-sm text-stone-600">Lookbook thuộc tài khoản cá nhân. Đăng nhập để tiếp tục xem và quản lý.</p>
-        <button type="button" onClick={() => setShowAuthModal(true)} className="rounded-lg bg-stone-900 px-4 py-2 text-sm font-semibold text-white">Đăng nhập</button>
+        <button type="button" onClick={() => setShowAuthModal(true)} className={primary}>Đăng nhập</button>
         <Link href="/lookbook" className="block text-sm text-heritage-red font-semibold hover:underline">Quay lại danh sách</Link>
         <AuthModal isOpen={showAuthModal} onClose={() => setShowAuthModal(false)} />
-      </div>
+      </div></LookbookShell>
     );
   }
 
   if (!lookbook) {
     return (
-      <div className="max-w-4xl mx-auto px-4 py-20 text-center space-y-4">
-        <h2 className="text-xl font-serif font-bold text-stone-900">{loadError ? "Không tải được Lookbook" : "Không tìm thấy Lookbook"}</h2>
+      <LookbookShell activeTab="collections"><div className="lookbook-panel space-y-4 p-6 text-center">
+        <h2 className="text-xl font-semibold text-stone-900">{loadError ? "Không tải được Lookbook" : "Không tìm thấy Lookbook"}</h2>
         {loadError && <p role="alert" className="text-sm text-rose-800">{loadError}</p>}
-        {loadError && <button type="button" onClick={() => void loadLookbook()} className="rounded-lg border border-stone-300 px-4 py-2 text-sm font-semibold">Thử tải lại</button>}
+        {loadError && <button type="button" onClick={() => void loadLookbook()} className={control}>Thử tải lại</button>}
         <Link href="/lookbook" className="text-xs text-heritage-red font-semibold hover:underline">
           ← Quay lại danh sách
         </Link>
-      </div>
+      </div></LookbookShell>
     );
   }
 
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
+    <LookbookShell activeTab="collections">
       {/* Top bar */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="lookbook-panel flex flex-wrap items-center justify-between gap-3 p-4">
         <Link
-          href="/lookbook"
-          className="inline-flex items-center space-x-1.5 text-xs font-semibold text-stone-600 hover:text-heritage-red transition-colors"
+          href="/lookbook?tab=collections"
+          className="inline-flex min-h-11 items-center space-x-1.5 text-sm font-semibold text-stone-600 hover:text-heritage-red"
         >
           <ArrowLeft className="w-4 h-4" />
           <span>Quay lại Lookbook</span>
@@ -178,7 +197,7 @@ export default function LookbookDetailPage() {
             disabled={isSharing}
             aria-label="Tạo liên kết chia sẻ Lookbook"
             title={isSharing ? "Đang tạo liên kết" : "Tạo liên kết chia sẻ"}
-            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl border border-stone-300 hover:bg-stone-50 text-xs font-semibold text-stone-700 transition-colors"
+            className={control}
           >
             <Share2 className="w-4 h-4 text-heritage-indigo" />
             <span>{isSharing ? "Đang tạo liên kết…" : "Tạo liên kết chia sẻ"}</span>
@@ -187,7 +206,7 @@ export default function LookbookDetailPage() {
           <button
             onClick={handleDelete}
             disabled={isDeleting}
-            className="p-2 rounded-xl text-stone-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+            className="flex h-11 w-11 items-center justify-center rounded-lg text-stone-500 hover:text-red-600 hover:bg-red-50"
             title="Xóa Lookbook"
             aria-label="Xóa Lookbook"
           >
@@ -218,7 +237,7 @@ export default function LookbookDetailPage() {
       {actionMessage && <div role="status" className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">{actionMessage}</div>}
 
       {/* Header thông tin Lookbook */}
-      <div className="bg-white rounded-3xl border border-stone-200 p-6 sm:p-8 shadow-sm space-y-4">
+      <div className="lookbook-panel space-y-4 p-5">
         <div className="flex items-center space-x-2">
           <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase bg-stone-100 text-stone-700 flex items-center space-x-1">
             {lookbook.visibility === "public" ? <Globe className="w-3 h-3" /> : <Lock className="w-3 h-3" />}
@@ -229,13 +248,14 @@ export default function LookbookDetailPage() {
           </span>
         </div>
 
-        <h1 className="font-serif text-2xl sm:text-3xl font-bold text-stone-900">{lookbook.title}</h1>
-        <p className="text-stone-600 text-xs leading-relaxed max-w-2xl">{lookbook.description}</p>
+        <h2 className="text-xl font-semibold text-stone-900 [overflow-wrap:anywhere]">{lookbook.title}</h2>
+        <p className="text-stone-600 text-sm leading-relaxed [overflow-wrap:anywhere]">{lookbook.description}</p>
+        {lookbook.owner_id === user?.id && <label className="block max-w-sm space-y-2 text-sm"><span className="font-semibold">Quyền xem bộ sưu tập</span><select value={lookbook.visibility} disabled={isChangingVisibility} onChange={event => void changeVisibility(event.target.value)} className="min-h-11 w-full rounded-xl border border-stone-300 bg-white px-3 py-2"><option value="private">Riêng tư — chỉ mình tôi</option><option value="unlisted">Người có liên kết</option><option value="public">Công khai</option></select><span className="block text-xs text-stone-600">Link cũ của bộ sưu tập riêng tư đã được thu hồi. Chọn Người có liên kết để tạo link mới.</span></label>}
       </div>
 
       {/* Danh sách các bộ phối trong Lookbook */}
       <div className="space-y-4">
-        <h3 className="font-serif text-lg font-bold text-stone-900">
+        <h3 className="text-base font-semibold text-stone-900">
           Các bộ phối trong bộ sưu tập ({lookbook.entries.length})
         </h3>
 
@@ -244,23 +264,38 @@ export default function LookbookDetailPage() {
             Chưa có bộ phối nào được thêm vào Lookbook này.
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             {lookbook.entries.map((entry, idx) => (
               <div
                 key={entry.id}
-                className="bg-white rounded-2xl border border-stone-200 p-5 shadow-sm flex flex-col justify-between space-y-4"
+                className="lookbook-panel flex min-w-0 flex-col justify-between space-y-4 p-4"
               >
                 <div className="flex items-center justify-between">
-                  <span className="font-serif font-bold text-sm text-stone-900">
-                    #{idx + 1}. {entry.outfit_title}
+                  <span className="font-semibold text-sm text-stone-900 [overflow-wrap:anywhere]">
+                    #{idx + 1}. {entry.outfit_title.trim() || "Bộ phối chưa đặt tên"}
                   </span>
                   <span className="text-[10px] text-stone-500 font-mono">
                     Phiên bản v{entry.version_number}
                   </span>
                 </div>
 
+                <OutfitPreview
+                  outfit={{
+                    id: entry.outfit_id, owner_id: lookbook.owner_id,
+                    title: entry.outfit_title.trim() || "Bộ phối chưa đặt tên",
+                    style_mode: entry.snapshot.styleMode,
+                    occasion_id: entry.snapshot.occasionId,
+                    revision: entry.version_number,
+                    current_version_id: entry.outfit_version_id,
+                    current_snapshot: entry.snapshot,
+                    preview_image_url: entry.preview_image_url,
+                    created_at: lookbook.created_at, updated_at: lookbook.updated_at,
+                  }}
+                  catalogItems={catalogItems} catalogLoading={catalog.itemsLoading}
+                  catalogError={catalog.itemsError} onRetryCatalog={() => void catalog.refreshCatalog()} />
+
                 {/* Tóm tắt các món trong bộ phối */}
-                <div className="space-y-1.5 text-xs bg-[#FAF8F5] p-3 rounded-xl border border-stone-100">
+                <div className="space-y-1.5 text-xs bg-page p-3 rounded-xl border border-stone-100">
                   {entry.snapshot.items.map((it) => (
                     <div key={it.slot} className="flex min-w-0 items-start justify-between gap-3">
                       <span className="shrink-0 text-stone-500">{slotLabel(it.slot)}:</span>
@@ -277,7 +312,7 @@ export default function LookbookDetailPage() {
                   </span>
                   <Link
                     href={`/studio?loadOutfit=${encodeURIComponent(entry.outfit_id)}`}
-                    className="px-3 py-1 bg-stone-100 hover:bg-stone-900 hover:text-white rounded-lg font-medium text-stone-700 transition-colors"
+                    className={control + ' px-3'}
                   >
                     Mở lại trong Studio
                   </Link>
@@ -289,6 +324,6 @@ export default function LookbookDetailPage() {
       </div>
       <AuthModal isOpen={showAuthModal} onClose={() => setShowAuthModal(false)} />
       {dialog}
-    </div>
+    </LookbookShell>
   );
 }

@@ -98,6 +98,20 @@ class CompareRequest(BaseModel):
     snapshot_b: OutfitSnapshot
 
 
+class OutfitPageResponse(BaseModel):
+    items: List[OutfitResponse]
+    next_cursor: Optional[str] = None
+
+
+class OutfitVersionPageResponse(BaseModel):
+    items: List[OutfitVersionResponse]
+    next_cursor: Optional[str] = None
+
+
+class OutfitCountResponse(BaseModel):
+    count: int
+
+
 class SlotDiff(BaseModel):
     slot: str
     item_a_id: Optional[str] = None

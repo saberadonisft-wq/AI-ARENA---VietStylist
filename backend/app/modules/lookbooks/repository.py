@@ -143,6 +143,9 @@ class LookbookRepository:
                 (title, description, cover_image_url, visibility, lookbook_id),
             )
 
+            if visibility == 'private':
+                conn.execute('UPDATE share_links SET is_revoked=1,revoked_at=CURRENT_TIMESTAMP WHERE lookbook_id=? AND is_revoked=0', (lookbook_id,))
+
             if entries is not None:
                 if entries:
                     version_ids = [e["outfit_version_id"] for e in entries]

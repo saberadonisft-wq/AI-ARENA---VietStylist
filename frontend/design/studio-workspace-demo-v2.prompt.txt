@@ -1,0 +1,23 @@
+Use case: ui-mockup.
+Asset type: high-fidelity desktop preview of the proposed VietStylist Studio redesign, one landscape 16:9 image, preferably 2560x1440 with very sharp readable interface text.
+Input image 1: edit target and visual composition reference, the existing proposed desktop mockup. This is a concept preview, not evidence of a finished working website.
+
+Preserve the overall full-screen dark workbench design from the supplied mockup: narrow left icon rail, dark garment catalog beside it, huge central vertical ivory 9:16 artboard, thin top title/actions bar, right contextual inspector, dotted charcoal workspace only OUTSIDE the artboard, crimson VietStylist selections and save button, quiet borders and shadows. Preserve the VietStylist ribbon mark, wordmark, clean sans-serif control text, orderly flat-lay Vietnamese clothing composition, red Nhật Bình outer garment, ivory skirt with wave border, navy khăn vành, gold jewelry and red embroidered shoes. No person or mannequin. Keep the selected robe's crimson dashed box and round resize/rotation handles. Do not certify the ensemble historically.
+
+Make the interface a polished realistic screenshot preview with careful Vietnamese accents and crisp icon strokes. Main specific correction: redesign ONLY the right inspector's transform controls to faithfully expose current operations, with no independent width/height scaling or direct X/Y numeric editing. Inspector exact content in reading order:
+header "Món đang chọn", close X;
+garment thumbnail + name "Áo Nhật Bình đỏ";
+"Biến thể màu", crimson, navy and ivory swatches, small link "Về màu gốc";
+a separated section "Điều chỉnh";
+"Kích thước" and one uniform scale stepper with minus button, "100%", plus button;
+"Góc xoay" and rotation-left icon button, "0°", rotation-right icon button;
+"Di chuyển" and four arrow buttons left/up/down/right;
+quiet button "Đặt lại";
+two buttons "Khóa món" and "Xóa khỏi bảng".
+Remove the unsupported separate width/height inputs and the old X/Y fields. Do not add mirror/flip, duplicate, arbitrary layer ordering, chat messages, 3D, credits or subscriptions.
+
+Keep these exact reachable groups in left rail: "Trang phục", "Mẫu phối", "Màu sắc", "Bối cảnh", "Văn hóa", "Trợ lý AI". Only catalog and selected-item inspector are open in this screenshot; the other feature groups remain as visibly reachable rail buttons. Catalog header "Trang phục", search "Tìm trang phục...", category chips "Tất cả", "Áo ngoài", "Áo trong", "Quần / Váy", "Khăn", "Phụ kiện", "Giày"; two-column thumbnail cards and bottom link "Mở Thư viện cổ phục". Keep current six product names legible and correct.
+
+Top row: "VietStylist", small "Studio phối đồ", editable title "Nhật Bình đỏ", understated status "Nháp trên thiết bị", style selector "Truyền thống", "Remix", "Cách tân"; right buttons "So sánh", "Xuất ảnh", "Đăng Lookbook", crimson "Lưu bộ phối", ellipsis menu.
+Bottom floating toolbar: "Hoàn tác", "Làm lại", minus, "100%", plus, "Vừa khung", "9:16", "Nền". Bottom-right small "Thử đồ AI" button.
+No unsupported autosaved-to-account claim, no giant blank feature cards, no artwork beyond the actual artboard, no grid on the artboard, no browser chrome, no phone frame, no purple/cyan/lime accents, no decorative gradients, no watermark, no additional explanatory paragraphs within the image. Return one refined finished interface mockup.

@@ -1,5 +1,6 @@
 "use client";
 
+import { lockBodyScroll } from "@/lib/ui/bodyScrollLock";
 import { useEffect, useRef, useState } from "react";
 import { SlidersHorizontal, X } from "lucide-react";
 import type { GarmentType } from "@/lib/types/api";
@@ -15,10 +16,8 @@ export default function FilterSheet({ filters, garmentTypes, onApply }: {
   const count = Number(filters.gender !== "all") + Number(filters.type !== "all");
   useEffect(() => {
     if (!open) return;
-    const previous = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    dialog.current?.showModal();
-    return () => { document.body.style.overflow = previous; };
+    if (dialog.current && !dialog.current.open) dialog.current.showModal();
+    return lockBodyScroll();
   }, [open]);
   function close() { dialog.current?.close(); setOpen(false); trigger.current?.focus(); }
   const fieldClass = "min-h-12 w-full min-w-0 rounded-xl border border-stone-300 bg-white px-3 text-base text-stone-900";

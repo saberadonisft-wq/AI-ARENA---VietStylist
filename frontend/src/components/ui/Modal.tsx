@@ -1,5 +1,6 @@
 "use client";
 
+import { lockBodyScroll } from "@/lib/ui/bodyScrollLock";
 import { useEffect, useRef, type ReactNode } from "react";
 
 /** Native top-layer dialogs keep the surrounding workspace inert. */
@@ -15,12 +16,11 @@ export default function Modal({ isOpen, onClose, label, children, closeDisabled 
     if (!isOpen) return;
     const dialog = dialogRef.current;
     const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
     if (dialog && !dialog.open) dialog.showModal();
+    const releaseScrollLock = lockBodyScroll();
     return () => {
       dialog?.close();
-      document.body.style.overflow = previousOverflow;
+      releaseScrollLock();
       if (previousFocus?.isConnected) previousFocus.focus({ preventScroll: true });
     };
   }, [isOpen]);

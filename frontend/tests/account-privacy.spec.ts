@@ -11,6 +11,7 @@ test("AI media deletion previews the selected image, preserves scope, and allows
     const method = route.request().method();
     const send = (body: unknown, status = 200) => route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
     if (path === "/api/auth/me") return send({ id: "media-user", email: "media@example.invalid", display_name: "Media User", roles: ["user"] });
+    if (path === "/api/outfits/page") return send({ items: [], next_cursor: null });
     if (path === "/api/media/ai") return send([{ media_id: "person-photo", purposes: ["person"], status: "ready", created_at: "2026-09-24T00:00:00Z" }]);
     if (path === "/api/media/person-photo/access") return send({ access_url: "/preview-test.svg", expires_in: 300 });
     if (path === "/api/media/person-photo" && method === "DELETE") {
@@ -72,6 +73,7 @@ test("device cleanup removes app drafts and session data but leaves server AI me
     const method = route.request().method();
     const send = (body: unknown) => route.fulfill({ contentType: "application/json", body: JSON.stringify(body) });
     if (path === "/api/auth/me") return send({ id: "media-user", email: "media@example.invalid", display_name: "Media User", roles: ["user"] });
+    if (path === "/api/outfits/page") return send({ items: [], next_cursor: null });
     if (path === "/api/media/ai") return send([{ media_id: "server-photo", purposes: ["person"], status: "ready", created_at: "2026-09-24T00:00:00Z" }]);
     if (path === "/api/media/server-photo" && method === "DELETE") {
       deleteAttempts += 1;

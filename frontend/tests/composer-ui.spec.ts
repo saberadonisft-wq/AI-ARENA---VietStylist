@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
-import { DRAFT_KEY, INITIAL_DOCUMENT } from "../src/features/studio/state";
+import { openStudioDocument, openStudioPanel } from "./helpers/studio-ui";
+import { INITIAL_DOCUMENT } from "../src/features/studio/state";
 
 const COMPOSER_DOCUMENT = {
   ...structuredClone(INITIAL_DOCUMENT),
@@ -19,6 +20,8 @@ test("V3 flag off keeps the legacy Studio and sends no V3 requests", async ({ pa
   page.on("request", request => { if (request.url().includes("/api/v3/")) requests.push(request.url()); });
   await page.route("http://127.0.0.1:4100/**", route => route.fulfill(new URL(route.request().url()).pathname.startsWith("/api/catalog/") ? { json: [] } : { status: 503, json: { error: { code: "UNAVAILABLE", message: "unavailable" } } }));
   await page.goto("/studio");
+  await openStudioPanel(page, "Văn hóa");
+  await openStudioDocument(page);
   await expect(page.getByRole("button", { name: "Lưu bộ phối", exact: true })).toBeVisible();
   await expect(page.getByTestId("studio-composer")).toHaveCount(0);
   expect(requests).toEqual([]);
@@ -60,13 +63,11 @@ test("V3 shows API validation and per-entity sources, clears stale results and r
     if (path === "/api/weather") return send({ location: { name: "Hà Nội" }, weather: {}, recommendation: { suggested_accessories: [] } });
     return send([]);
   });
-  await page.addInitScript(({ key, document }) => {
-    if (!sessionStorage.getItem("composer-seeded")) {
-      localStorage.setItem(key, JSON.stringify(document));
-      sessionStorage.setItem("composer-seeded", "yes");
-    }
-  }, { key: DRAFT_KEY, document: COMPOSER_DOCUMENT });
-  await page.goto("/studio");
+  await page.route("**/api/outfits/composer-fixture", route => route.fulfill({ json: {
+    id: "composer-fixture", title: COMPOSER_DOCUMENT.title, revision: 1, current_snapshot: COMPOSER_DOCUMENT.snapshot,
+  } }));
+  await page.goto("/studio?loadOutfit=composer-fixture");
+  await openStudioPanel(page, "Văn hóa");
   const panel = page.getByTestId("studio-composer");
   await expect(panel.getByText("Chưa thể kết luận với dữ liệu hiện có")).toBeVisible();
   await expect(panel.getByText("Nguồn entity_0; trang 5")).toBeVisible();
@@ -110,9 +111,10 @@ test("V3 shows API validation and per-entity sources, clears stale results and r
   await page.getByTitle("Làm lại (Ctrl+Y)").click();
   await expect(panel.getByLabel("Bộ dữ liệu", { exact: true })).toHaveValue("ds_fixture");
   await page.reload();
-  await page.getByRole("button", { name: "Tiếp tục bản nháp", exact: true }).click();
-  await expect(panel.getByLabel("Bộ dữ liệu", { exact: true })).toHaveValue("ds_fixture");
-  await expect(panel.getByLabel("Thời kỳ", { exact: true })).toHaveValues(["period_fixture"]);
+  await openStudioPanel(page, "Văn hóa");
+  await panel.getByRole("button", { name: "Chọn bối cảnh và bộ dữ liệu riêng" }).click();
+  await expect(panel.getByLabel("Bộ dữ liệu", { exact: true })).toHaveValue("dev");
+  await expect(panel.getByLabel("Thời kỳ", { exact: true })).toHaveValues([]);
 });
 
 test("incomplete mappings keep the V1 editor usable without validating a partial outfit", async ({ page }) => {
@@ -124,10 +126,14 @@ test("incomplete mappings keep the V1 editor usable without validating a partial
     if (path === "/api/v3/legacy-mappings") return route.fulfill({ json: { dataset_version: "dev", ruleset_version: "dev", reproducible: false, mappings: [] } });
     return route.fulfill(path.startsWith("/api/catalog/") ? { json: [] } : { status: 503, json: { error: { code: "UNAVAILABLE", message: "unavailable" } } });
   });
-  await page.addInitScript(({ key, document }) => localStorage.setItem(key, JSON.stringify(document)), { key: DRAFT_KEY, document: COMPOSER_DOCUMENT });
-  await page.goto("/studio");
+  await page.route("**/api/outfits/composer-fixture", route => route.fulfill({ json: {
+    id: "composer-fixture", title: COMPOSER_DOCUMENT.title, revision: 1, current_snapshot: COMPOSER_DOCUMENT.snapshot,
+  } }));
+  await page.goto("/studio?loadOutfit=composer-fixture");
+  await openStudioPanel(page, "Văn hóa");
   await expect(page.getByTestId("studio-composer").getByText(/chưa có ánh xạ đầy đủ/)).toBeVisible();
-  await page.locator("input").first().fill("Bộ phối vẫn sửa được");
-  await expect(page.locator("input").first()).toHaveValue("Bộ phối vẫn sửa được");
+  await openStudioDocument(page);
+  await page.getByLabel("Tên bản phối", { exact: true }).fill("Bộ phối vẫn sửa được");
+  await expect(page.getByLabel("Tên bản phối", { exact: true })).toHaveValue("Bộ phối vẫn sửa được");
   expect(validations).toBe(0);
 });

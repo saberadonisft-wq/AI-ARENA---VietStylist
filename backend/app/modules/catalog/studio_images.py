@@ -11,6 +11,7 @@ from pathlib import Path
 from PIL import Image, ImageChops, ImageFilter, ImageOps, UnidentifiedImageError
 
 from app.core.config import settings
+from app.core.database import get_db_connection
 from app.core.errors import AppError
 from app.infrastructure.r2.client import r2_client
 from app.modules.catalog.repository import CatalogRepository
@@ -110,15 +111,18 @@ def make_cutout(data: bytes) -> bytes:
 
 
 def _published_studio_source(item_id: str):
-    item = CatalogRepository.get_item_by_id(item_id)
-    if not item:
-        raise AppError("ITEM_NOT_FOUND", "Không tìm thấy trang phục công khai.", 404)
-    metadata = item.get("metadata") or {}
-    if isinstance(metadata, str):
-        metadata = json.loads(metadata)
-    item = {**item, "metadata": metadata}
-    media_id = metadata.get("catalog_media_id") if isinstance(metadata, dict) else None
-    media = MediaRepository.get_media_by_id(media_id) if isinstance(media_id, str) else None
+    # Revalidate access on every request, including warm/conditional responses,
+    # while paying for only one pool checkout and its remote connection check.
+    with get_db_connection() as conn:
+        item = CatalogRepository.get_item_by_id(item_id, conn=conn)
+        if not item:
+            raise AppError("ITEM_NOT_FOUND", "Không tìm thấy trang phục công khai.", 404)
+        metadata = item.get("metadata") or {}
+        if isinstance(metadata, str):
+            metadata = json.loads(metadata)
+        item = {**item, "metadata": metadata}
+        media_id = metadata.get("catalog_media_id") if isinstance(metadata, dict) else None
+        media = MediaRepository.get_media_by_id(media_id, conn=conn) if isinstance(media_id, str) else None
     if not media or (media["visibility"], media["status"], media["media_type"], media["bucket"]) != (
         "public", "ready", "image", settings.R2_BUCKET_PUBLIC
     ):

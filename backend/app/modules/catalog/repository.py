@@ -23,8 +23,7 @@ class CatalogRepository:
         *, conn=None,
     ) -> List[Dict[str, Any]]:
         query = """
-            SELECT DISTINCT i.* FROM items i
-            LEFT JOIN item_occasions io ON i.id = io.item_id
+            SELECT i.* FROM items i
             WHERE i.is_published = 1
         """
         params = []
@@ -42,7 +41,7 @@ class CatalogRepository:
             params.append(gender)
 
         if occasion_id:
-            query += " AND io.occasion_id = ?"
+            query += " AND EXISTS (SELECT 1 FROM item_occasions io WHERE io.item_id = i.id AND io.occasion_id = ?)"
             params.append(occasion_id)
 
         if search:
@@ -56,10 +55,10 @@ class CatalogRepository:
         return Database.fetch_all(query, tuple(params), conn=conn)
 
     @staticmethod
-    def get_item_by_id(item_id: str, published_only: bool = True) -> Optional[Dict[str, Any]]:
+    def get_item_by_id(item_id: str, published_only: bool = True, *, conn=None) -> Optional[Dict[str, Any]]:
         if published_only:
-            return Database.fetch_one("SELECT * FROM items WHERE id = ? AND is_published = 1", (item_id,))
-        return Database.fetch_one("SELECT * FROM items WHERE id = ?", (item_id,))
+            return Database.fetch_one("SELECT * FROM items WHERE id = ? AND is_published = 1", (item_id,), conn=conn)
+        return Database.fetch_one("SELECT * FROM items WHERE id = ?", (item_id,), conn=conn)
 
     @staticmethod
     def get_published_items_by_ids(item_ids: List[str], *, conn=None) -> List[Dict[str, Any]]:

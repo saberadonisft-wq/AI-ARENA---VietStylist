@@ -18,7 +18,7 @@ items[1].variants.push({ id: "shirt-second-color", color_name: "Trắng ngà", h
 const results = (page: Page) => page.getByRole("region", { name: "Danh sách trang phục" });
 
 async function mockCatalog(page: Page, mode: { empty?: boolean; fail?: boolean; wait?: Promise<void> } = {}) {
-  await page.route("http://127.0.0.1:4100/**", async route => {
+  await page.route("**/api/**", async route => {
     const path = new URL(route.request().url()).pathname;
     if (path === "/api/catalog/items") {
       if (mode.wait) await mode.wait;
@@ -133,7 +133,7 @@ test("detail return link and browser back retain search and scroll position", as
   await expect.poll(() => page.evaluate(() => scrollY)).toBeCloseTo(y, 0);
 });
 
-test("library handoff preserves an existing Studio draft until replacement is confirmed", async ({ page }) => {
+test("library handoff starts a fresh outfit instead of restoring an old device draft", async ({ page }) => {
   await mockCatalog(page);
   const existing = [{ slot: "outerwear", itemId: "old-coat", colorHex: "#426348" }, { slot: "headwear", itemId: "hat", colorHex: "#426348" }];
   await page.addInitScript(({ key, document }) => {
@@ -142,17 +142,17 @@ test("library handoff preserves an existing Studio draft until replacement is co
   await page.goto("/thu-vien");
   await results(page).getByRole("link", { name: "Phối đồ với Áo ngũ thân xanh rêu" }).click();
   await expect(page).toHaveURL(/\/studio\?itemId=coat$/);
-  await page.getByRole("button", { name: "Tiếp tục bản nháp", exact: true }).click();
-  const savedItems = () => page.evaluate(key => JSON.parse(localStorage.getItem(key)!).snapshot.items, DRAFT_KEY);
-  expect(await savedItems()).toEqual(existing);
+  await expect(page.getByRole("button", { name: "Tiếp tục bản nháp", exact: true })).toHaveCount(0);
+  await expect(page.locator("#content-outerwear")).toHaveCount(0);
+  await expect(page.locator("#content-headwear")).toHaveCount(0);
+  expect(await page.evaluate(key => localStorage.getItem(key), DRAFT_KEY)).toBeNull();
   await page.getByRole("button", { name: "Thêm vào bản phối", exact: true }).click();
-  await expect(page.getByRole("dialog", { name: "Thay món đang có?" })).toBeVisible();
-  expect(await savedItems()).toEqual(existing);
-  await page.getByRole("button", { name: "Giữ món hiện tại" }).click();
-  expect(await savedItems()).toEqual(existing);
-  await page.getByRole("button", { name: "Thêm vào bản phối", exact: true }).click();
-  await page.getByRole("button", { name: "Thay bằng Áo ngũ thân xanh rêu" }).click();
-  await expect.poll(savedItems).toEqual(expect.arrayContaining([expect.objectContaining({ itemId: "coat" }), expect.objectContaining({ itemId: "hat" })]));
+  await expect(page.locator("#content-outerwear image")).toBeVisible();
+  await expect(page.locator("#content-headwear")).toHaveCount(0);
+  await expect(page.getByRole("dialog", { name: "Thay món đang có?" })).toHaveCount(0);
+  await page.getByTitle("Hoàn tác (Ctrl+Z)").click();
+  await expect(page.locator("#content-outerwear")).toHaveCount(0);
+  expect(await page.evaluate(key => localStorage.getItem(key), DRAFT_KEY)).toBeNull();
 });
 
 test("cards and filter sheet fit supported widths with readable text and touch targets", async ({ page }) => {

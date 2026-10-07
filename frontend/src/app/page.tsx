@@ -286,7 +286,7 @@ function GarmentStoryCard({
           <div className="relative w-full max-w-[280px] sm:max-w-[420px] aspect-[4/5] flex items-center justify-center">
             {/* Khung Đế Đứng Cổ Phong với 4 Góc Đồng Dát Vàng Cung Đình */}
             <div
-              className="relative w-full h-full rounded-3xl overflow-hidden bg-[#FAF8F5] border border-amber-800/30 shadow-2xl flex items-center justify-center group z-10"
+              className="relative w-full h-full rounded-3xl overflow-hidden bg-page border border-amber-800/30 shadow-2xl flex items-center justify-center group z-10"
             >
               {/* 4 Góc Đồng Dát Vàng Cung Đình (Imperial Corner Brackets) */}
               <div className="absolute top-2.5 left-2.5 w-6 h-6 pointer-events-none text-amber-600/80 z-20">
@@ -384,7 +384,7 @@ function GarmentStoryCard({
 
 export default function WelcomePage() {
   return (
-    <div className="min-h-screen bg-[#FAF8F5] text-stone-900 selection:bg-heritage-gold/30 selection:text-heritage-red overflow-x-clip">
+    <div className="min-h-screen bg-page text-stone-900 selection:bg-heritage-gold/30 selection:text-heritage-red overflow-x-clip">
       {/* Hero with a quiet paper ground and heritage linework. */}
       <section aria-label="Giới thiệu VietStylist" className="relative isolate overflow-hidden pt-8 pb-28 sm:pt-20 sm:pb-32 lg:pb-28">
         <HeritageHeroBackdrop />
@@ -467,7 +467,7 @@ export default function WelcomePage() {
       </section>
 
       {/* 3. COMPARATIVE 5 REFERENCE GARMENTS GALLERY */}
-      <section aria-labelledby="comparison-heading" className="py-10 sm:py-24 bg-[#F5EFEB] border-t border-stone-300/80">
+      <section aria-labelledby="comparison-heading" className="py-10 sm:py-24 bg-page border-t border-stone-300/80">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center space-y-4 max-w-3xl mx-auto mb-8 sm:mb-14">
             <div className="inline-flex items-center space-x-2 px-3.5 py-1.5 rounded-full bg-heritage-indigo/10 text-heritage-indigo border border-heritage-indigo/20 text-xs font-semibold uppercase tracking-wider">
@@ -494,7 +494,7 @@ export default function WelcomePage() {
                   aria-label={`Khám phá ${g.name}`}
                   className="group min-w-0 bg-white rounded-2xl sm:rounded-3xl border border-stone-200/90 transition-all duration-200 overflow-hidden flex flex-col hover:shadow-xl sm:hover:-translate-y-2 hover:border-amber-400/60 active:bg-amber-50"
                 >
-                  <div className="bg-gradient-to-b from-[#FBF9F6] via-stone-50 to-stone-100 flex items-center justify-center relative aspect-[4/5] sm:aspect-auto sm:h-72 overflow-hidden">
+                  <div className="bg-gradient-to-b from-page via-stone-50 to-stone-100 flex items-center justify-center relative aspect-[4/5] sm:aspect-auto sm:h-72 overflow-hidden">
                     {/* Hover radial shimmer overlay */}
                     <div className="absolute inset-0 bg-radial-at-center from-white/60 via-transparent to-black/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
 
@@ -587,7 +587,7 @@ export default function WelcomePage() {
       </section>
 
       {/* 5. OCCASION SHOWCASE SECTION */}
-      <section className="py-10 sm:py-24 bg-[#F5EFEB] border-t border-stone-300/80">
+      <section className="py-10 sm:py-24 bg-page border-t border-stone-300/80">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center space-y-4 max-w-3xl mx-auto mb-8 sm:mb-14">
             <div className="inline-flex items-center space-x-2 px-3.5 py-1.5 rounded-full bg-heritage-red/10 text-heritage-red border border-heritage-red/20 text-xs font-semibold uppercase tracking-wider">

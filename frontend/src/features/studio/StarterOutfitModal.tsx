@@ -56,7 +56,7 @@ export default function StarterOutfitModal({
         {/* Body */}
         <div className="p-6 space-y-4 min-h-0 overflow-y-auto">
           <p className="text-xs text-stone-600 leading-relaxed">
-            Chọn một mẫu để đưa các món có sẵn trong mẫu vào bản phối. Bản nháp hiện tại sẽ được giữ trong mục khôi phục trên thiết bị.
+            Chọn mẫu sẽ thay bản phối đang mở. Nếu có thay đổi chưa lưu, bạn sẽ được yêu cầu xác nhận trước khi bỏ những thay đổi đó.
           </p>
 
           {isLoading ? (
@@ -79,7 +79,7 @@ export default function StarterOutfitModal({
                   type="button"
                   key={outfit.id}
                   onClick={() => { if (onSelectStarter(outfit) !== false) onClose(); }}
-                  className="group p-4 text-left rounded-xl border border-stone-200 hover:border-heritage-red bg-[#FAF8F5] hover:bg-white transition-all shadow-sm hover:shadow-md flex flex-col justify-between focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-heritage-red"
+                  className="group p-4 text-left rounded-xl border border-stone-200 hover:border-heritage-red bg-page hover:bg-white transition-all shadow-sm hover:shadow-md flex flex-col justify-between focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-heritage-red"
                 >
                   <div className="space-y-2">
                     <div className="flex items-center justify-between gap-2">

@@ -174,6 +174,9 @@ async def test_all_timeouts_obey_total_deadline_and_release_slot(gemini, monkeyp
         calls.append(args)
         await anyio.sleep_forever()
 
+    # TLS/client construction is test setup, outside the recommendation deadline.
+    # Keep the one-second guard focused on cancellation of the mocked provider.
+    get_shared_async_client(25.0)
     with anyio.fail_after(1):
         result = await run(gemini, monkeypatch, response)
     assert 1 <= len(calls) <= 4

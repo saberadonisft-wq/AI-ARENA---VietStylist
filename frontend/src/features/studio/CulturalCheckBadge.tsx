@@ -23,13 +23,13 @@ export default function CulturalCheckBadge({ checkData, status, error, onRetry, 
   const hasWarning = checkData.warning_count > 0;
 
   return (
-    <div className="rounded-xl border transition-all overflow-hidden shadow-sm">
+    <div className="studio-cultural-check rounded-xl border overflow-hidden">
       {/* Thanh tiêu đề Banner */}
       <button
         type="button"
         aria-expanded={isExpanded}
         onClick={() => setIsExpanded(!isExpanded)}
-        className={`w-full flex items-center justify-between px-3.5 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-heritage-red ${
+        className={`w-full flex flex-col items-stretch gap-2 px-3.5 py-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-heritage-red ${
           hasStrict
             ? "bg-red-50 border-red-200 text-red-900 hover:bg-red-100/80"
             : hasWarning
@@ -37,7 +37,7 @@ export default function CulturalCheckBadge({ checkData, status, error, onRetry, 
             : "bg-emerald-50 border-emerald-200 text-emerald-900 hover:bg-emerald-100/80"
         }`}
       >
-        <div className="flex items-center space-x-2">
+        <span className="flex items-start gap-2 leading-relaxed">
           {hasStrict ? (
             <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
           ) : hasWarning ? (
@@ -46,7 +46,7 @@ export default function CulturalCheckBadge({ checkData, status, error, onRetry, 
             <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
           )}
 
-          <div className="text-xs font-semibold">
+          <span className="text-xs font-semibold">
             {hasStrict
               ? `Có ${checkData.strict_count} cảnh báo mức nghiêm trọng`
               : hasWarning
@@ -54,13 +54,13 @@ export default function CulturalCheckBadge({ checkData, status, error, onRetry, 
               : checkData.info_count > 0
               ? `Có ${checkData.info_count} gợi ý về quy thức trang phục`
               : "Chưa phát hiện cảnh báo trong các quy tắc đang kiểm tra"}
-          </div>
-        </div>
+          </span>
+        </span>
 
-        <div className="flex items-center space-x-1 text-xs text-stone-500">
+        <span className="studio-cultural-details flex shrink-0 items-center justify-end gap-1 whitespace-nowrap text-xs">
           <span>{isExpanded ? "Thu gọn" : "Xem chi tiết"}</span>
           {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-        </div>
+        </span>
       </button>
 
       {/* Nội dung chi tiết các cảnh báo & Trích dẫn nguồn */}

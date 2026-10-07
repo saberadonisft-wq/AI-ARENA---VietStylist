@@ -16,9 +16,40 @@ from app.modules.outfits.repository import OutfitRepository
 from app.modules.catalog.repository import CatalogRepository
 from app.core.errors import AppError
 from app.core.database import is_unique_violation
+from app.core.pagination import decode_cursor, encode_cursor
 
 
 class OutfitService:
+    @staticmethod
+    def _page_outfit_response(row):
+        snapshot = row.get('snapshot_json')
+        if isinstance(snapshot, str):
+            snapshot = json.loads(snapshot)
+        return OutfitResponse.model_validate({**row, 'current_snapshot': snapshot,
+                                               'created_at': str(row['created_at']), 'updated_at': str(row['updated_at'])})
+
+    @staticmethod
+    def list_user_outfit_page(user_id: str, limit: int = 30, cursor: str | None = None):
+        scope = 'outfits:' + user_id
+        rows = OutfitRepository.get_outfits_by_owner(user_id, limit + 1, decode_cursor(cursor, scope))
+        selected = rows[:limit]
+        return {
+            'items': [OutfitService._page_outfit_response(row) for row in selected],
+            'next_cursor': encode_cursor(scope, str(selected[-1]['updated_at']), selected[-1]['id']) if len(rows) > limit else None,
+        }
+
+    @staticmethod
+    def list_outfit_version_page(outfit_id: str, user_id: str, limit: int = 30, cursor: str | None = None):
+        if not OutfitRepository.get_outfit_by_id_and_owner(outfit_id, user_id):
+            raise AppError('OUTFIT_NOT_FOUND', 'Không tìm thấy bộ phối yêu cầu', 404)
+        scope = 'versions:' + user_id + ':' + outfit_id
+        rows = OutfitRepository.get_outfit_versions(outfit_id, limit + 1, decode_cursor(cursor, scope, numeric=True))
+        selected = rows[:limit]
+        items = [OutfitVersionResponse(id=row['id'], outfit_id=row['outfit_id'], version_number=row['version_number'],
+                    snapshot=OutfitSnapshot.model_validate(row['snapshot_json'] if isinstance(row['snapshot_json'], dict) else json.loads(row['snapshot_json'])),
+                    preview_image_url=row.get('preview_image_url'), created_at=str(row['created_at'])) for row in selected]
+        return {'items': items, 'next_cursor': encode_cursor(scope, selected[-1]['version_number'], selected[-1]['id']) if len(rows) > limit else None}
+
     @staticmethod
     def list_user_outfits(user_id: str) -> List[OutfitResponse]:
         rows = OutfitRepository.get_outfits_by_owner(user_id)
@@ -68,10 +99,9 @@ class OutfitService:
             if receipt["input_hash"] != request_hash:
                 raise AppError("IDEMPOTENCY_CONFLICT", "Mã lưu đã được dùng cho bản phối khác. Hãy lưu lại để tạo một mã mới.", 409)
 
-            existing_outfit = OutfitRepository.get_outfit_by_id_and_owner(outfit_id, user_id)
-            if existing_outfit:
-                OutfitRepository.finish_create_receipt(scoped_key, outfit_id)
-                return OutfitService.get_outfit(outfit_id, user_id)
+            recovered = OutfitService._recover_create(outfit_id, user_id, scoped_key)
+            if recovered:
+                return recovered
         else:
             outfit_id = str(uuid.uuid4())
 
@@ -89,14 +119,34 @@ class OutfitService:
         except Exception as exc:
             # A concurrent retry can win the deterministic outfit ID after the
             # receipt was reserved. Reuse its saved result; surface other errors.
-            existing_outfit = OutfitRepository.get_outfit_by_id_and_owner(outfit_id, user_id)
-            if not idempotency_key or not is_unique_violation(exc) or not existing_outfit:
+            if not idempotency_key or not is_unique_violation(exc):
                 raise
+            recovered = OutfitService._recover_create(outfit_id, user_id, scoped_key)
+            if recovered:
+                return recovered
+            raise
 
         if idempotency_key:
-            OutfitRepository.finish_create_receipt(scoped_key, outfit_id)
+            recovered = OutfitService._recover_create(outfit_id, user_id, scoped_key)
+            if recovered:
+                return recovered
 
         return OutfitService.get_outfit(outfit_id, user_id)
+
+    @staticmethod
+    def _recover_create(outfit_id: str, user_id: str, scoped_key: str) -> Optional[OutfitResponse]:
+        # Replaying a create must never grant a newer revision to a stale draft.
+        # Read the snapshot and revision together, including deletion tombstones.
+        row = OutfitRepository.get_outfit_by_id_and_owner(outfit_id, user_id, include_deleted=True)
+        if not row:
+            return None
+        details = {"outfit_id": outfit_id, "revision": 1}
+        if row["is_deleted"]:
+            raise AppError("OUTFIT_DELETED", "Bộ phối đã được xóa. Bản nháp vẫn có thể được lưu thành bản mới.", 409, details)
+        if row["revision"] != 1:
+            raise AppError("REVISION_CONFLICT", "Bộ phối đã thay đổi sau lần lưu đầu tiên. Hãy xem bản máy chủ hoặc lưu thành bản mới.", 409, details)
+        OutfitRepository.finish_create_receipt(scoped_key, outfit_id)
+        return OutfitService._outfit_response(row)
 
     @staticmethod
     def get_outfit(outfit_id: str, user_id: str) -> OutfitResponse:
@@ -104,6 +154,27 @@ class OutfitService:
         if not r:
             raise AppError(code="OUTFIT_NOT_FOUND", message="Không tìm thấy bộ phối yêu cầu", status_code=404)
 
+        return OutfitService._outfit_response(r)
+
+    @staticmethod
+    def get_outfit_version(version_id: str, user_id: str) -> OutfitVersionResponse:
+        row = OutfitRepository.get_version_by_id_and_owner(version_id, user_id)
+        if not row:
+            raise AppError("OUTFIT_VERSION_NOT_FOUND", "Không tìm thấy phiên bản bộ phối yêu cầu", 404)
+        snapshot = row["snapshot_json"]
+        if isinstance(snapshot, str):
+            snapshot = json.loads(snapshot)
+        return OutfitVersionResponse(
+            id=row["id"],
+            outfit_id=row["outfit_id"],
+            version_number=row["version_number"],
+            snapshot=OutfitSnapshot.model_validate(snapshot),
+            preview_image_url=row.get("preview_image_url"),
+            created_at=str(row["created_at"]),
+        )
+
+    @staticmethod
+    def _outfit_response(r: Dict[str, Any]) -> OutfitResponse:
         snap = r.get("snapshot_json")
         parsed_snap = OutfitSnapshot(**snap) if isinstance(snap, dict) else (OutfitSnapshot(**json.loads(snap)) if isinstance(snap, str) else None)
 

@@ -232,6 +232,23 @@ def test_api_generation_prompt_endpoint():
     assert "positive_prompt" in data
     assert "negative_prompt" in data
     assert "Hữu nhậm" in data["positive_prompt"]
+    assert "Áo ngũ thân" in data["positive_prompt"]
+
+
+def test_grounding_context_labels_use_published_dataset_entities():
+    outfit = {
+        "dataset_version": "dev", "selections": [],
+        "context": {"period_ids": ["period_nguyen", "period_nguyen"]},
+        "metadata": {"legacy_bridge": {"version": 1, "source": {"culturalSettings": {"context": {}}}}},
+    }
+    response = client.post("/api/v3/generation/grounding", json=outfit)
+    assert response.status_code == 200
+    context = response.json()["grounding"]["outfit_description"]["context"]
+    assert context["period"] == ["Triều Nguyễn"]
+    Database.execute("UPDATE entity_registry SET status='draft' WHERE id='period_nguyen'")
+    response = client.post("/api/v3/generation/grounding", json=outfit)
+    assert response.status_code == 200
+    assert "period" not in response.json()["grounding"]["outfit_description"]["context"]
 
 
 def test_api_generation_synthesize_endpoint():
@@ -516,6 +533,16 @@ def test_synthesis_uses_published_catalog_when_v3_has_no_mapping(monkeypatch, pn
         "INSERT INTO items(id,garment_type_id,name,slot,gender,era,is_published) VALUES(?,?,?,?,?,?,1)",
         (item_id, "ngu_than", "Áo bào đã duyệt", "outerwear", "unisex", "nguyen"),
     )
+    variant_id = item_id + "_cotton"
+    Database.execute(
+        "INSERT INTO item_variants(id,item_id,color_name,hex_color,secondary_hex,material,thickness_level,pattern_description,is_default) VALUES(?,?,?,?,?,?,?,?,?)",
+        (variant_id, item_id, "Trắng", "#FFFFFF", "#112233", "Cotton", "light", "Plain weave", 0),
+    )
+    Database.execute(
+        "INSERT INTO item_variants(id,item_id,color_name,hex_color,material,pattern_description,is_default) VALUES(?,?,?,?,?,?,?)",
+        (item_id + "_default", item_id, "Đỏ", "#990000", "Silk", "Floral weave", 1),
+    )
+    occasion = Database.fetch_one("SELECT id,name FROM occasions ORDER BY id LIMIT 1")
     seen = {}
 
     async def generate(_self, request):
@@ -531,7 +558,13 @@ def test_synthesis_uses_published_catalog_when_v3_has_no_mapping(monkeypatch, pn
         "/api/v3/generation/synthesize",
         headers={"Authorization": auth_header("dev-user-test-1")},
         json={
-            "outfit": {"schema_version": "2.0", "dataset_version": "dev", "selections": []},
+            "outfit": {
+                "schema_version": "2.0", "dataset_version": "dev", "selections": [],
+                "context": {"styleMode": "modern_fusion", "overlapDirection": "left_over_right", "occasionId": occasion["id"]},
+                "metadata": {"legacy_bridge": {"version": 1, "linked": [], "source": {"items": [
+                    {"itemId": item_id, "slot": "outerwear", "variantId": variant_id, "colorHex": "#123ABC", "material": "Client invented material"},
+                ]}}},
+            },
             "legacy_item_ids": [item_id],
             "outfit_image_id": "private-board",
         },
@@ -539,6 +572,10 @@ def test_synthesis_uses_published_catalog_when_v3_has_no_mapping(monkeypatch, pn
     assert response.status_code == 200
     assert "Áo bào đã duyệt" in seen["prompt"]
     assert "Image 1 is the outfit board" in seen["prompt"]
+    for expected in ("#123ABC", "#112233", "Cotton", "Plain weave", "Contemporary fusion", "Tả nhậm: closure toward the wearer's left", occasion["name"]):
+        assert expected in seen["prompt"]
+    assert '"material":"Silk"' not in seen["prompt"]
+    assert "Client invented material" not in seen["prompt"]
     assert response.json()["post_validation"]["review_status"] == "not_evaluated"
 
 

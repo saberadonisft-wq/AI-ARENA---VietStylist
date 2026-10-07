@@ -221,6 +221,9 @@ class LookbookService:
                 status_code=422,
             )
 
+        if current['visibility'] == 'private':
+            raise AppError('SHARE_NOT_ALLOWED', 'Chọn Người có liên kết hoặc Công khai trước khi chia sẻ.', 409)
+
         token = secrets.token_urlsafe(32)
         token_hash = hashlib.sha256(token.encode()).hexdigest()
         token_prefix = token[:8]
@@ -296,6 +299,9 @@ class LookbookService:
                 )
 
         lookbook_id = share["lookbook_id"]
+        current = LookbookRepository.get_lookbook_by_id(lookbook_id)
+        if not current or current['visibility'] == 'private':
+            raise AppError('SHARE_NOT_FOUND', 'Liên kết không còn khả dụng.', 404)
         entries = LookbookService._get_formatted_entries(lookbook_id)
 
         return SharedLookbookViewResponse(

@@ -16,6 +16,8 @@ export default function TrangPhucDetailPage() {
 
   const [item, setItem] = useState<CatalogItem | null>(null);
   const [article, setArticle] = useState<HeritageArticle | null>(null);
+  const [articleLoading, setArticleLoading] = useState(false);
+  const [articleError, setArticleError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [notFound, setNotFound] = useState(false);
@@ -36,12 +38,14 @@ export default function TrangPhucDetailPage() {
     setNotFound(false);
     setItem(null);
     setArticle(null);
+    setArticleLoading(false);
+    setArticleError(null);
     setImageLoadFailed(false);
 
     api
       .getItemDetail(slug)
       .then((itemData) => {
-        if (!active) return null;
+        if (!active) return;
         if (!itemData || typeof itemData !== "object" || Array.isArray(itemData) ||
             typeof itemData.id !== "string" || typeof itemData.name !== "string" || typeof itemData.slot !== "string") {
           throw new Error("Máy chủ trả dữ liệu trang phục không hợp lệ. Hãy thử tải lại.");
@@ -52,12 +56,16 @@ export default function TrangPhucDetailPage() {
           variants: Array.isArray(itemData.variants) ? itemData.variants : [],
         };
         setItem(safeItem);
+        setArticleLoading(true);
         // Tìm bài viết di sản liên quan (ví dụ: art_ngu_than hoặc art_ao_tac)
         const articleKey = safeItem.garment_type_id ? `art_${safeItem.garment_type_id}` : "art_ngu_than";
-        return api.getHeritageArticle(articleKey).catch(() => null);
-      })
-      .then((artData) => {
-        if (active && artData) setArticle(artData);
+        // Optional heritage must not hold the garment image behind the page loading gate.
+        void api.getHeritageArticle(articleKey)
+          .then((artData) => { if (active && artData) setArticle(artData); })
+          .catch((err) => {
+            if (active && err?.statusCode !== 404) setArticleError("Tư liệu tham khảo hiện chưa tải được.");
+          })
+          .finally(() => { if (active) setArticleLoading(false); });
       })
       .catch((err) => {
         if (!active) return;
@@ -120,7 +128,7 @@ export default function TrangPhucDetailPage() {
       {/* Phần 1: Tổng quan hiện vật & Canvas Vector */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-8 bg-white rounded-3xl border border-stone-200 p-6 sm:p-8 shadow-sm items-center">
         {/* Vector Preview hoặc Ảnh thật */}
-        <div className="md:col-span-5 bg-[#FAF8F5] rounded-2xl p-6 flex flex-col items-center justify-center border border-stone-100 min-h-[360px] relative">
+        <div className="md:col-span-5 bg-page rounded-2xl p-6 flex flex-col items-center justify-center border border-stone-100 min-h-[360px] relative">
           {(item.metadata?.real_image_url || item.metadata?.catalog_media_id) && !imageLoadFailed ? (
             <img
               src={catalogImageUrl(item)}
@@ -201,6 +209,8 @@ export default function TrangPhucDetailPage() {
       </div>
 
       {/* Phần 2: Kiến thức Di sản & Khảo cứu Thư tịch cổ (F04) */}
+      {articleLoading && <p role="status" className="text-sm text-stone-500">Đang tải tư liệu tham khảo…</p>}
+      {articleError && <p role="status" className="text-sm text-stone-500">{articleError}</p>}
       {article && (
         <div className="bg-white rounded-3xl border border-stone-200 p-6 sm:p-8 shadow-sm space-y-6">
           <div className="flex items-center space-x-2 text-heritage-indigo text-xs font-bold uppercase tracking-wider">

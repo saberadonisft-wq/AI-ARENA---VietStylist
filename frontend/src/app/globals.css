@@ -3,6 +3,13 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --app-background-rgb: 240 242 245;
+    --app-background: rgb(var(--app-background-rgb));
+    --site-brand-inset: 17.5px;
+    --site-brand-landscape-inset: 9.5px;
+  }
+
   html, body {
     overflow-x: clip;
     scroll-behavior: auto !important;
@@ -10,7 +17,7 @@
   }
 
   body {
-    @apply bg-[#FAF8F5] text-[#1A202C] font-sans antialiased selection:bg-heritage-gold/30 selection:text-heritage-red;
+    @apply bg-page text-[#1A202C] font-sans antialiased selection:bg-heritage-gold/30 selection:text-heritage-red;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: auto;
@@ -29,6 +36,19 @@
     outline: 2px solid #9f1239 !important;
     outline-offset: 2px !important;
     box-shadow: 0 0 0 2px #ffffff, 0 0 0 4px #9f1239 !important;
+  }
+}
+
+/* Shared header alignment follows the Studio rail at every route. */
+@media (min-width: 1024px) {
+  .site-navbar > .site-navbar-container {
+    padding-inline-start: var(--site-brand-inset);
+  }
+}
+
+@media (max-width: 1023px) and (max-height: 500px) {
+  .site-navbar > .site-navbar-container {
+    padding-inline-start: var(--site-brand-landscape-inset);
   }
 }
 
@@ -300,7 +320,7 @@
 }
 
 ::-webkit-scrollbar-track {
-  background: #F0EAE1;
+  background: var(--app-background);
 }
 
 ::-webkit-scrollbar-thumb {

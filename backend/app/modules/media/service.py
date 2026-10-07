@@ -3,7 +3,7 @@ import time
 import uuid
 from pathlib import PurePosixPath
 from app.core.config import settings
-from app.core.database import Database
+from app.core.database import Database, get_db_connection
 from app.core.errors import AppError
 from app.infrastructure.r2.client import r2_client
 from app.modules.media.repository import MediaRepository
@@ -17,6 +17,7 @@ from app.modules.media.schemas import (
     AIMediaResponse,
 )
 from app.modules.media.validation import TYPES, byte_limit, validate_content
+from app.modules.media.image_cache import evict_image, prime_image
 
 
 class MediaService:
@@ -235,7 +236,10 @@ class MediaService:
             ) from exc
         # Retain the staging ledger until its PUT capability has expired; cleanup retries.
         r2_client.delete_object(media["staging_bucket"], media["staging_key"])
-        return MediaAssetResponse(**MediaRepository.get_media_by_id(media_id))
+        ready = MediaRepository.get_media_by_id(media_id)
+        if ready["status"] == "ready" and ready["media_type"] == "image":
+            prime_image(ready, data)
+        return MediaAssetResponse(**ready)
 
     @staticmethod
     def ingest_generated_image(owner_id, content, mime_type):
@@ -371,51 +375,18 @@ class MediaService:
                 "STORAGE_DELETE_FAILED", "Chưa xóa xong file; hệ thống sẽ thử lại", 503
             )
         MediaRepository.mark_media_deleted(media_id)
+        evict_image(media)
 
     @staticmethod
     def list_ai_media(owner_id, limit=30, offset=0):
-        """Page all AI media explicitly referenced by this owner's generation receipts."""
-        candidates = {}
-        batch_size = 500
-        job_offset = 0
-        while True:
-            jobs = MediaRepository.list_recent_ai_jobs(owner_id, limit=batch_size, offset=job_offset)
-            if not jobs:
-                break
-            references = {}
-            for job in jobs:
-                try:
-                    inputs = json.loads(job["input_params"]) if isinstance(job.get("input_params"), str) else (job.get("input_params") or {})
-                    result = json.loads(job["result_data"]) if isinstance(job.get("result_data"), str) else (job.get("result_data") or {})
-                except (TypeError, ValueError):
-                    continue
-                if not isinstance(inputs, dict) or not isinstance(result, dict):
-                    continue
-                for purpose, media_id in (
-                    ("result", result.get("result_media_id")),
-                    ("person", inputs.get("user_image_id")),
-                    ("outfit", inputs.get("outfit_image_id")),
-                ):
-                    if isinstance(media_id, str) and media_id:
-                        references.setdefault(media_id, set()).add(purpose)
-
-            for media in MediaRepository.get_owned_ai_images(references, owner_id):
-                media_id = media["id"]
-                entry = candidates.setdefault(media_id, {
-                    "purposes": set(),
-                    "status": media["status"],
-                    "created_at": str(media["created_at"]),
-                })
-                entry["purposes"].update(references[media_id])
-
-            job_offset += len(jobs)
-            if len(jobs) < batch_size:
-                break
-
-        ordered = sorted(candidates.items(), key=lambda item: (item[1]["created_at"], item[0]), reverse=True)
-        page = [AIMediaResponse(media_id=media_id, purposes=sorted(entry["purposes"]), status=entry["status"], created_at=entry["created_at"])
-                for media_id, entry in ordered[offset:offset + limit]]
-        return page
+        """Read one indexed gallery page; only load purposes for its images."""
+        with get_db_connection() as conn:
+            images = MediaRepository.list_ai_images(owner_id, limit, offset, conn=conn)
+            purposes = {}
+            for ref in MediaRepository.ai_image_purposes(owner_id, [image['id'] for image in images], conn=conn):
+                purposes.setdefault(ref['media_id'], []).append(ref['purpose'])
+        return [AIMediaResponse(media_id=image['id'], purposes=sorted(purposes.get(image['id'], [])),
+                                status=image['status'], created_at=str(image['created_at'])) for image in images]
 
     @staticmethod
     def cleanup(limit=100, dry_run=False):

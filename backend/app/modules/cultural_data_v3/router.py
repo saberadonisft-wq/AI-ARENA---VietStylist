@@ -63,13 +63,14 @@ def projection_context(
     return context or None
 
 
-def build_grounding(outfit: OutfitSpecV2):
+def build_grounding(outfit: OutfitSpecV2, *, published_items=None):
     with dataset_resolver(outfit.dataset_version, outfit.ruleset_version) as (selected_resolver, metadata):
-        return build_grounding_from_dataset(outfit, selected_resolver, metadata)
+        return build_grounding_from_dataset(outfit, selected_resolver, metadata, published_items=published_items)
 
 
-def build_grounding_from_dataset(outfit, selected_resolver, metadata):
+def build_grounding_from_dataset(outfit, selected_resolver, metadata, *, published_items=None):
     from app.modules.cultural_data_v3.services.generation import GroundingBuilder
+    from app.modules.cultural_data_v3.services.outfit_prompt import load_outfit_description
 
     profiles = []
     for selection in outfit.selections:
@@ -93,7 +94,11 @@ def build_grounding_from_dataset(outfit, selected_resolver, metadata):
             fact["selection_id"] = selection.selection_id
             fact["slot"] = selection.slot
         profiles.append(profile)
-    return GroundingBuilder().build(outfit.model_dump(), profiles, dataset=metadata)
+    outfit_data = outfit.model_dump()
+    return GroundingBuilder().build(
+        outfit_data, profiles, dataset=metadata,
+        outfit_description=load_outfit_description(outfit_data, resolver=selected_resolver, published_items=published_items),
+    )
 
 
 @router.post("/editor/datasets", response_model=DatasetMetadataResponse, status_code=201)
@@ -308,6 +313,7 @@ async def _generate_image(req: SynthesizeRequest, user: AuthenticatedUser):
 
     from app.modules.catalog.repository import CatalogRepository
     from app.modules.cultural_data_v3.services.generation import GroundingBuilder
+    from app.modules.cultural_data_v3.services.outfit_prompt import load_outfit_description
 
     if not req.outfit.selections and not req.legacy_item_ids:
         raise AppError("OUTFIT_EMPTY", "Bộ phối chưa có trang phục.", 422)
@@ -320,18 +326,16 @@ async def _generate_image(req: SynthesizeRequest, user: AuthenticatedUser):
         raise AppError("ITEM_NOT_FOUND", "Trang phục chưa được xuất bản hoặc không còn tồn tại.", 404)
 
     grounding = (
-        await run_in_threadpool(build_grounding, req.outfit)
+        await run_in_threadpool(build_grounding, req.outfit, published_items=published_items)
         if req.outfit.selections
-        else GroundingBuilder().build(
+        else await run_in_threadpool(GroundingBuilder().build,
             req.outfit.model_dump(), [],
             dataset={"dataset_version": req.outfit.dataset_version, "ruleset_version": req.outfit.ruleset_version, "reproducible": False},
+            outfit_description=await run_in_threadpool(load_outfit_description, req.outfit.model_dump(), published_items=published_items),
         )
     )
     prompts = PromptBuilder.build(grounding)
     try_on_prompt = PromptBuilder.build_try_on(grounding, has_person_image=bool(req.user_image_id))
-    if published_items:
-        garment_list = "; ".join(f"{item['slot']}: {item['name']}" for item in published_items)
-        try_on_prompt += f" Selected published catalog garments: {garment_list}. Follow the outfit board for exact appearance and colors."
     idempotency_key = req.idempotency_key or canonical_hash(
         {
             "user_id": user.user_id,

@@ -8,9 +8,12 @@ const CORE_PAGES = [
 
 test("core pages fit the supported viewport widths", async ({ page }) => {
   test.setTimeout(120_000);
+  const sharedHeaderSizes = new Map<number, string>();
   await page.route("http://127.0.0.1:4100/**", route => {
     const path = new URL(route.request().url()).pathname;
-    const payload = path.endsWith("/weather")
+    const payload = ["/api/lookbook-posts", "/api/lookbook-posts/mine", "/api/lookbook-posts/favorites"].includes(path)
+      ? { items: [], next_cursor: null }
+      : path.endsWith("/weather")
       ? {
           location: { key: "ha_noi", name: "Hà Nội", region: "Việt Nam", latitude: 21, longitude: 105 },
           weather: { temperature_c: 26, apparent_temperature_c: 27, humidity_percent: 60, weather_condition: "Nhiều mây", is_rainy: false, wind_speed_kmh: 5 },
@@ -30,6 +33,52 @@ test("core pages fit the supported viewport widths", async ({ page }) => {
       await page.setViewportSize({ width, height: 900 });
       const dimensions = await page.evaluate(() => ({ viewport: document.documentElement.clientWidth, content: document.documentElement.scrollWidth }));
       expect(dimensions.content, `${path} overflows at ${width}px`).toBeLessThanOrEqual(dimensions.viewport);
+      if (["/studio", "/thu-vien", "/lookbook"].includes(path)) {
+        await page.evaluate(() => document.fonts.ready);
+        const header = page.locator(".site-navbar");
+        await expect(header).toHaveCount(1);
+        const size = await header.evaluate(element => {
+          const row = element.querySelector<HTMLElement>(".site-nav-row")!;
+          const logo = element.querySelector<HTMLImageElement>(".site-brand img")!.getBoundingClientRect();
+          const brand = element.querySelector<HTMLElement>(".site-brand > div:last-child > div")!;
+          const tagline = element.querySelector<HTMLElement>(".site-brand > div:last-child > span")!;
+          return {
+            rowHeight: row.getBoundingClientRect().height,
+            headerHeight: element.getBoundingClientRect().height,
+            logoWidth: logo.width,
+            logoHeight: logo.height,
+            brandFont: parseFloat(getComputedStyle(brand).fontSize),
+            brandLineHeight: getComputedStyle(brand).lineHeight,
+            taglineVisible: tagline.getClientRects().length > 0,
+            taglineFont: parseFloat(getComputedStyle(tagline).fontSize),
+            desktopLinkFonts: [...row.querySelectorAll<HTMLElement>("nav a")]
+              .filter(link => link.getClientRects().length > 0)
+              .map(link => parseFloat(getComputedStyle(link).fontSize)),
+          };
+        });
+        expect(size.rowHeight, `${path} header row at ${width}px`).toBe(58);
+        expect(size.headerHeight, `${path} closed header at ${width}px`).toBe(59);
+        expect(size.logoWidth, `${path} logo width at ${width}px`).toBe(36);
+        expect(size.logoHeight, `${path} logo height at ${width}px`).toBe(36);
+        expect(size.brandFont, `${path} brand type at ${width}px`).toBe(19);
+        expect(size.taglineVisible, `${path} tagline at ${width}px`).toBe(width >= 768);
+        for (const font of size.desktopLinkFonts) expect(font, `${path} navigation type at ${width}px`).toBe(13);
+        const baseline = sharedHeaderSizes.get(width);
+        if (baseline === undefined) sharedHeaderSizes.set(width, JSON.stringify(size));
+        else expect(JSON.stringify(size), `${path} shared header dimensions at ${width}px`).toBe(baseline);
+        if ([375, 1440].includes(width)) {
+          await header.screenshot({ path: test.info().outputPath(`header-${path.slice(1)}-${width}.png`) });
+        }
+        if (width === 375) {
+          await header.getByRole("button", { name: "Mở menu điều hướng", exact: true }).click();
+          const mobileNavigation = header.getByRole("navigation", { name: "Điều hướng trên điện thoại", exact: true });
+          await expect(mobileNavigation).toBeVisible();
+          expect(await mobileNavigation.getByRole("link").first().evaluate(element =>
+            parseFloat(getComputedStyle(element).fontSize)), `${path} mobile navigation type`).toBe(16);
+          await header.getByRole("button", { name: "Đóng menu điều hướng", exact: true }).click();
+          await expect(mobileNavigation).toHaveCount(0);
+        }
+      }
     }
   }
 });

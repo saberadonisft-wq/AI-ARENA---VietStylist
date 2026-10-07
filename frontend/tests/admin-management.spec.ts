@@ -1,5 +1,7 @@
+import { openStudioDocument } from "./helpers/studio-ui";
 import { test, expect, Page } from "@playwright/test";
 import { DRAFT_KEY, INITIAL_DOCUMENT } from "../src/features/studio/state";
+import { assertNoStoredOutfits } from "./helpers/device-storage";
 
 async function setup(page: Page, role = "admin") {
   const admin = { id: "admin-1", email: "admin@example.invalid", display_name: "Admin Test", roles: [role], auth_provider: "local" };
@@ -18,6 +20,8 @@ async function setup(page: Page, role = "admin") {
     requests.push({ method, path, body });
     const send = (data: unknown, status = 200) => route.fulfill({ status, contentType: "application/json", body: JSON.stringify(data) });
     if (path === "/api/auth/me") return send(admin);
+    if (path === "/api/outfits/page") return send({ items: [], next_cursor: null });
+    if (path === "/api/outfits/count") return send({ count: 0 });
     if (path === "/api/admin/overview") return send({ users: 2, items: 1, outfits: 1, lookbooks: 0, rules: 0 });
     if (path === "/api/admin/users/student-1") { student = { ...student, ...(body.is_active === undefined ? {} : { is_active: body.is_active }), ...(body.is_stylist === undefined ? {} : { roles: body.is_stylist ? ["user", "stylist"] : ["user"] }) }; return send({ status: "updated" }); }
     if (path === "/api/admin/users") return send({ items: [student], total: 1 });
@@ -76,17 +80,45 @@ test("admin grants and revokes stylist, locks user, and edits catalog on account
   expect(requests.filter(r => r.method === "PATCH").map(r => r.body)).toEqual([{ is_stylist: true }, { is_stylist: false }, { is_active: false }]);
 });
 
-test("admin Studio edits foreign outfit through admin API and preserves personal draft", async ({ page }) => {
+test("admin Studio edits foreign outfit through admin API without retaining device drafts", async ({ page }) => {
   const requests = await setup(page);
+  const personalDraft = { ...INITIAL_DOCUMENT, title: "Bản nháp riêng admin", ownerId: "admin-1", outfitId: "personal-look-1", revision: 9,
+    savedDocument: { ...INITIAL_DOCUMENT, title: "Bản nháp riêng admin" } };
+  await page.addInitScript(({ key, draft }) => localStorage.setItem(key, JSON.stringify(draft)), { key: DRAFT_KEY, draft: personalDraft });
+  let managedOutfit = { id: "look-1", title: "Bộ phối sinh viên", owner_id: "student-1", revision: 1,
+    current_snapshot: { ...INITIAL_DOCUMENT.snapshot, items: [{ slot: "outerwear", itemId: "shirt-1", assetVersion: 1, colorHex: "#8B1E24" }] } };
+  await page.route("**/api/admin/outfits/look-1", route => {
+    const method = route.request().method();
+    const body = method === "GET" ? null : route.request().postDataJSON();
+    requests.push({ method, path: "/api/admin/outfits/look-1", body });
+    if (method === "PUT") managedOutfit = { ...managedOutfit, title: body.title, revision: managedOutfit.revision + 1, current_snapshot: body.snapshot };
+    return route.fulfill({ json: managedOutfit });
+  });
   await page.goto("/studio?loadOutfit=look-1&manage=1");
-  const title = page.locator("input").first();
+  const title = page.getByLabel("Tên bản phối", { exact: true });
   await expect(title).toHaveValue("Bộ phối sinh viên");
+  await openStudioDocument(page);
+  await page.getByLabel("Thao tác bộ phối", { exact: true }).click();
+  const publish = page.getByRole("button", { name: "Đăng lên Lookbook", exact: true });
+  await expect(publish).toBeVisible();
+  await expect(publish).toBeDisabled();
+  await expect(publish).toHaveAttribute("aria-describedby", "studio-managed-ownership");
+  await expect(page.getByText("Chỉ tài khoản sở hữu bộ phối mới có thể đăng lên Lookbook.", { exact: true })).toBeVisible();
+  await publish.evaluate((button: HTMLButtonElement) => button.click());
+  await expect(page).toHaveURL(/\/studio\?loadOutfit=look-1&manage=1$/);
+  expect(requests.filter(r => r.method === "PUT")).toHaveLength(0);
+  await page.getByLabel("Thao tác bộ phối", { exact: true }).click();
   await title.fill("Admin sửa bộ phối");
+  await openStudioDocument(page);
   await page.getByRole("button", { name: "Lưu bộ phối", exact: true }).click();
   await expect.poll(() => requests.filter(r => r.method === "PUT" && r.path === "/api/admin/outfits/look-1").length).toBe(1);
   expect(requests.find(r => r.method === "PUT")?.body.revision).toBe(1);
-  expect(await page.evaluate(key => JSON.parse(localStorage.getItem(key)!).title, DRAFT_KEY)).toBe("Bản nháp riêng admin");
+  await assertNoStoredOutfits(page);
+  expect(await page.evaluate(() => localStorage.getItem("viet_stylist_auth_token"))).toBe("test-token");
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem("viet_stylist_user") || "null")?.id)).toBe("admin-1");
   expect(requests.some(r => r.path === "/api/outfits/look-1")).toBe(false);
+  expect(requests.some(r => r.path === "/api/outfits/personal-look-1" || r.path.startsWith("/api/lookbook-posts"))).toBe(false);
+  await expect(page).toHaveURL(/\/studio\?loadOutfit=look-1&manage=1$/);
 });
 
 test("student cannot see admin controls", async ({ page }) => {

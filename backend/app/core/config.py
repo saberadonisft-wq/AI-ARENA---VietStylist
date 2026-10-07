@@ -64,6 +64,7 @@ class Settings(BaseSettings):
     # Frontend / Public URLs
     FRONTEND_PUBLIC_ORIGIN: str = "http://localhost:3000"
     API_PUBLIC_ORIGIN: str = "http://localhost:4000"
+    LOOKBOOK_COMMUNITY_ENABLED: bool = True
 
     # Cloudflare R2 / Storage
     R2_ACCOUNT_ID: str = ""

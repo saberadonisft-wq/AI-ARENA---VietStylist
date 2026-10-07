@@ -57,6 +57,9 @@ export function projectionQuery(context?: Partial<ContextQualifier>, datasetVers
 export const v3Api = {
   listDatasets: () => apiFetch<Array<{ dataset_version: string; ruleset_version: string; label: string }>>("/api/v3/datasets"),
   getLegacyMappings: (datasetVersion = "dev") => apiFetch<LegacyMappingBundle>(`/api/v3/legacy-mappings?dataset_version=${encodeURIComponent(datasetVersion)}`),
+  getGenerationGrounding: (outfit: OutfitSpecV2, signal?: AbortSignal) => apiFetch<{
+    grounding: { outfit_description?: { context?: Record<string, unknown> } };
+  }>("/api/v3/generation/grounding", { method: "POST", body: JSON.stringify(outfit), signal }),
   /**
    * Liệt kê canonical cultural entities trong Knowledge Graph
    */

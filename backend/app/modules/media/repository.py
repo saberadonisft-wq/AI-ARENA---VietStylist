@@ -27,8 +27,8 @@ class MediaRepository:
             )
 
     @staticmethod
-    def get_media_by_id(media_id):
-        return Database.fetch_one("SELECT * FROM media_assets WHERE id=?", (media_id,))
+    def get_media_by_id(media_id, *, conn=None):
+        return Database.fetch_one("SELECT * FROM media_assets WHERE id=?", (media_id,), conn=conn)
 
     @staticmethod
     def get_media_by_bucket_and_key(bucket, object_key):
@@ -158,6 +158,8 @@ class MediaRepository:
 
     @staticmethod
     def _mark_unused(conn, media_id, owner_id):
+        if conn.execute('SELECT 1 FROM lookbook_posts WHERE cover_media_id=? AND is_deleted=0 LIMIT 1', (media_id,)).fetchone():
+            return 'in_use'
         media = conn.execute("SELECT public_url FROM media_assets WHERE id=?", (media_id,)).fetchone()
         url = media["public_url"] if media else None
         # Existing gallery JSON is the canonical link, including legacy
@@ -210,6 +212,26 @@ class MediaRepository:
         return Database.fetch_all(
             "SELECT id,input_params,result_data,created_at FROM ai_jobs WHERE owner_id=? AND task_type='v3_generation' ORDER BY created_at DESC,id DESC LIMIT ? OFFSET ?",
             (owner_id, limit, offset),
+        )
+
+    @staticmethod
+    def list_ai_images(owner_id, limit=30, offset=0, *, conn=None):
+        return Database.fetch_all(
+            "SELECT m.id,m.status,m.created_at FROM ai_media_library l "
+            "JOIN media_assets m ON m.id=l.media_id AND m.owner_id=l.owner_id "
+            "WHERE l.owner_id=? AND m.media_type='image' "
+            "ORDER BY l.created_at DESC,l.media_id DESC LIMIT ? OFFSET ?",
+            (owner_id, limit, offset), conn=conn,
+        )
+
+    @staticmethod
+    def ai_image_purposes(owner_id, media_ids, *, conn=None):
+        if not media_ids:
+            return []
+        placeholders = ','.join('?' for _ in media_ids)
+        return Database.fetch_all(
+            f"SELECT DISTINCT media_id,purpose FROM ai_job_media WHERE owner_id=? AND media_id IN ({placeholders})",
+            (owner_id, *media_ids), conn=conn,
         )
 
     @staticmethod
