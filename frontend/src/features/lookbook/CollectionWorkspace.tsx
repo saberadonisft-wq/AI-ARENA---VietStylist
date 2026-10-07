@@ -10,8 +10,21 @@ import { FolderHeart, Plus, Share2, Eye, Lock, Globe, Sparkles, Check } from "lu
 import { LookbookCardSkeleton } from "@/components/ui/Skeleton";
 import Modal from "@/components/ui/Modal";
 import AuthModal from "@/components/AuthModal";
+import { control, field, primary } from "./PostCard";
+import { LookbookEmptyState } from "./LookbookShell";
 
-export default function CollectionWorkspace() {
+function CollectionCover({ lookbook }: { lookbook: Lookbook }) {
+  const imageUrl = lookbook.cover_image_url || lookbook.entries.find(entry => entry.preview_image_url)?.preview_image_url;
+  const [failed, setFailed] = useState(false);
+  useEffect(() => setFailed(false), [imageUrl]);
+  return <Link href={`/lookbook/${lookbook.id}`} aria-label={`Mở bộ sưu tập ${lookbook.title}`} className="flex aspect-[2/1] items-center justify-center overflow-hidden border-b border-stone-200 bg-stone-100">
+    {imageUrl && !failed ?
+      // eslint-disable-next-line @next/next/no-img-element
+      <img src={imageUrl} alt={`Ảnh bìa ${lookbook.title}`} width={600} height={300} loading="lazy" decoding="async" className="h-full w-full object-cover" onError={() => setFailed(true)} /> : <FolderHeart className="h-12 w-12 text-stone-400" strokeWidth={1.25} aria-hidden="true" />}
+  </Link>;
+}
+
+export default function CollectionWorkspace({ embedded = false }: { embedded?: boolean }) {
   const { user, isLoggedIn, isReady } = useAuth();
   const currentOwnerId = useRef(user?.id);
   currentOwnerId.current = user?.id;
@@ -197,43 +210,39 @@ export default function CollectionWorkspace() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
+    <div className={embedded ? "space-y-4" : "mx-auto max-w-7xl space-y-4 px-4 py-8 sm:px-6"}>
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="lookbook-panel flex flex-wrap items-center justify-between gap-4 p-5">
         <div className="space-y-1">
-          <div className="flex items-center space-x-2 text-heritage-red text-xs font-bold uppercase tracking-widest">
-            <FolderHeart className="w-4 h-4" />
-              <span>Bộ sưu tập cá nhân</span>
-          </div>
-          <h2 className="font-serif text-3xl font-bold text-stone-900 tracking-tight">
+          <h2 className="text-lg font-semibold text-stone-900">
             Bộ sưu tập của tôi
           </h2>
-          <p className="text-stone-600 text-xs leading-relaxed max-w-xl">
-            Tập hợp các bộ phối đã lưu thành bộ sưu tập theo chủ đề. Bạn có thể tạo liên kết chia sẻ có thời hạn và tự chọn quyền xem.
+          <p className="max-w-md text-sm leading-relaxed text-stone-500">
+            Sắp xếp bộ phối đã lưu theo chủ đề và chọn quyền xem cho từng bộ sưu tập.
           </p>
         </div>
 
         {isLoggedIn ? (
           <button
             onClick={() => { setCreateError(null); setTitleError(null); setIsCreateOpen(true); }}
-            className="inline-flex items-center space-x-2 px-4 py-2 bg-heritage-red hover:bg-heritage-red-dark text-white rounded-xl text-xs font-semibold shadow-sm transition-all shrink-0"
+            className={primary}
           >
             <Plus className="w-4 h-4" />
-            <span>Tạo Lookbook Mới</span>
+            <span>Tạo Lookbook mới</span>
           </button>
         ) : (
           <button
             onClick={() => setShowAuthModal(true)}
-            className="inline-flex items-center space-x-2 px-4 py-2 bg-stone-900 hover:bg-stone-800 text-white rounded-xl text-xs font-semibold shadow-sm transition-all shrink-0"
+            className={control}
           >
             <Sparkles className="w-4 h-4 text-heritage-gold" />
-            <span>Đăng nhập để quản lý Lookbook</span>
+            <span>Đăng nhập</span>
           </button>
         )}
       </div>
 
       {actionMessage && <div role="status" className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">{actionMessage}</div>}
-      {loadError && <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900"><span>Không tải được dữ liệu Lookbook: {loadError}</span><button type="button" onClick={() => void fetchLookbooks()} disabled={isLoading} className="rounded-lg border border-rose-300 bg-white px-3 py-1.5 text-xs font-semibold disabled:opacity-50">Thử tải lại</button></div>}
+      {loadError && <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900"><span>Không tải được dữ liệu Lookbook: {loadError}</span><button type="button" onClick={() => void fetchLookbooks()} disabled={isLoading} className={control}>Thử tải lại</button></div>}
 
       {/* Thông báo chia sẻ vừa tạo */}
       {activeShareData && activeShareOwnerId === user?.id && (
@@ -258,58 +267,47 @@ export default function CollectionWorkspace() {
 
       {/* Danh sách Lookbooks */}
       {!isReady ? (
-        <div role="status" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">{[1, 2, 3].map(i => <LookbookCardSkeleton key={i} />)}</div>
+        <div role="status" className="grid grid-cols-1 gap-4 sm:grid-cols-2">{[1, 2].map(i => <LookbookCardSkeleton key={i} />)}</div>
       ) : !isLoggedIn ? (
-        <div className="bg-white rounded-3xl border border-stone-200 p-12 text-center space-y-4 shadow-sm">
-          <FolderHeart className="w-12 h-12 text-stone-300 mx-auto" />
-          <div className="space-y-1">
-            <h3 className="font-serif text-lg font-bold text-stone-900">
-              Bạn đang ở chế độ Khách (Guest)
-            </h3>
-            <p className="text-stone-500 text-xs max-w-md mx-auto">
-              Đăng nhập để lưu Lookbook trong tài khoản, đồng bộ giữa các thiết bị và quản lý liên kết chia sẻ.
-            </p>
-          </div>
+        <LookbookEmptyState title="Đăng nhập để xem bộ sưu tập" description="Lưu bộ sưu tập trong tài khoản và quản lý những liên kết bạn đã chia sẻ.">
           <button
             onClick={() => setShowAuthModal(true)}
-            className="px-5 py-2 bg-heritage-red text-white text-xs font-semibold rounded-xl hover:bg-heritage-red-dark transition-all"
+            className={primary}
           >
             Đăng nhập ngay
           </button>
-        </div>
+        </LookbookEmptyState>
       ) : isLoading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {[1, 2, 3, 4, 5, 6].map((i) => (
+        <div role="status" className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {[1, 2].map((i) => (
             <LookbookCardSkeleton key={i} />
           ))}
         </div>
       ) : loadError ? null : loadedOwnerId !== user?.id ? (
-        <div role="status" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">{[1, 2, 3].map(i => <LookbookCardSkeleton key={i} />)}</div>
+        <div role="status" className="grid grid-cols-1 gap-4 sm:grid-cols-2">{[1, 2].map(i => <LookbookCardSkeleton key={i} />)}</div>
       ) : lookbooks.length === 0 ? (
-        <div className="bg-white rounded-3xl border border-stone-200 p-12 text-center space-y-4 shadow-sm">
-          <FolderHeart className="w-12 h-12 text-stone-300 mx-auto" />
-          <h3 className="font-serif text-lg font-bold text-stone-900">Chưa có Lookbook nào</h3>
-          <p className="text-stone-500 text-xs max-w-sm mx-auto">
-            Bắt đầu bằng cách tạo một bộ sưu tập và chọn các bộ phối từ Studio để đính kèm.
-          </p>
+        <LookbookEmptyState title="Chưa có bộ sưu tập nào" description="Tạo một bộ sưu tập theo chủ đề rồi chọn các bộ phối đã lưu trong Studio để đính kèm.">
           <button
             onClick={() => { setCreateError(null); setTitleError(null); setIsCreateOpen(true); }}
-            className="px-5 py-2 bg-heritage-red text-white text-xs font-semibold rounded-xl hover:bg-heritage-red-dark transition-all"
+            className={primary}
           >
-            Tạo Lookbook đầu tiên
+            Tạo bộ sưu tập đầu tiên
           </button>
-        </div>
+        </LookbookEmptyState>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         {lookbooks.map((lb) => (
-            <div
+            <article
               key={lb.id}
-              className="bg-white rounded-2xl border border-stone-200 overflow-hidden shadow-sm hover:shadow-md transition-all p-5 flex flex-col justify-between space-y-4"
+              className="lookbook-panel flex min-w-0 flex-col overflow-hidden"
+              aria-label={`Bộ sưu tập ${lb.title}`}
             >
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
+              <CollectionCover lookbook={lb} />
+              <div className="flex flex-1 flex-col space-y-3 p-4">
+              <div className="flex-1 space-y-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
                   <span
-                    className={`inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                    className={`inline-flex items-center space-x-1 px-2 py-1 rounded-md text-xs font-semibold ${
                       lb.visibility === "public"
                         ? "bg-emerald-100 text-emerald-800"
                         : lb.visibility === "unlisted"
@@ -324,18 +322,18 @@ export default function CollectionWorkspace() {
                     )}
                     <span>{lb.visibility === "public" ? "Công khai" : lb.visibility === "unlisted" ? "Người có liên kết" : "Riêng tư"}</span>
                   </span>
-                  <span className="text-[11px] text-stone-400 font-mono">
+                  <span className="text-xs text-stone-500">
                     {new Date(lb.created_at).toLocaleDateString("vi-VN")}
                   </span>
                 </div>
 
-                <h3 className="font-serif font-bold text-base text-stone-900">{lb.title}</h3>
-                <p className="text-xs text-stone-600 line-clamp-2 leading-relaxed">
+                <h3 className="text-base font-semibold text-stone-900 [overflow-wrap:anywhere]"><Link href={`/lookbook/${lb.id}`} className="hover:underline">{lb.title}</Link></h3>
+                <p className="text-sm text-stone-600 line-clamp-2 leading-relaxed [overflow-wrap:anywhere]">
                   {lb.description || "Chưa có mô tả"}
                 </p>
               </div>
 
-              <div className="pt-3 border-t border-stone-100 flex items-center justify-between text-xs">
+              <div className="pt-3 border-t border-stone-100 flex flex-wrap items-center justify-between gap-2 text-xs">
                 <span className="font-medium text-stone-500">
                   {lb.entries.length} bộ phối đính kèm
                 </span>
@@ -345,22 +343,23 @@ export default function CollectionWorkspace() {
                     onClick={() => handleShare(lb.id)}
                     type="button"
                     disabled={isLoading || loadedOwnerId !== user?.id || sharingLookbookId !== null}
-                    className="p-1.5 rounded-lg border border-stone-200 hover:bg-stone-50 text-stone-700 transition-colors disabled:opacity-50"
+                    className="flex h-11 w-11 items-center justify-center rounded-lg border border-stone-200 hover:bg-stone-50 text-stone-700 disabled:opacity-50"
                     title={sharingLookbookId === lb.id ? "Đang tạo liên kết" : "Tạo liên kết chia sẻ"}
                     aria-label={`Tạo liên kết chia sẻ ${lb.title}`}
                   >
-                    <Share2 className={`w-3.5 h-3.5 ${sharingLookbookId === lb.id ? "animate-pulse" : ""}`} />
+                    <Share2 aria-hidden="true" className={`w-4 h-4 ${sharingLookbookId === lb.id ? "animate-pulse" : ""}`} />
                   </button>
 
                   <Link
                     href={`/lookbook/${lb.id}`}
-                    className="px-3 py-1.5 rounded-lg bg-stone-900 hover:bg-heritage-red text-white font-semibold transition-colors"
+                    className={control + ' px-3'}
                   >
-                    Quản lý →
+                    Quản lý
                   </Link>
                 </div>
               </div>
-            </div>
+              </div>
+            </article>
           ))}
         </div>
       )}
@@ -373,7 +372,7 @@ export default function CollectionWorkspace() {
               Tạo Bộ Sưu Tập Lookbook Mới
             </h3>
 
-            <form onSubmit={handleCreateLookbook} className="space-y-4 text-xs">
+            <form onSubmit={handleCreateLookbook} className="space-y-4 text-sm">
               <div className="space-y-1">
                 <label htmlFor="lookbook-title" className="font-semibold text-stone-700">Tên Lookbook *</label>
                 <input
@@ -383,7 +382,7 @@ export default function CollectionWorkspace() {
                   value={newTitle}
                   onChange={(e) => { setNewTitle(e.target.value); setTitleError(null); }}
                   placeholder="Ví dụ: Kỷ yếu Cố đô Huế 2026..."
-                  className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:border-heritage-red"
+                  className={field}
                 />
                 {titleError && <p id="lookbook-title-error" role="alert" className="text-sm text-red-800">{titleError}</p>}
               </div>
@@ -396,7 +395,7 @@ export default function CollectionWorkspace() {
                   onChange={(e) => setNewDesc(e.target.value)}
                   placeholder="Mô tả phong cách, bối cảnh chụp ảnh..."
                   rows={3}
-                  className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:border-heritage-red"
+                  className={field}
                 />
               </div>
 
@@ -406,7 +405,7 @@ export default function CollectionWorkspace() {
                   id="lookbook-visibility" disabled={isCreating}
                   value={newVisibility}
                   onChange={(e) => setNewVisibility(e.target.value as any)}
-                  className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:border-heritage-red bg-stone-50"
+                  className={field}
                 >
                   <option value="unlisted">Người có liên kết (khuyên dùng)</option>
                   <option value="public">Công khai</option>
@@ -427,7 +426,7 @@ export default function CollectionWorkspace() {
                       return (
                         <label
                           key={outfit.id}
-                          className="flex items-center space-x-2 text-stone-800 cursor-pointer"
+                          className="flex min-h-11 items-center space-x-2 text-stone-800 cursor-pointer"
                         >
                           <input
                             type="checkbox"
@@ -444,7 +443,7 @@ export default function CollectionWorkspace() {
                             }}
                             className="rounded border-stone-300 text-heritage-red focus:ring-heritage-red"
                           />
-                          <span className="truncate">{outfit.title}</span>
+                          <span className="truncate">{outfit.title.trim() || "Bộ phối chưa đặt tên"}</span>
                         </label>
                       );
                     })}
@@ -458,14 +457,14 @@ export default function CollectionWorkspace() {
                 <button
                   type="button"
                   onClick={() => setIsCreateOpen(false)} disabled={isCreating}
-                  className="px-4 py-2 border border-stone-300 rounded-lg hover:bg-stone-50"
+                  className={control}
                 >
                   Hủy
                 </button>
                 <button
                   type="submit"
                   disabled={isCreating}
-                  className="px-5 py-2 bg-heritage-red hover:bg-heritage-red-dark text-white rounded-lg font-semibold disabled:opacity-50 transition-colors"
+                  className={primary}
                 >
                   {isCreating ? "Đang tạo..." : "Xác nhận tạo"}
                 </button>

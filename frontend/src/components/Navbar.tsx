@@ -71,7 +71,7 @@ export default function Navbar() {
 
   return (
     <>
-      <header className="sticky top-0 z-50 bg-[#FAF8F5] border-b border-stone-200/80 shadow-xs transition-colors will-change-transform relative">
+      <header className={`site-navbar ${pathname === "/studio" ? "studio-navbar " : ""}sticky top-0 z-50 bg-page border-b border-stone-200/80 shadow-xs transition-colors will-change-transform relative`}>
         {/* Thanh chỉ báo điều hướng tức thì khi người dùng click chuyển trang */}
         {navigatingTo && (
           <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-400 via-heritage-red to-amber-500 animate-shimmer z-50">
@@ -79,8 +79,8 @@ export default function Navbar() {
           </div>
         )}
 
-        <div className="max-w-[1720px] mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
+        <div className="site-navbar-container w-full px-4 sm:px-6 lg:px-8">
+          <div className="site-nav-row flex items-center justify-between h-[58px]">
             {/* Logo Brand VietStylist */}
             <Link
               href="/"
@@ -90,24 +90,25 @@ export default function Navbar() {
               }}
               className="group flex items-center outline-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 border-none"
             >
-              <Logo size="md" />
+              <Logo size="header" className="site-brand" />
             </Link>
 
             {/* Desktop Navigation */}
             <nav className="hidden xl:flex items-center space-x-1 lg:space-x-2">
               {navLinks.map((item) => {
                 const Icon = item.icon;
-                const isActive = pathname === item.href;
+                const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
                 const isNavigatingThis = navigatingTo === item.href;
                 return (
                   <Link
                     key={item.href}
                     href={item.href}
+                    aria-current={isActive ? "page" : undefined}
                     prefetch={true}
                     onClick={() => {
                       if (pathname !== item.href) setNavigatingTo(item.href);
                     }}
-                    className={`flex items-center space-x-1.5 px-3 py-2 rounded-md text-sm font-medium transition-all ${
+                    className={`flex items-center space-x-1.5 px-3 py-2 rounded-md text-[13px] leading-5 font-medium transition-all ${
                       isActive
                         ? "bg-heritage-red/10 text-heritage-red font-semibold border-b-2 border-heritage-red"
                         : isNavigatingThis
@@ -265,15 +266,16 @@ export default function Navbar() {
 
         {/* Mobile menu dropdown */}
         {isMobileMenuOpen && (
-          <nav id="mobile-navigation" aria-label="Điều hướng trên điện thoại" className="xl:hidden max-h-[calc(100dvh-4rem)] overflow-y-auto overscroll-contain border-b border-stone-200 bg-[#FAF8F5] px-4 pt-2 pb-[max(1rem,env(safe-area-inset-bottom))] space-y-1 [&_a]:min-h-11 [&_button]:min-h-11">
+          <nav id="mobile-navigation" aria-label="Điều hướng trên điện thoại" className="xl:hidden max-h-[calc(100dvh-59px)] overflow-y-auto overscroll-contain border-b border-stone-200 bg-page px-4 pt-2 pb-[max(1rem,env(safe-area-inset-bottom))] space-y-1 [&_a]:min-h-11 [&_button]:min-h-11">
             {navLinks.map((item) => {
               const Icon = item.icon;
-              const isActive = pathname === item.href;
+              const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
               const isNavigatingThis = navigatingTo === item.href;
               return (
                 <Link
                   key={item.href}
                   href={item.href}
+                  aria-current={isActive ? "page" : undefined}
                   prefetch={true}
                   onClick={() => {
                     setIsMobileMenuOpen(false);

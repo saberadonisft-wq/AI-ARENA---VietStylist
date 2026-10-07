@@ -64,9 +64,9 @@ export default function ColorAnalysisPanel({
   if (!analysis) return null;
 
   return (
-    <div className="p-3.5 bg-white rounded-xl border border-stone-200 shadow-sm space-y-3 text-xs">
+    <div className="studio-color-analysis studio-panel-section p-3.5 bg-white rounded-xl border border-stone-200 shadow-sm space-y-3 text-xs">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center space-x-1.5 text-stone-900 font-semibold">
           <Palette className="w-3.5 h-3.5 text-heritage-gold" />
           <span>Hài hòa Màu sắc</span>
@@ -85,7 +85,7 @@ export default function ColorAnalysisPanel({
       </div>
 
       {/* Màu chủ đạo & Điểm nhấn */}
-      <div className="flex items-center justify-between bg-stone-50 p-2 rounded-lg border border-stone-200/80">
+      <div className="flex flex-wrap items-center justify-between gap-2 bg-stone-50 p-2 rounded-lg border border-stone-200/80">
         <div className="flex items-center space-x-1.5">
           <span className="text-[11px] text-stone-500 font-medium">Chủ đạo:</span>
           <div
@@ -122,7 +122,7 @@ export default function ColorAnalysisPanel({
             {analysis.suggested_variants.map((sug) => (
               <div
                 key={sug.variant_id}
-                className="flex items-center justify-between p-2 rounded-lg bg-stone-50 border border-stone-200/80 hover:bg-stone-100/60 transition-colors"
+                className="flex flex-wrap items-center justify-between gap-2 p-2 rounded-lg bg-stone-50 border border-stone-200/80 hover:bg-stone-100/60 transition-colors"
               >
                 <div className="flex items-center space-x-2">
                   <div
@@ -135,7 +135,7 @@ export default function ColorAnalysisPanel({
                 {onApplyColorVariant && (
                   <button
                     onClick={() => onApplyColorVariant(sug)}
-                    className="px-2.5 py-1 rounded bg-stone-200/80 hover:bg-heritage-red hover:text-white text-xs font-semibold transition-colors"
+                    className="shrink-0 whitespace-nowrap px-2.5 py-1 rounded bg-stone-200/80 hover:bg-heritage-red hover:text-white text-xs font-semibold transition-colors"
                   >
                     Thử màu
                   </button>

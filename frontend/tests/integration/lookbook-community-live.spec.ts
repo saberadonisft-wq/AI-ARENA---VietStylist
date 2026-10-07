@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { clickStudioAction } from '../helpers/studio-ui';
 
 test('real publications, Studio image upload, idempotent retry, favorites and private revocation across accounts', async ({ page, request, browser }) => {
   test.setTimeout(180000);
@@ -21,9 +22,10 @@ test('real publications, Studio image upload, idempotent retry, favorites and pr
     localStorage.setItem('viet_stylist_user', JSON.stringify({ id: account.user.id, displayName: account.user.display_name, email: account.user.email, roles: ['user'] }));
   }, owner);
   await page.goto('/studio?loadOutfit=' + outfit.id);
-  await expect(page.locator('input').first()).toHaveValue('Bộ phối cộng đồng');
-  await page.getByRole('button', { name: 'Đăng lên Lookbook', exact: true }).click();
+  await expect(page.getByLabel("Tên bản phối", { exact: true })).toHaveValue('Bộ phối cộng đồng');
+  await clickStudioAction(page, 'Đăng lên Lookbook');
   const composer = page.getByRole('dialog', { name: 'Đăng bộ phối' });
+  await expect(composer).toBeVisible({ timeout: 20000 });
   const savedSource = await (await request.get(origin + '/api/outfits/' + outfit.id, { headers: ownerHeaders })).json();
   await expect(composer.getByLabel('Bộ phối đã lưu')).toHaveValue(savedSource.current_version_id);
   await expect(composer.getByLabel('Ai có thể xem?')).toHaveValue('private');
@@ -51,7 +53,15 @@ test('real publications, Studio image upload, idempotent retry, favorites and pr
   expect(publicHtml).toContain('property="og:title"');
   expect(publicHtml).toContain('Áo tấc cộng đồng thử nghiệm · Tác giả');
   const coverResponse = await request.get(publicImage); expect(coverResponse.ok()).toBeTruthy();
-  expect(coverResponse.headers()['cache-control']).toBe('private, no-store');
+  expect(coverResponse.headers()['cache-control']).toBe('private, no-cache, must-revalidate');
+  const publicEtag = coverResponse.headers().etag;
+  expect(publicEtag).toBeTruthy();
+  const unchangedCover = await request.get(publicImage, { headers: { 'If-None-Match': publicEtag } });
+  expect(unchangedCover.status()).toBe(304);
+  expect((await unchangedCover.body()).length).toBe(0);
+  const ownerCover = await request.get(post.image_url);
+  expect(ownerCover.ok()).toBeTruthy();
+  expect(ownerCover.headers()['cache-control']).toBe('private, no-store');
 
   const readerContext = await browser.newContext({ baseURL: 'http://127.0.0.1:3100' });
   await readerContext.addInitScript(account => {
@@ -76,6 +86,7 @@ test('real publications, Studio image upload, idempotent retry, favorites and pr
     await expect(editor).toHaveCount(0);
   };
   await changeVisibility('unlisted');
+  expect((await request.get(publicImage, { headers: { 'If-None-Match': publicEtag } })).status()).toBe(404);
   await page.getByRole('button', { name: 'Chia sẻ', exact: true }).click();
   const shareDialog = page.getByRole('dialog', { name: 'Chia sẻ bộ phối' });
   await shareDialog.getByRole('button', { name: 'Tạo liên kết có thời hạn' }).click();
@@ -88,7 +99,7 @@ test('real publications, Studio image upload, idempotent retry, favorites and pr
   await expect(guest.getByRole('img', { name: 'Bộ phối ' + post.title })).toHaveJSProperty('naturalWidth', 1400);
   await expect(guest.getByRole('button', { name: 'Lưu yêu thích' })).toHaveCount(0);
   await changeVisibility('private');
-  expect((await request.get(publicImage)).status()).toBe(404);
+  expect((await request.get(publicImage, { headers: { 'If-None-Match': publicEtag } })).status()).toBe(404);
   const privateHtml = await (await request.get('http://127.0.0.1:3100/lookbook/bai-dang/' + post.id, { headers: { 'User-Agent': 'facebookexternalhit/1.1' } })).text();
   expect(privateHtml).toContain('noindex');
   expect(privateHtml).not.toContain('Áo tấc cộng đồng thử nghiệm');

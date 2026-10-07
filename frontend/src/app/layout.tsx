@@ -3,6 +3,7 @@ import { Be_Vietnam_Pro, Noto_Serif } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/lib/auth/context";
 import { CatalogProvider } from "@/lib/catalog/CatalogProvider";
+import { StudioDocumentProvider } from "@/features/studio/useStudioDocument";
 import SiteFrame from "@/components/SiteFrame";
 
 const beVietnamPro = Be_Vietnam_Pro({
@@ -43,10 +44,12 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="vi" className={`h-full ${beVietnamPro.variable} ${notoSerif.variable}`}>
-      <body className="flex flex-col min-h-screen bg-[#FAF8F5] text-stone-800 font-sans">
+      <body className="flex flex-col min-h-screen bg-page text-stone-800 font-sans">
         <AuthProvider>
           <CatalogProvider>
-            <SiteFrame>{children}</SiteFrame>
+            <StudioDocumentProvider>
+              <SiteFrame>{children}</SiteFrame>
+            </StudioDocumentProvider>
           </CatalogProvider>
         </AuthProvider>
       </body>

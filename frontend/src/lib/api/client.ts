@@ -257,7 +257,7 @@ export const api = {
   }),
 
   // Outfits & Versions
-  listUserOutfits: () => apiFetch<OutfitResponse[]>("/api/outfits"),
+  listUserOutfits: (signal?: AbortSignal) => apiFetch<OutfitResponse[]>("/api/outfits", { signal }),
   listUserOutfitsPage: (cursor?: string | null, signal?: AbortSignal) => apiFetch<CursorPage<OutfitResponse>>(
     `/api/outfits/page?limit=30${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`, { signal }),
   countUserOutfits: (signal?: AbortSignal) => apiFetch<{ count: number }>("/api/outfits/count", { signal }),
@@ -275,6 +275,7 @@ export const api = {
     body: JSON.stringify(payload),
   }),
   getOutfit: (id: string) => apiFetch<OutfitResponse>(`/api/outfits/${id}`),
+  getOutfitVersion: (id: string, signal?: AbortSignal) => apiFetch<OutfitVersionResponse>(`/api/outfits/versions/${encodeURIComponent(id)}`, { signal }),
   updateOutfit: (id: string, payload: {
     title?: string;
     occasion_id?: string;

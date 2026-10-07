@@ -2,7 +2,7 @@ import React from "react";
 import Image from "next/image";
 
 interface LogoProps {
-  size?: "sm" | "md" | "lg" | "xl";
+  size?: "sm" | "md" | "lg" | "xl" | "header";
   showText?: boolean;
   textColor?: "dark" | "light";
   className?: string;
@@ -16,6 +16,7 @@ export default function Logo({
 }: LogoProps) {
   // Dimension definitions
   const dimensions = {
+    header: { box: "w-9 h-9", text: "text-[19px]", sub: "text-[10.5px]" },
     sm: { box: "w-8 h-8", text: "text-lg", sub: "text-[10px]" },
     md: { box: "w-10 h-10", text: "text-xl", sub: "text-[11px]" },
     lg: { box: "w-12 h-12", text: "text-2xl", sub: "text-xs" },
@@ -53,7 +54,7 @@ export default function Logo({
           <span
             className={`${current.sub} ${
               textColor === "light" ? "text-stone-300" : "text-stone-500"
-            } font-medium tracking-tight block`}
+            } font-medium tracking-tight ${size === "header" ? "hidden md:block" : "block"}`}
           >
             Nền tảng Phối đồ & Di sản Thời trang Việt
           </span>

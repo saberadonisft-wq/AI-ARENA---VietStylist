@@ -369,7 +369,7 @@ export default function GiaiPhapPage() {
 
             {/* Hiển thị danh sách minh chứng khi in */}
             {selectedLookbooks.length > 0 && (
-              <div className="p-3 bg-[#FAF8F5] rounded-xl border border-stone-200 space-y-1">
+              <div className="p-3 bg-page rounded-xl border border-stone-200 space-y-1">
                 <span className="font-semibold text-stone-800">Các bộ sưu tập đính kèm:</span>
                 <ul className="list-disc list-inside space-y-0.5 text-stone-600">
                   {selectedLookbooks.map((ref) => (

@@ -1,6 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
 import { openStudioPanel, openStudioProperties, closeStudioPanels, chooseStudioGarment, clickStudioAction } from "./helpers/studio-ui";
-import { DRAFT_KEY } from "../src/features/studio/state";
 
 // These workflows include navigation and PNG generation after a cold dev compile.
 test.setTimeout(60_000);
@@ -50,8 +49,11 @@ async function fixtures(page: Page, signedIn = true) {
   });
 }
 
-async function draft(page: Page) {
-  return page.evaluate(key => JSON.parse(localStorage.getItem(key) || "null"), DRAFT_KEY);
+async function visibleOutfit(page: Page) {
+  const title = await page.getByLabel("Tên bản phối", { exact: true }).inputValue();
+  const garments = await page.locator('#flatlay-outfit-board [id^="content-"]').evaluateAll(elements => elements.map(element => ({ id: element.id, content: element.innerHTML })));
+  const style = await page.getByRole("group", { name: "Phong cách bản phối", exact: true }).locator('[aria-pressed="true"]').getAttribute("aria-label");
+  return { title, garments, style };
 }
 async function chooseGarment(page: Page) {
   await page.goto("/studio");
@@ -73,8 +75,8 @@ async function focusStaysInside(page: Page) {
 test("export resets after editing and stays scrollable in landscape with keyboard focus contained", async ({ page }) => {
   await fixtures(page);
   await chooseGarment(page);
-  const trigger = page.getByRole("button", { name: "Xuất ảnh", exact: true });
-  await trigger.click();
+  const trigger = page.getByLabel("Thao tác bộ phối", { exact: true });
+  await clickStudioAction(page, "Xuất ảnh");
   let dialog = page.getByRole("dialog", { name: "Xuất ảnh bản phối", exact: true });
   await expect(dialog.getByRole("button", { name: /Story \/ Reels/ })).toHaveAttribute("aria-pressed", "true");
   await expect(dialog.getByRole("button", { name: /Vuông/ })).toHaveAttribute("aria-pressed", "false");
@@ -114,16 +116,16 @@ test("AI model select and other modal controls cannot undo the Studio draft behi
   await page.getByRole("button", { name: "Cách tân hiện đại", exact: true }).click();
   await expect(page.getByRole("button", { name: "Cách tân hiện đại", exact: true })).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByRole("button", { name: "Truyền thống", exact: true })).toHaveAttribute("aria-pressed", "false");
-  const before = await draft(page);
+  const before = await visibleOutfit(page);
   await clickStudioAction(page, "Thử đồ AI");
   const dialog = page.getByRole("dialog", { name: "Thử đồ bằng Gemini" });
   await dialog.locator("select").focus();
   await page.keyboard.press("Control+z");
-  expect(await draft(page)).toEqual(before);
+  expect(await visibleOutfit(page)).toEqual(before);
   await focusStaysInside(page);
   await page.keyboard.press("Escape");
   await expect(dialog).toHaveCount(0);
-  expect(await draft(page)).toEqual(before);
+  expect(await visibleOutfit(page)).toEqual(before);
 });
 
 test("a late PNG from a closed export cannot populate the reopened dialog", async ({ page }) => {
@@ -185,7 +187,8 @@ test("color-analysis failure is recoverable and dominant/accent dots have their 
     ? route.fulfill({ status: 503, json: fail }) : route.fallback());
   await chooseGarment(page);
   await openStudioProperties(page);
-  await expect(page.getByRole("button", { name: "Xanh", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByTitle("Xanh", { exact: true })).toBeVisible();
+  await expect(page.getByTitle("Xanh", { exact: true })).toHaveCSS("background-color", "rgb(26, 54, 93)");
   await openStudioPanel(page, "Màu sắc");
   await expect(page.getByRole("region", { name: "Hài hòa Màu sắc" }).getByRole("alert")).toBeVisible();
   await page.getByRole("button", { name: "Thử lại phân tích màu" }).click();
@@ -242,25 +245,30 @@ test("slot locks are keyboard buttons and weather can add headwear without repla
   await expect(page.getByRole("button", { name: "Mở khóa vị trí khăn vấn", exact: true })).toHaveAttribute("aria-pressed", "true");
   await openStudioPanel(page, "Bối cảnh");
   await add.click();
-  expect((await draft(page)).snapshot.items.map((item: any) => item.slot)).toEqual(["outerwear"]);
+  await expect(page.locator("#content-outerwear")).toHaveCount(1);
+  await expect(page.locator("#content-headwear")).toHaveCount(0);
   await openStudioPanel(page, "Chọn trang phục");
   await page.getByRole("button", { name: "Mở khóa vị trí khăn vấn", exact: true }).click();
   await page.getByRole("button", { name: "Khăn vấn", exact: true }).click();
   await page.getByText("Mũ cũ", { exact: true }).click();
-  const original = (await draft(page)).snapshot.items;
+  await openStudioProperties(page);
+  await expect(page.getByLabel("Trang phục đang điều chỉnh").locator('option[value="headwear"]')).toContainText("Mũ cũ");
+  const original = await visibleOutfit(page);
+  const outerwear = await page.locator("#content-outerwear").innerHTML();
   await openStudioPanel(page, "Bối cảnh");
   await add.click();
   const confirm = page.getByRole("alertdialog", { name: "Thay phụ kiện theo thời tiết?" });
   await confirm.getByRole("button", { name: "Giữ bộ phối" }).click();
-  expect((await draft(page)).snapshot.items).toEqual(original);
+  expect(await visibleOutfit(page)).toEqual(original);
   await openStudioPanel(page, "Bối cảnh");
   await add.click();
   await confirm.getByRole("button", { name: "Thay phụ kiện", exact: true }).click();
-  await expect.poll(async () => (await draft(page)).snapshot.items.find((item: any) => item.slot === "headwear")?.itemId).toBe(items[2].id);
-  expect((await draft(page)).snapshot.items.find((item: any) => item.slot === "outerwear")).toEqual(original.find((item: any) => item.slot === "outerwear"));
+  await openStudioProperties(page);
+  await expect(page.getByLabel("Trang phục đang điều chỉnh").locator('option[value="headwear"]')).toContainText("Khăn đóng");
+  expect(await page.locator("#content-outerwear").innerHTML()).toBe(outerwear);
   await closeStudioPanels(page);
   await page.getByTitle("Hoàn tác (Ctrl+Z)").click();
-  await expect.poll(async () => (await draft(page)).snapshot.items).toEqual(original);
+  await expect.poll(() => visibleOutfit(page)).toEqual(original);
 });
 
 test("Lookbook labels, whitespace validation and server errors stay accessible inside its modal", async ({ page }) => {
@@ -339,6 +347,7 @@ test("account and Lookbook show catalog names, occasion labels and modern-fusion
   await page.goto("/tai-khoan");
   await expect(page.getByText("Cách tân hiện đại", { exact: true })).toBeVisible();
   await expect(page.getByText("Kỷ yếu", { exact: true })).toBeVisible();
+  await page.getByTestId("saved-outfit-card").locator("summary").click();
   await expect(page.getByText(items[0].name, { exact: true })).toBeVisible();
   await expect(page.locator("main")).not.toContainText(items[0].id);
   await expect(page.locator("main")).not.toContainText("modern_fusion");
@@ -353,7 +362,7 @@ test("account and Lookbook show catalog names, occasion labels and modern-fusion
 test("failed Google loading exposes a live error and the Google button actually retries SDK loading", async ({ page }) => {
   await fixtures(page, false);
   let attempts = 0;
-  await page.route("https://accounts.google.com/gsi/client", route => {
+  await page.route("https://accounts.google.com/gsi/client*", route => {
     attempts++;
     return attempts === 1 ? route.abort("failed") : route.fulfill({ contentType: "application/javascript", body: 'window.google = { accounts: { id: { initialize() {}, renderButton(container) { const button = document.createElement("button"); button.textContent = "Google đã tải"; container.appendChild(button); } } } };' });
   });
@@ -367,3 +376,78 @@ test("failed Google loading exposes a live error and the Google button actually 
   await expect(dialog.getByRole("button", { name: "Google đã tải" })).toBeVisible();
   await expect(dialog.getByRole("alert")).toHaveCount(0);
 });
+
+for (const initialWidth of [1280, 375]) {
+  test(`Google button keeps its frame during delayed loading, reopening and resizing from ${initialWidth}px`, async ({ page }) => {
+    await fixtures(page, false);
+    await page.setViewportSize({ width: initialWidth, height: 812 });
+    let releaseSdk!: () => void;
+    const sdkReady = new Promise<void>(resolve => { releaseSdk = resolve; });
+    await page.route("https://accounts.google.com/gsi/client*", async route => {
+      await sdkReady;
+      await route.fulfill({ contentType: "application/javascript", body: `
+        window.google = { accounts: { id: {
+          initialize() {},
+          renderButton(container, options) {
+            const button = document.createElement("div");
+            button.setAttribute("role", "button");
+            button.tabIndex = 0;
+            button.textContent = options.locale === "en" ? "Continue with Google" : "Nhãn Google theo ngôn ngữ trình duyệt";
+            Object.assign(button.style, {
+              width: options.width + "px", height: "40px", boxSizing: "border-box",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              border: "1px solid #747775", borderRadius: "4px", fontSize: "14px"
+            });
+            container.appendChild(button);
+          }
+        } } };
+      ` });
+    });
+    await page.goto("/lookbook");
+    const openDialog = async () => {
+      if (page.viewportSize()!.width < 1024) {
+        await page.getByRole("button", { name: "Mở menu điều hướng" }).click();
+      }
+      await page.getByRole("button", { name: "Đăng nhập", exact: true }).last().click();
+    };
+    await openDialog();
+    const dialog = page.getByRole("dialog", { name: "Đăng nhập hoặc tạo tài khoản" });
+    const frame = dialog.getByTestId("google-sign-in");
+    const fallback = dialog.locator("button", { hasText: "Continue with Google" });
+    await expect(fallback).toBeVisible();
+    const before = await frame.boundingBox();
+    expect(before).not.toBeNull();
+    expect(before!.width).toBeLessThanOrEqual(380);
+    expect((await fallback.boundingBox())!.width).toBe(before!.width);
+    const emailY = (await dialog.getByLabel("Địa chỉ Email").boundingBox())!.y;
+
+    releaseSdk();
+    const googleButton = dialog.getByRole("button", { name: "Continue with Google", exact: true });
+    await expect(googleButton).toBeVisible();
+    await expect(fallback).toHaveCount(0);
+    expect(await frame.boundingBox()).toEqual(before);
+    expect((await googleButton.boundingBox())!.width).toBe(Math.floor(before!.width));
+    expect((await dialog.getByLabel("Địa chỉ Email").boundingBox())!.y).toBe(emailY);
+
+    await dialog.getByRole("button", { name: "Đóng cửa sổ đăng nhập" }).click();
+    await openDialog();
+    await expect(googleButton).toBeVisible();
+    expect((await frame.boundingBox())!.width).toBe(before!.width);
+    expect((await googleButton.boundingBox())!.width).toBe(Math.floor(before!.width));
+
+    for (const width of [320, 667, 1280]) {
+      await page.setViewportSize({ width, height: width === 667 ? 375 : 812 });
+      await expect.poll(async () => {
+        const buttonBounds = await googleButton.boundingBox();
+        const frameBounds = await frame.boundingBox();
+        return buttonBounds && frameBounds ? buttonBounds.width - Math.floor(frameBounds.width) : null;
+      }).toBe(0);
+      await expect(googleButton).toBeVisible();
+      const bounds = (await googleButton.boundingBox())!;
+      expect(bounds.x).toBeGreaterThanOrEqual(0);
+      expect(bounds.x + bounds.width).toBeLessThanOrEqual(width);
+      expect(bounds.width).toBeLessThanOrEqual(380);
+    }
+    await dialog.screenshot({ path: test.info().outputPath(`google-button-${initialWidth}.png`) });
+  });
+}

@@ -31,7 +31,7 @@ export default function WeatherWidget({ onApplyWeatherSuggestion }: {
     return () => { active = false; };
   }, [selectedCity, retry]);
   const data = result?.city === selectedCity ? result.data : null;
-  return <section aria-label="Thời tiết và bối cảnh" aria-busy={isLoading} className="p-3.5 bg-white rounded-xl border border-stone-200 shadow-sm space-y-2.5 text-xs">
+  return <section aria-label="Thời tiết và bối cảnh" aria-busy={isLoading} className="studio-weather studio-panel-section p-3.5 bg-white rounded-xl border border-stone-200 shadow-sm space-y-2.5 text-xs">
     <div className="flex flex-wrap items-center justify-between gap-2">
       <h3 className="flex items-center gap-1.5 text-stone-700 font-semibold"><MapPin aria-hidden="true" className="w-3.5 h-3.5 text-heritage-red" />Thời tiết &amp; Bối cảnh</h3>
       <select aria-label="Thành phố xem thời tiết" value={selectedCity}

@@ -136,7 +136,7 @@ export function LookbookCardSkeleton() {
  */
 export function StarterOutfitCardSkeleton() {
   return (
-    <div className="p-4 rounded-xl border border-stone-200 bg-[#FAF8F5] flex flex-col justify-between space-y-3">
+    <div className="p-4 rounded-xl border border-stone-200 bg-page flex flex-col justify-between space-y-3">
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <Skeleton className="h-5 w-1/2 rounded-md" />

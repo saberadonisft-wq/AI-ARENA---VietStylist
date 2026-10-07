@@ -1,7 +1,7 @@
 "use client";
 
 import { createPortal } from "react-dom";
-import React, { useRef, useImperativeHandle, forwardRef, useState, useEffect, useLayoutEffect } from "react";
+import React, { useRef, useImperativeHandle, forwardRef, useState, useEffect, useLayoutEffect, useId } from "react";
 import { Avatar, AssetLayer, SnapshotItem, CatalogItem } from "@/lib/types/api";
 import { API_ORIGIN } from "@/lib/api/client";
 import BoardBackground from "./BoardBackground";
@@ -56,6 +56,8 @@ export interface Canvas2DProps {
   onTransformsCommit?: (changes: Record<string, ItemTransform | undefined>) => void;
   onColorLoadFailure?: (itemId: string, colorHex: string) => void;
   className?: string;
+  readOnly?: boolean;
+  ariaLabel?: string;
   controlsContainer?: HTMLElement | null;
   toolbarLeading?: React.ReactNode;
   toolbarTrailing?: React.ReactNode;
@@ -74,6 +76,14 @@ interface ItemGeometry {
   defaultRotation: number;
   zIndex: number;
   label: string;
+}
+
+function scopeSvgIds(source: string, prefix: string): string {
+  const ids = new Set(Array.from(source.matchAll(/\sid\s*=\s*(["'])([^"']+)\1/g), match => match[2]));
+  return source
+    .replace(/(\s)id\s*=\s*(["'])([^"']+)\2/g, (_, space, quote, id) => `${space}id=${quote}${prefix}-${id}${quote}`)
+    .replace(/url\(\s*(["']?)#([^\s)'"]+)\1\s*\)/g, (match, _quote, id) => ids.has(id) ? `url(#${prefix}-${id})` : match)
+    .replace(/(\s(?:xlink:)?href\s*=\s*)(["'])#([^"']+)\2/g, (match, attribute, quote, id) => ids.has(id) ? `${attribute}${quote}#${prefix}-${id}${quote}` : match);
 }
 
 // Bảng tọa độ và vùng bao (Bounding Box) chuẩn xác cho từng hiện vật thực tế trên khung 800 x 1200
@@ -355,12 +365,17 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
       onTransformsCommit,
       onColorLoadFailure,
       className = "",
+      readOnly = false,
+      ariaLabel,
       controlsContainer,
       toolbarLeading,
       toolbarTrailing,
     },
     ref
   ) => {
+    const instanceId = useId().replaceAll(":", "");
+    const svgId = (id: string) => readOnly ? `${instanceId}-${id}` : id;
+    const shadowFilter = `url(#${svgId("flatlayDropShadow")})`;
     const containerRef = useRef<HTMLDivElement | null>(null);
     const viewportRef = useRef<HTMLDivElement | null>(null);
     const zoomAnchorRef = useRef({ x: 0.5, y: 0.5 });
@@ -510,6 +525,7 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
     };
 
     useEffect(() => {
+      if (readOnly) return;
       const artboard = svgRef.current;
       if (!artboard) return;
       // SVG descendants do not consistently suppress browser scrolling with CSS
@@ -523,7 +539,7 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
       };
       artboard.addEventListener("touchstart", preventGarmentScroll, { passive: false });
       return () => artboard.removeEventListener("touchstart", preventGarmentScroll);
-    }, []);
+    }, [readOnly]);
 
     useEffect(() => () => { cancelAnimationFrame(pointerFrame.current); }, []);
 
@@ -569,7 +585,7 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
     // One pointer owns the gesture; a second finger must not move or finish it.
     const startGesture = (e: React.PointerEvent, slot: string, type: DragSession["type"]) => {
       e.stopPropagation();
-      if (dragSessionRef.current || !e.isPrimary || e.button !== 0) return;
+      if (readOnly || dragSessionRef.current || !e.isPrimary || e.button !== 0) return;
       setActiveSlot(slot);
       onSelectItem?.(slot);
       if (lockedSlots.includes(slot)) return;
@@ -610,7 +626,7 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
       }
       transformsRef.current = { ...transformsRef.current, [session.slot]: next };
       const transform = `translate(${geom.cx + next.dx}, ${geom.cy + next.dy}) rotate(${next.rotation}) scale(${next.scale}) translate(${-geom.cx}, ${-geom.cy})`;
-      // Update only the moving SVG groups; persist one document on release.
+      // Update only the moving SVG groups; commit one undo step on release.
       svgRef.current?.getElementById(`item-transform-${session.slot}`)?.setAttribute("transform", transform);
       svgRef.current?.getElementById(`selection-overlay-${session.slot}`)?.setAttribute("transform", transform);
       const group = svgRef.current?.getElementById(`item-transform-${session.slot}`);
@@ -652,6 +668,7 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
     };
 
     useEffect(() => {
+      if (readOnly) return;
       const handleGlobalPointerUp = (event: PointerEvent) => finishGesture(event);
       const handleBlur = () => finishGesture(undefined, true);
       window.addEventListener("pointerup", handleGlobalPointerUp);
@@ -660,7 +677,7 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
         window.removeEventListener("pointerup", handleGlobalPointerUp);
         window.removeEventListener("blur", handleBlur);
       };
-    }, [dragSession, onTransformsCommit]);
+    }, [dragSession, onTransformsCommit, readOnly]);
 
     const resetSlotTransform = (slot: string) => {
       if (lockedSlots.includes(slot)) return;
@@ -836,6 +853,9 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
         ? colorLoadFailed ? imageUrlFor(dbItem) : undefined
         : candidateImageUrl;
       const customHex = eq.colorHex;
+      const layerSvg = layer?.svg_content
+        ? customHex ? layer.svg_content.replaceAll("VAR_COLOR_PRIMARY", customHex) : layer.svg_content
+        : "";
 
       // Tâm quay và co dãn chính xác của món này
       const cx = geom.cx;
@@ -849,14 +869,14 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
       const transformString = `translate(${cx + t.dx}, ${cy + t.dy}) rotate(${t.rotation}) scale(${t.scale}) translate(${-cx}, ${-cy})`;
 
       return (
-        <g key={eq.itemId} id={`interactive-slot-${eq.slot}`}>
-          <g id={`item-transform-${eq.slot}`} transform={transformString}>
+        <g key={eq.itemId} id={svgId(`interactive-slot-${eq.slot}`)}>
+          <g id={svgId(`item-transform-${eq.slot}`)} transform={transformString}>
             {/* Lớp chứa nội dung trang phục: Kéo để di chuyển, Nhấp để chọn */}
             <g
-              id={`content-${eq.slot}`}
-              data-studio-drag={!lockedSlots.includes(eq.slot)}
-              className={`${lockedSlots.includes(eq.slot) ? "cursor-pointer" : "cursor-move"} select-none [&_*]:[touch-action:inherit]`}
-              style={{ touchAction: lockedSlots.includes(eq.slot) ? "auto" : "none" }}
+              id={svgId(`content-${eq.slot}`)}
+              data-studio-drag={!readOnly && !lockedSlots.includes(eq.slot)}
+              className={`${readOnly ? "" : lockedSlots.includes(eq.slot) ? "cursor-pointer" : "cursor-move"} select-none [&_*]:[touch-action:inherit]`}
+              style={{ touchAction: readOnly || lockedSlots.includes(eq.slot) ? "auto" : "none" }}
               onPointerDown={(e) => startGesture(e, eq.slot, "move")}
             >
               {/* 1. Ảnh thật bóc tách (Cloudflare R2 / Public) */}
@@ -869,24 +889,22 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
                   width={w}
                   height={h}
                   preserveAspectRatio="xMidYMid meet"
-                  filter="url(#flatlayDropShadow)"
+                  filter={shadowFilter}
                 />
               ) : layer?.svg_content ? (
                 /* 2. Lớp vẽ SVG */
                 <g
-                  filter="url(#flatlayDropShadow)"
+                  filter={shadowFilter}
                   style={{
                     ['--layer-color' as any]: customHex || undefined,
                   }}
                   dangerouslySetInnerHTML={{
-                    __html: customHex
-                      ? layer.svg_content.replaceAll("VAR_COLOR_PRIMARY", customHex)
-                      : layer.svg_content,
+                    __html: readOnly ? scopeSvgIds(layerSvg, `${instanceId}-${eq.slot}`) : layerSvg,
                   }}
                 />
               ) : null}
             </g>
-            {garmentImageUrl && <DragShadowImage url={garmentImageUrl} x={x} y={y} width={w} height={h} />}
+            {!readOnly && garmentImageUrl && <DragShadowImage url={garmentImageUrl} x={x} y={y} width={w} height={h} />}
           </g>
         </g>
       );
@@ -1099,7 +1117,7 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
     };
     const controlButton = "flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-lg border border-stone-200 bg-white px-2 text-sm font-medium text-stone-800 hover:bg-stone-100 active:bg-stone-200 disabled:opacity-40 touch-manipulation";
 
-    const transformControls = viewMode === "flatlay" && equippedItems.length > 0 ? (<section aria-label="Điều chỉnh trang phục" className="studio-transform-controls space-y-2 rounded-xl border border-stone-200 bg-white p-3">
+    const transformControls = !readOnly && viewMode === "flatlay" && equippedItems.length > 0 ? (<section aria-label="Điều chỉnh trang phục" className="studio-transform-controls space-y-2 rounded-xl border border-stone-200 bg-white p-3">
           <div className="studio-selection-row flex items-center gap-2">
             <select aria-label="Trang phục đang điều chỉnh" value={selectedEq?.slot || ""}
               onChange={event => { setActiveSlot(event.target.value); onSelectItem?.(event.target.value); }}
@@ -1144,12 +1162,13 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
         </section>) : null;
 
     return (
-      <div className={`studio-canvas min-w-0 space-y-2 ${className}`}>
-      <div className="studio-artboard-stage" style={{
+      <div className={`${readOnly ? "h-full" : "studio-canvas space-y-2"} min-w-0 ${className}`}
+        style={readOnly ? { aspectRatio: aspectRatio === "1:1" ? "1 / 1" : "9 / 16", maxWidth: "100%" } : undefined}>
+      <div className={readOnly ? "h-full" : "studio-artboard-stage"} style={{
         "--studio-artboard-ratio": aspectRatio === "1:1" ? 1 : 9 / 16,
         "--studio-board-zoom": boardZoom,
       } as React.CSSProperties}>
-      <div role="group" aria-label="Thu phóng bảng phối" className="studio-board-zoom">
+      {!readOnly && <div role="group" aria-label="Thu phóng bảng phối" className="studio-board-zoom">
         {toolbarLeading}
         <button type="button" aria-label="Thu nhỏ bảng phối" disabled={boardZoom <= 0.5 || !!dragSession}
           onClick={() => changeBoardZoom(boardZoom - 0.25)}><ZoomOut size={16} /></button>
@@ -1158,14 +1177,14 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
           onClick={() => changeBoardZoom(boardZoom + 0.25)}><ZoomIn size={16} /></button>
         <button type="button" disabled={!!dragSession} onClick={() => changeBoardZoom(1)} className="studio-board-fit">Vừa khung</button>
         {toolbarTrailing}
-      </div>
-      <div ref={viewportRef} className="studio-artboard-viewport" data-zoomed={boardZoom > 1}
-        role="region" aria-label="Vùng xem bảng phối" tabIndex={0}>
-      <div className="studio-artboard-surface">
+      </div>}
+      <div ref={viewportRef} className={readOnly ? "h-full" : "studio-artboard-viewport"} data-zoomed={boardZoom > 1}
+        role={readOnly ? undefined : "region"} aria-label={readOnly ? undefined : "Vùng xem bảng phối"} tabIndex={readOnly ? undefined : 0}>
+      <div className={readOnly ? "h-full" : "studio-artboard-surface"}>
       <div
         ref={containerRef}
         data-testid="outfit-artboard"
-        className={`studio-artboard relative mx-auto flex max-h-[60svh] flex-col items-center justify-center rounded-lg overflow-hidden border border-stone-300 shadow-sm select-none transition-colors duration-300 ${
+        className={`${readOnly ? "h-full" : "studio-artboard max-h-[60svh] rounded-lg border border-stone-300 shadow-sm"} relative mx-auto flex flex-col items-center justify-center overflow-hidden select-none transition-colors duration-300 ${
           backgroundTheme === "white" ? "bg-white" : "bg-[#FAF8F5]"
         }`}
         style={{
@@ -1191,6 +1210,8 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
         {/* SVG Artboard chuẩn 800 x 1200 px */}
         <svg
           ref={svgRef}
+          role={readOnly ? "img" : undefined}
+          aria-label={readOnly ? ariaLabel || "Ảnh bộ phối" : undefined}
           viewBox="0 0 800 1200"
           className="w-full h-full object-contain relative z-10"
           style={{ touchAction: boardZoom > 1 ? "pan-x pan-y pinch-zoom" : "pan-y pinch-zoom" }}
@@ -1200,7 +1221,7 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
           }}
         >
           <defs>
-            <filter id="flatlayDropShadow" x="-30%" y="-30%" width="160%" height="160%">
+            <filter id={svgId("flatlayDropShadow")} x="-30%" y="-30%" width="160%" height="160%">
               <feDropShadow dx="0" dy="14" stdDeviation="16" floodColor="#1A202C" floodOpacity="0.10" />
               <feDropShadow dx="0" dy="4" stdDeviation="6" floodColor="#1A202C" floodOpacity="0.06" />
             </filter>
@@ -1208,7 +1229,7 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
 
           {/* CHẾ ĐỘ 1: BẢNG PHỐI ĐỒ FLAT-LAY (OOTD COLLAGE) */}
           {viewMode === "flatlay" ? (
-            <g id="flatlay-outfit-board">
+            <g id={svgId("flatlay-outfit-board")}>
               {/* Render tất cả các lớp đồ theo thứ tự z-index */}
               {equippedItems
                 .slice()
@@ -1220,7 +1241,7 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
                 .map((eq) => renderInteractiveItem(eq))}
 
               {/* Lớp khung điều khiển của món đang chọn (luôn nằm trên cùng, không bị món khác che khuất) */}
-              {selectedEq && renderSelectionControls(selectedEq)}
+              {!readOnly && selectedEq && renderSelectionControls(selectedEq)}
             </g>
           ) : (
             /* CHẾ ĐỘ 2: NGƯỜI MẪU 2D (AVATAR STUDIO) */
@@ -1274,8 +1295,8 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
           const url = imageUrlFor(getItemInfo(item.itemId), item.colorHex, item.colorSourceVersion, item.colorAlgorithmVersion);
           return Boolean(url && imageErrors[item.itemId] === url);
         }) && (
-          <div role="alert" className="absolute left-3 top-3 z-20 flex items-center gap-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800 shadow">
-            <span>{equippedItems.some(item => imageErrors[item.itemId]?.includes("color=")) ? "Không tải được ảnh đổi màu; canvas đang giữ ảnh gốc. Hãy kiểm tra kết nối, thử lại hoặc khôi phục màu gốc trước khi xuất." : "Không tải được ảnh trang phục. Kiểm tra backend hoặc kết nối rồi thử lại."}</span>
+          <div role="alert" className={`absolute z-20 flex gap-2 rounded-lg bg-red-50 px-3 py-2 text-red-800 shadow ${readOnly ? "inset-x-2 top-2 flex-col items-start text-xs" : "left-3 top-3 items-center text-sm"}`}>
+            <span>{readOnly ? "Chưa tải được một số ảnh trang phục." : equippedItems.some(item => imageErrors[item.itemId]?.includes("color=")) ? "Không tải được ảnh đổi màu; canvas đang giữ ảnh gốc. Hãy kiểm tra kết nối, thử lại hoặc khôi phục màu gốc trước khi xuất." : "Không tải được ảnh trang phục. Kiểm tra backend hoặc kết nối rồi thử lại."}</span>
             <button type="button" onClick={() => setImageRetry(value => value + 1)} className="shrink-0 rounded border border-red-300 bg-white px-2 py-1 font-semibold hover:bg-red-100">Thử lại ảnh</button>
           </div>
         )}

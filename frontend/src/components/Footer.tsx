@@ -8,7 +8,7 @@ import Logo from "@/components/Logo";
 export default function Footer() {
 
   return (
-    <footer className="bg-[#F5EFEB] border-t border-stone-300/80 text-stone-700 py-10 mt-auto">
+    <footer className="bg-page border-t border-stone-300/80 text-stone-700 py-10 mt-auto">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           {/* Cột 1: Thông tin dự án */}

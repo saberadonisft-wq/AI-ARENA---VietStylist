@@ -4,9 +4,11 @@ import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth/context";
 import { api, ApiError } from "@/lib/api/client";
-import { HeritageArticle, CatalogItem } from "@/lib/types/api";
+import { HeritageArticle } from "@/lib/types/api";
+import { useCatalog } from "@/lib/catalog/CatalogProvider";
 import AuthModal from "@/components/AuthModal";
 import StoryImagePicker, { DraftStoryImage } from "@/features/heritage/StoryImagePicker";
+import StoryCover from "@/features/heritage/StoryCover";
 import { validateStoryText, uploadStoryDraftImages } from "@/features/heritage/storyDraft";
 import { useConfirmDialog } from "@/components/ui/ConfirmDialog";
 import {
@@ -47,7 +49,6 @@ export default function ChuyenCoPhucPage() {
   const { confirm, dialog } = useConfirmDialog();
 
   const [articles, setArticles] = useState<HeritageArticle[]>([]);
-  const [catalogItems, setCatalogItems] = useState<CatalogItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const articleRequestGeneration = useRef(0);
   const [articleLoadError, setArticleLoadError] = useState<string | null>(null);
@@ -77,6 +78,7 @@ export default function ChuyenCoPhucPage() {
   const submittingRef = useRef(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const { catalogItems, itemsLoading, itemsLoaded, itemsError, refreshCatalog } = useCatalog({ enabled: showCreateModal });
 
   // Form states for creating a new story
   const [newTitle, setNewTitle] = useState("");
@@ -176,13 +178,6 @@ export default function ChuyenCoPhucPage() {
       if (generation === articleRequestGeneration.current) setIsLoading(false);
     }
   };
-
-  // Fetch catalog items for the garment selector dropdown
-  useEffect(() => {
-    api.getAllCatalogItems()
-      .then((items) => setCatalogItems(items || []))
-      .catch(() => {});
-  }, []);
 
   useEffect(() => {
     fetchArticles();
@@ -299,7 +294,7 @@ export default function ChuyenCoPhucPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#FAF8F5] pb-24 text-stone-800">
+    <div className="min-h-screen bg-page pb-24 text-stone-800">
       {/* Hero Header Section */}
       <section className="border-b border-stone-200/90 bg-white/70 backdrop-blur-sm pt-12 pb-14 px-4 sm:px-6 lg:px-8">
         <div className="max-w-6xl mx-auto text-center space-y-4">
@@ -460,11 +455,7 @@ export default function ChuyenCoPhucPage() {
                 {/* Image Banner / Illustration */}
                 <div className="relative aspect-[16/10] bg-gradient-to-br from-stone-900 via-stone-800 to-red-950 overflow-hidden">
                   {article.cover_image_url && !article.cover_image_url.includes(".example") ? (
-                    <img
-                      src={article.cover_image_url}
-                      alt={article.title}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 opacity-90 group-hover:opacity-100"
-                    />
+                    <StoryCover src={article.cover_image_url} title={article.title} />
                   ) : (
                     <div className="w-full h-full flex flex-col items-center justify-center p-6 text-center relative">
                       <div className="w-14 h-14 rounded-full bg-white/10 flex items-center justify-center text-amber-300 mb-2 border border-white/15">
@@ -541,7 +532,7 @@ export default function ChuyenCoPhucPage() {
       {/* Reader Modal (Đọc chi tiết câu chuyện phong cách Tạp chí) */}
       {selectedArticle && (
         <div className="fixed inset-0 z-[110] bg-stone-900/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 overflow-y-auto animate-in fade-in duration-200">
-          <div className="bg-[#FAF8F5] max-w-3xl w-full rounded-2xl shadow-2xl border border-stone-300 overflow-hidden my-auto max-h-[90vh] flex flex-col">
+          <div className="bg-page max-w-3xl w-full rounded-2xl shadow-2xl border border-stone-300 overflow-hidden my-auto max-h-[90vh] flex flex-col">
             {/* Modal Header */}
             <div className="bg-white px-6 py-4 border-b border-stone-200 flex items-center justify-between shrink-0">
               <div className="flex items-center space-x-2">
@@ -852,17 +843,31 @@ export default function ChuyenCoPhucPage() {
                   Trang phục liên quan (trong Studio)
                 </label>
                 <select
+                  aria-label="Trang phục liên quan"
+                  aria-describedby={itemsError ? "story-catalog-error" : undefined}
                   value={newRelatedGarment}
                   onChange={(e) => setNewRelatedGarment(e.target.value)}
                   className="w-full px-3 py-2 text-xs rounded-xl border border-stone-300 bg-white focus:outline-none focus:border-heritage-red"
                 >
                   <option value="">-- Không chọn (Bài viết chung) --</option>
+                  {newRelatedGarment && !catalogItems.some(item => item.id === newRelatedGarment) && (
+                    <option value={newRelatedGarment}>Trang phục đã liên kết</option>
+                  )}
                   {catalogItems.map((item) => (
                     <option key={item.id} value={item.id}>
                       {item.name} ({item.era || "Cổ phục"})
                     </option>
                   ))}
                 </select>
+                {(itemsLoading || !itemsLoaded) && !itemsError && (
+                  <p role="status" className="mt-1 text-xs text-stone-500">Đang tải danh sách trang phục…</p>
+                )}
+                {itemsError && (
+                  <p id="story-catalog-error" role="alert" className="mt-1 text-xs text-red-700">
+                    Chưa tải được danh sách trang phục.{' '}
+                    <button type="button" onClick={() => void refreshCatalog()} className="underline">Thử lại</button>
+                  </p>
+                )}
               </div>
 
               <div>

@@ -44,7 +44,7 @@ export default function StylistWorkspacePage() {
     </main>;
   }
 
-  return <main className="min-h-[calc(100vh-4rem)] bg-[#FAF8F5] px-4 py-8 sm:px-6 lg:px-8">
+  return <main className="min-h-[calc(100vh-4rem)] bg-page px-4 py-8 sm:px-6 lg:px-8">
     <div className="mx-auto max-w-7xl space-y-6">
       <header className="flex flex-col gap-4 border-b border-stone-200 pb-6 sm:flex-row sm:items-end sm:justify-between">
         <div>

@@ -10,6 +10,7 @@ export interface StudioDraft extends StudioDocument {
   savedDocument?: StudioDocument;
   createIdempotencyKey?: string;
   createDocument?: StudioDocument;
+  createAsNew?: boolean;
 }
 export interface StudioHistory {
   past: StudioDocument[];
@@ -105,6 +106,7 @@ export function parseDraft(raw: string | null): StudioDraft | null {
       createIdempotencyKey: typeof data.createIdempotencyKey === "string" && /^[A-Za-z0-9._:-]{8,128}$/.test(data.createIdempotencyKey)
         ? data.createIdempotencyKey
         : legacyCreateKey,
-      createDocument: createRecord ? parseDraft(JSON.stringify({ title: createRecord.title, snapshot: createRecord.snapshot })) || undefined : undefined };
+      createDocument: createRecord ? parseDraft(JSON.stringify({ title: createRecord.title, snapshot: createRecord.snapshot })) || undefined : undefined,
+      createAsNew: data.createAsNew === true ? true : undefined };
   } catch { return null; }
 }

@@ -1,37 +1,8 @@
 import type { OutfitSnapshot } from "@/lib/types/api";
 import type { OutfitResponse } from "@/lib/types/api";
-import { DRAFT_KEY, parseDraft } from "./state";
+import { ApiError } from "@/lib/api/client";
 import { sameDocument } from "./state";
 import type { StudioDocument, StudioDraft } from "./state";
-
-export function ownerDraftKey(ownerId: string): string {
-  return `${DRAFT_KEY}:${ownerId}`;
-}
-
-export function readStudioDraft(key: string): StudioDraft | null {
-  if (typeof window === "undefined") return null;
-  return parseDraft(window.localStorage.getItem(key));
-}
-
-export function writeStudioDraft(key: string, draft: StudioDraft): boolean {
-  if (typeof window === "undefined") return false;
-  try {
-    window.localStorage.setItem(key, JSON.stringify(draft));
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-export function removeStudioDraft(key: string): boolean {
-  if (typeof window === "undefined") return false;
-  try {
-    window.localStorage.removeItem(key);
-    return true;
-  } catch {
-    return false;
-  }
-}
 
 export interface OutfitSavePayload {
   title: string;
@@ -56,7 +27,7 @@ export function newSaveIdempotencyKey(): string {
 }
 
 export type OutfitSaveIdentity = Pick<StudioDraft,
-  "ownerId" | "outfitId" | "revision" | "savedDocument" | "createIdempotencyKey" | "createDocument"
+  "ownerId" | "outfitId" | "revision" | "savedDocument" | "createIdempotencyKey" | "createDocument" | "createAsNew"
 >;
 
 export interface SaveOutfitDocumentOptions {
@@ -65,12 +36,24 @@ export interface SaveOutfitDocumentOptions {
   asNew?: boolean;
   create: (payload: OutfitSavePayload, idempotencyKey: string) => Promise<OutfitResponse>;
   update: (id: string, payload: OutfitSavePayload & { revision: number }) => Promise<OutfitResponse>;
-  onPendingCreate?: (identity: OutfitSaveIdentity) => void;
+  onCheckpoint?: (identity: OutfitSaveIdentity) => void;
+}
+
+function savedIdentity(ownerId: string | undefined, saved: OutfitResponse, submitted: StudioDocument): OutfitSaveIdentity {
+  return {
+    ownerId,
+    outfitId: saved.id,
+    revision: saved.revision,
+    savedDocument: { title: saved.title, snapshot: saved.current_snapshot || submitted.snapshot },
+    createIdempotencyKey: undefined,
+    createDocument: undefined,
+    createAsNew: undefined,
+  };
 }
 
 /**
- * One save policy for Studio and Account: revision guarded updates, durable
- * idempotent creates, and recovery of a create whose response was lost.
+ * Studio's server-save policy: revision guarded updates, idempotent creates,
+ * and retrying an uncertain create while its receipt remains in page memory.
  */
 export async function saveOutfitDocument({
   document,
@@ -78,20 +61,45 @@ export async function saveOutfitDocument({
   asNew = false,
   create,
   update,
-  onPendingCreate,
+  onCheckpoint,
 }: SaveOutfitDocumentOptions): Promise<{ saved: OutfitResponse; identity: OutfitSaveIdentity; submitted: StudioDocument }> {
   const submitted = structuredClone(document);
   const payload = toOutfitSavePayload(submitted);
   let meta = { ...identity };
   let saved: OutfitResponse | null = null;
+  const checkpoint = (next: OutfitSaveIdentity) => {
+    meta = next;
+    onCheckpoint?.(meta);
+  };
 
   if (meta.createIdempotencyKey && meta.createDocument) {
-    onPendingCreate?.(meta);
+    onCheckpoint?.(meta);
     const createDocument = meta.createDocument;
-    const recovered = await create(toOutfitSavePayload(createDocument), meta.createIdempotencyKey);
-    saved = sameDocument(createDocument, submitted)
-      ? recovered
-      : await update(recovered.id, { ...payload, revision: recovered.revision });
+    // A retry of a pending "save as new" reuses that create; requesting a new
+    // copy of a pending ordinary save must leave the first outfit untouched.
+    const separateCopy = asNew && !meta.createAsNew;
+    let recovered: OutfitResponse | null = null;
+    try {
+      recovered = await create(toOutfitSavePayload(createDocument), meta.createIdempotencyKey);
+    } catch (err) {
+      if (!(err instanceof ApiError) || err.statusCode !== 409 ||
+          !["REVISION_CONFLICT", "OUTFIT_DELETED"].includes(err.code) ||
+          typeof err.details?.outfit_id !== "string" || err.details?.revision !== 1) throw err;
+      // The create succeeded, even though its result has since changed. Keep
+      // its original revision so the conflict UI can load it without overwriting.
+      checkpoint({
+        ownerId: meta.ownerId, outfitId: err.details.outfit_id, revision: 1,
+        savedDocument: createDocument, createIdempotencyKey: undefined,
+        createDocument: undefined, createAsNew: undefined,
+      });
+      if (!separateCopy) throw err;
+    }
+    if (recovered) {
+      checkpoint(savedIdentity(meta.ownerId, recovered, createDocument));
+      if (!separateCopy) saved = sameDocument(createDocument, submitted)
+        ? recovered
+        : await update(recovered.id, { ...payload, revision: recovered.revision });
+    }
   }
 
   const creating = asNew || !meta.outfitId;
@@ -102,8 +110,7 @@ export async function saveOutfitDocument({
 
   if (!saved) {
     if (!meta.createIdempotencyKey || !meta.createDocument || !sameDocument(meta.createDocument, submitted)) {
-      meta = { ...meta, createIdempotencyKey: newSaveIdempotencyKey(), createDocument: submitted };
-      onPendingCreate?.(meta);
+      checkpoint({ ...meta, createIdempotencyKey: newSaveIdempotencyKey(), createDocument: submitted, createAsNew: asNew || undefined });
     }
     saved = await create(toOutfitSavePayload(meta.createDocument || submitted), meta.createIdempotencyKey!);
   }
@@ -111,14 +118,6 @@ export async function saveOutfitDocument({
   return {
     saved,
     submitted,
-    identity: {
-      ownerId: meta.ownerId,
-      outfitId: saved.id,
-      revision: saved.revision,
-      savedDocument: {
-        title: saved.title,
-        snapshot: saved.current_snapshot || submitted.snapshot,
-      },
-    },
+    identity: savedIdentity(meta.ownerId, saved, submitted),
   };
 }

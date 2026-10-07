@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from "react";
 import { api } from "@/lib/api/client";
 import { AuthUser, AuthResponse } from "@/lib/types/api";
+import { clearLegacyOutfitStorage } from "@/features/studio/deviceStorage";
 
 export interface User {
   id: string;
@@ -77,8 +78,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const authGeneration = useRef(0);
   const restoredToken = useRef<string | null>(null);
 
-  // Restore identity before account-scoped drafts are read; observe other tabs.
+  // Remove retired outfit caches, then restore identity and observe other tabs.
   useEffect(() => {
+    clearLegacyOutfitStorage();
     let cancelled = false;
     const restore = async () => {
       const generation = ++authGeneration.current;

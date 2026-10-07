@@ -162,6 +162,15 @@ export interface OutfitResponse {
   updated_at: string;
 }
 
+export interface OutfitVersionResponse {
+  id: string;
+  outfit_id: string;
+  version_number: number;
+  snapshot: OutfitSnapshot;
+  preview_image_url?: string | null;
+  created_at: string;
+}
+
 export interface CulturalRuleWarning {
   rule_id: string;
   code: string;
@@ -361,13 +370,4 @@ export interface AuthResponse {
   access_token: string;
   token_type: string;
   user: AuthUser;
-}
-
-export interface OutfitVersionResponse {
-  id: string;
-  outfit_id: string;
-  version_number: number;
-  snapshot: OutfitSnapshot;
-  preview_image_url?: string | null;
-  created_at: string;
 }

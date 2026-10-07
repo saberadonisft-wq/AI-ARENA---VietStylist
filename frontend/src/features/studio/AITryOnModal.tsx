@@ -157,7 +157,7 @@ export default function AITryOnModal({
           {/* Hiển thị tiến trình hoặc kết quả */}
           {errorMessage && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-800">{errorMessage}</p>}
           {jobStatus && (
-            <div className="p-4 rounded-xl border border-stone-200 bg-[#FAF8F5] space-y-3">
+            <div className="p-4 rounded-xl border border-stone-200 bg-page space-y-3">
               <div className="flex items-center justify-between text-xs">
                 <span className="font-semibold text-stone-700">Trạng thái tác vụ:</span>
                 <span

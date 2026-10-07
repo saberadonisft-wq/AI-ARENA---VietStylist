@@ -1,11 +1,13 @@
-.studio-workspace {
-  --studio-paper: oklch(97% 0.005 80);
+.studio-site-frame {
+  --studio-paper: var(--app-background);
   --studio-surface: oklch(100% 0 0);
-  --studio-surface-hover: oklch(95% 0.008 80);
-  --studio-input: oklch(98% 0.004 80);
+  --studio-surface-hover: #e4e6eb;
+  --studio-input: var(--app-background);
+  --studio-canvas-paper: var(--app-background);
+  --studio-accent-soft: oklch(96% 0.018 24);
   --studio-ink: oklch(25% 0.008 60);
   --studio-muted: oklch(48% 0.01 60);
-  --studio-rule: oklch(86% 0.007 60);
+  --studio-rule: oklch(90% 0.007 60);
   --studio-accent: oklch(48% 0.17 24);
   --studio-accent-hover: oklch(55% 0.17 24);
   --studio-accent-ink: oklch(45% 0.17 24);
@@ -20,6 +22,6 @@
   --studio-space-xs: 8px;
   --studio-space-sm: 12px;
   --studio-space-md: 16px;
-  --studio-rail-size: 76px;
-  --studio-panel-size: 300px;
+  --studio-rail-size: 72px;
+  --studio-panel-size: 320px;
 }

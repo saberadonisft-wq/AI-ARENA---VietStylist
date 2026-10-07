@@ -3,10 +3,11 @@
 import Modal from "@/components/ui/Modal";
 import { slotLabel, itemLabel } from "@/lib/catalog/display";
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { CatalogItem, OutfitSnapshot } from "@/lib/types/api";
+import { CatalogItem, Occasion, OutfitSnapshot } from "@/lib/types/api";
 import type { OutfitSpecV2 } from "@/lib/types/v3";
 import { v3Api, type GenerationRequest } from "@/lib/api/v3Client";
-import { buildManualTryOnPrompt } from "@/features/studio/tryOnPrompt";
+import { buildManualTryOnPrompt, type ManualCulturalContextLabels } from "@/features/studio/tryOnPrompt";
+import { loadManualCulturalContext } from "@/features/studio/tryOnContext";
 import {
   mappingIssues,
   snapshotV1ToSpecV2,
@@ -27,6 +28,7 @@ interface GeminiTryOnModalProps {
   snapshot: OutfitSnapshot;
   outfitTitle: string;
   catalogItems: CatalogItem[];
+  catalogOccasions?: Occasion[];
   catalogLoading: boolean;
   catalogError: string | null;
   onReloadCatalog: () => Promise<void>;
@@ -69,6 +71,7 @@ export default function GeminiTryOnModal({
   snapshot,
   outfitTitle,
   catalogItems,
+  catalogOccasions,
   catalogLoading,
   catalogError,
   onReloadCatalog,
@@ -88,13 +91,17 @@ export default function GeminiTryOnModal({
   const operation = useRef<AbortController | null>(null);
   const savedGeneration = useRef<SavedGeneration | null>(null);
   const fingerprint = JSON.stringify(snapshot);
-  const storageKey = ownerId ? `vietstylist_generation:${ownerId}` : null;
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [mappingNotice, setMappingNotice] = useState<string | null>(null);
   const [modelId, setModelId] = useState<string>(GEMINI_IMAGE_MODELS[0].id);
   const [manualBusy, setManualBusy] = useState(false);
   const [manualNotice, setManualNotice] = useState<string | null>(null);
   const [generationAvailable, setGenerationAvailable] = useState<boolean | null>(null);
+  const culturalContextKey = snapshot.culturalSettings ? JSON.stringify(snapshot.culturalSettings) : "";
+  const [contextAttempt, setContextAttempt] = useState(0);
+  const [manualContext, setManualContext] = useState<{ key: string; labels?: ManualCulturalContextLabels; error?: string }>();
+  const currentManualContext = manualContext?.key === culturalContextKey ? manualContext : undefined;
+  const manualContextPending = !!culturalContextKey && !currentManualContext;
   const availableItemIds = useMemo(() => new Set(catalogItems.filter(item => item.is_published).map(item => item.id)), [catalogItems]);
   const unavailableItems = useMemo(
     () => catalogLoading || catalogError ? [] : snapshot.items.filter(item => !availableItemIds.has(item.itemId)),
@@ -104,17 +111,26 @@ export default function GeminiTryOnModal({
   const resultRef = useRef<HTMLDivElement>(null);
   const errorRef = useRef<HTMLDivElement>(null);
   const manualPrompt = useMemo(
-    () => buildManualTryOnPrompt(outfitTitle, snapshot, catalogItems, !!photo),
-    [outfitTitle, snapshot, catalogItems, photo],
+    () => buildManualTryOnPrompt(outfitTitle, snapshot, catalogItems, !!photo, catalogOccasions, currentManualContext?.labels),
+    [outfitTitle, snapshot, catalogItems, photo, catalogOccasions, currentManualContext?.labels],
   );
 
-  const persistGeneration = (value: SavedGeneration | null) => {
+  useEffect(() => {
+    if (!isOpen || !culturalContextKey) return;
+    let active = true;
+    setManualContext(undefined);
+    const settings = JSON.parse(culturalContextKey) as NonNullable<OutfitSnapshot["culturalSettings"]>;
+    loadManualCulturalContext(settings).then(labels => {
+      if (active) setManualContext({ key: culturalContextKey, labels });
+    }).catch(error => {
+      if (active) setManualContext({ key: culturalContextKey, error: error?.message || "Chưa tải được bối cảnh văn hóa cho prompt." });
+    });
+    return () => { active = false; };
+  }, [isOpen, culturalContextKey, contextAttempt]);
+
+  const rememberGeneration = (value: SavedGeneration | null) => {
+    // The request and its snapshot fingerprint are page memory only.
     savedGeneration.current = value;
-    if (!storageKey) return;
-    try {
-      if (value) sessionStorage.setItem(storageKey, JSON.stringify(value));
-      else sessionStorage.removeItem(storageKey);
-    } catch { /* Keep the in-memory receipt if browser storage is unavailable. */ }
   };
 
   const followGeneration = async (saved: SavedGeneration, signal: AbortSignal) => {
@@ -122,7 +138,7 @@ export default function GeminiTryOnModal({
     let job = saved.jobId ? await v3Api.getGenerationJob(saved.jobId, signal) : await v3Api.startGeneration(saved.request, signal);
     active();
     saved = { ...saved, jobId: job.job_id };
-    persistGeneration(saved);
+    rememberGeneration(saved);
     const deadline = Date.now() + 250000;
     while (job.status === "running") {
       if (Date.now() >= deadline) throw new Error("Chưa nhận được kết quả. Chọn Kiểm tra lại kết quả để tiếp tục theo dõi lần tạo này.");
@@ -142,7 +158,7 @@ export default function GeminiTryOnModal({
       }
     }
     if (job.status === "failed") {
-      persistGeneration(null);
+      rememberGeneration(null);
       setHasPendingJob(false);
       throw new Error(job.error?.message || "Không thể hoàn tất lần tạo ảnh.");
     }
@@ -176,17 +192,12 @@ export default function GeminiTryOnModal({
   }, [fingerprint, ownerId]);
 
   useEffect(() => {
-    if (!isOpen || !storageKey || inFlight.current) return;
-    try {
-      const saved = JSON.parse(sessionStorage.getItem(storageKey) || "null") as SavedGeneration | null;
-      if (saved?.fingerprint === fingerprint && saved.request?.idempotency_key) {
-        savedGeneration.current = saved;
-        void resumeGeneration(saved);
-      }
-    } catch { /* Ignore an unreadable local receipt. */ }
+    if (!isOpen || inFlight.current) return;
+    const saved = savedGeneration.current;
+    if (saved?.fingerprint === fingerprint && saved.request.idempotency_key) void resumeGeneration(saved);
     // Resume when opening the outfit, not when polling changes state.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, storageKey, fingerprint]);
+  }, [isOpen, ownerId, fingerprint]);
 
   useEffect(() => {
     if (status !== "loading_result") return;
@@ -231,7 +242,7 @@ export default function GeminiTryOnModal({
     }
     if (file.size > 10 * 1024 * 1024) { setErrorMessage("Ảnh nhân vật phải nhỏ hơn hoặc bằng 10 MB."); return; }
     setResultMediaId(null);
-    persistGeneration(null);
+    rememberGeneration(null);
     setPhoto(file);
     setPhotoPreview(URL.createObjectURL(file));
     setResultImageUrl(null);
@@ -263,7 +274,9 @@ export default function GeminiTryOnModal({
         if (snapshot.culturalSettings) throw error;
         // The visual try-on can use published catalog items even when the
         // optional V3 cultural mappings are unavailable.
-        outfit = { schema_version: "2.0", dataset_version: "dev", selections: [] };
+        outfit = snapshotV1ToSpecV2(snapshot, {
+          dataset_version: "dev", ruleset_version: "dev", reproducible: false, mappings: [],
+        });
         unmappedCount = snapshot.items.length;
       }
       if (controller.signal.aborted) return;
@@ -287,7 +300,7 @@ export default function GeminiTryOnModal({
         outfit, legacy_item_ids: snapshot.items.map(item => item.itemId), outfit_image_id: outfitImageId,
         user_image_id: userImageId, model_id: modelId, options: {}, idempotency_key: crypto.randomUUID(),
       } };
-      persistGeneration(saved);
+      rememberGeneration(saved);
       setHasPendingJob(true);
       await followGeneration(saved, controller.signal);
     } catch (error: any) {
@@ -323,14 +336,14 @@ export default function GeminiTryOnModal({
 
   const handleSaveOutfit = async () => {
     if (!isLoggedIn) {
-      setManualNotice("Bản nháp vẫn ở trình duyệt. Đăng nhập rồi chọn Lưu bộ phối để lưu lên tài khoản.");
+      setManualNotice("Bộ phối chỉ tồn tại trong trang đang mở. Đăng nhập rồi chọn Lưu bộ phối để lưu lên tài khoản.");
       return;
     }
     setManualBusy(true);
     setManualNotice(null);
     try {
       const saved = await onSaveOutfit();
-      setManualNotice(saved ? "Đã lưu bộ phối vào tài khoản." : "Chưa lưu được bộ phối; bản nháp vẫn được giữ trong Studio.");
+      setManualNotice(saved ? "Đã lưu bộ phối vào tài khoản." : "Chưa lưu được bộ phối; giữ trang Studio mở để thử lại.");
     } finally {
       setManualBusy(false);
     }
@@ -427,7 +440,7 @@ export default function GeminiTryOnModal({
             </span>
             {photo && <span className="mt-1 block text-center text-xs text-stone-500 truncate">{photo.name}</span>}
           </label>
-          {photo && <button type="button" disabled={isBusy || hasPendingJob} onClick={() => { setPhoto(null); setPhotoPreview(null); setResultImageUrl(null); setResultMediaId(null); setStatus(null); persistGeneration(null); }} className="text-xs text-heritage-red underline">Bỏ ảnh nhân vật để AI tự chọn người mặc</button>}
+          {photo && <button type="button" disabled={isBusy || hasPendingJob} onClick={() => { setPhoto(null); setPhotoPreview(null); setResultImageUrl(null); setResultMediaId(null); setStatus(null); rememberGeneration(null); }} className="text-xs text-heritage-red underline">Bỏ ảnh nhân vật để AI tự chọn người mặc</button>}
 
           {(photoPreview || resultImageUrl) && (
             <div ref={resultRef} className={`grid gap-4 ${photoPreview && resultImageUrl ? "sm:grid-cols-2" : "max-w-xs mx-auto"}`}>
@@ -478,10 +491,15 @@ export default function GeminiTryOnModal({
               <p className="text-xs text-stone-600">Lưu bộ phối, tải ảnh bản phối và dán prompt vào công cụ tạo ảnh khác. Nếu có ảnh nhân vật, đính kèm ảnh đó làm ảnh thứ hai.</p>
             </div>
             <textarea aria-label="Prompt thử đồ thủ công" readOnly value={manualPrompt} rows={6} className="w-full rounded-md border border-stone-300 bg-white p-2 text-xs text-stone-800" />
+            {manualContextPending && <p role="status" className="text-xs text-stone-600">Đang tải bối cảnh văn hóa cho prompt…</p>}
+            {currentManualContext?.error && <div className="text-xs text-amber-800">
+              <p role="alert">{currentManualContext.error}</p>
+              <button type="button" onClick={() => setContextAttempt(value => value + 1)} className="mt-1 underline">Tải lại bối cảnh prompt</button>
+            </div>}
             <div className="flex flex-wrap gap-2">
               <button type="button" disabled={manualBusy || !snapshot.items.length} onClick={handleSaveOutfit} className="rounded-md border border-stone-300 bg-white px-3 py-2 text-xs font-semibold disabled:opacity-50">Lưu bộ phối</button>
               <button type="button" disabled={manualBusy || !snapshot.items.length || catalogLoading || unavailableItems.length > 0} onClick={handleDownloadOutfit} className="rounded-md border border-stone-300 bg-white px-3 py-2 text-xs font-semibold disabled:opacity-50">Tải ảnh bản phối</button>
-              <button type="button" disabled={!snapshot.items.length || catalogLoading || unavailableItems.length > 0} onClick={handleCopyPrompt} className="rounded-md border border-stone-300 bg-white px-3 py-2 text-xs font-semibold disabled:opacity-50">Sao chép prompt</button>
+              <button type="button" disabled={!snapshot.items.length || catalogLoading || unavailableItems.length > 0 || manualContextPending || !!currentManualContext?.error} onClick={handleCopyPrompt} className="rounded-md border border-stone-300 bg-white px-3 py-2 text-xs font-semibold disabled:opacity-50">Sao chép prompt</button>
             </div>
             {manualNotice && <p role="status" className="text-xs text-stone-700">{manualNotice}</p>}
           </div>

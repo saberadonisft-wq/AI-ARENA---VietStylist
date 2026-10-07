@@ -14,7 +14,7 @@ const gridClass = "grid grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3
 // Hallmark · pre-emit critique: P4 H5 E4 S5 R5 V4
 // Existing library route: a consistent catalog grid supports scanning and comparison.
 export default function LibraryCatalog() {
-  const { catalogItems: items, garmentTypes, isLoading, itemsError, error, refreshCatalog } = useCatalog();
+  const { catalogItems: items, garmentTypes, itemsLoading: isLoading, itemsError, error, refreshCatalog } = useCatalog();
   const params = useSearchParams();
   const filters: LibraryFilters = {
     q: params.get("q") || "",

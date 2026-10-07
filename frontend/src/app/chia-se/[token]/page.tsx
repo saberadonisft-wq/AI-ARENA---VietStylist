@@ -92,7 +92,7 @@ export default function PublicSharePage() {
               </div>
 
               {/* Chi tiết từng món trong bản phối */}
-              <div className="space-y-2 bg-[#FAF8F5] p-4 rounded-2xl border border-stone-100 text-xs">
+              <div className="space-y-2 bg-page p-4 rounded-2xl border border-stone-100 text-xs">
                 {entry.snapshot.items.map((it: any) => (
                   <div key={it.slot} className="flex items-center justify-between">
                     <span className="text-stone-500 capitalize">{it.slot}:</span>

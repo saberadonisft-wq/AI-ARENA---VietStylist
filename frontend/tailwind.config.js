@@ -9,6 +9,7 @@ module.exports = {
   theme: {
     extend: {
       colors: {
+        page: "rgb(var(--app-background-rgb) / <alpha-value>)",
         heritage: {
           red: "#B83232",
           "red-dark": "#922828",
@@ -20,7 +21,7 @@ module.exports = {
           jade: "#276749",
           "jade-light": "#319795",
           lotus: "#D53F8C",
-          parchment: "#FBF8F3",
+          parchment: "rgb(var(--app-background-rgb) / <alpha-value>)",
           "parchment-dark": "#EFE9DF",
           ink: "#171923",
           silk: "#F7FAFC",
