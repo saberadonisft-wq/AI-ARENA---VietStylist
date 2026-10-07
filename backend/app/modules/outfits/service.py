@@ -16,9 +16,40 @@ from app.modules.outfits.repository import OutfitRepository
 from app.modules.catalog.repository import CatalogRepository
 from app.core.errors import AppError
 from app.core.database import is_unique_violation
+from app.core.pagination import decode_cursor, encode_cursor
 
 
 class OutfitService:
+    @staticmethod
+    def _page_outfit_response(row):
+        snapshot = row.get('snapshot_json')
+        if isinstance(snapshot, str):
+            snapshot = json.loads(snapshot)
+        return OutfitResponse.model_validate({**row, 'current_snapshot': snapshot,
+                                               'created_at': str(row['created_at']), 'updated_at': str(row['updated_at'])})
+
+    @staticmethod
+    def list_user_outfit_page(user_id: str, limit: int = 30, cursor: str | None = None):
+        scope = 'outfits:' + user_id
+        rows = OutfitRepository.get_outfits_by_owner(user_id, limit + 1, decode_cursor(cursor, scope))
+        selected = rows[:limit]
+        return {
+            'items': [OutfitService._page_outfit_response(row) for row in selected],
+            'next_cursor': encode_cursor(scope, str(selected[-1]['updated_at']), selected[-1]['id']) if len(rows) > limit else None,
+        }
+
+    @staticmethod
+    def list_outfit_version_page(outfit_id: str, user_id: str, limit: int = 30, cursor: str | None = None):
+        if not OutfitRepository.get_outfit_by_id_and_owner(outfit_id, user_id):
+            raise AppError('OUTFIT_NOT_FOUND', 'Không tìm thấy bộ phối yêu cầu', 404)
+        scope = 'versions:' + user_id + ':' + outfit_id
+        rows = OutfitRepository.get_outfit_versions(outfit_id, limit + 1, decode_cursor(cursor, scope, numeric=True))
+        selected = rows[:limit]
+        items = [OutfitVersionResponse(id=row['id'], outfit_id=row['outfit_id'], version_number=row['version_number'],
+                    snapshot=OutfitSnapshot.model_validate(row['snapshot_json'] if isinstance(row['snapshot_json'], dict) else json.loads(row['snapshot_json'])),
+                    preview_image_url=row.get('preview_image_url'), created_at=str(row['created_at'])) for row in selected]
+        return {'items': items, 'next_cursor': encode_cursor(scope, selected[-1]['version_number'], selected[-1]['id']) if len(rows) > limit else None}
+
     @staticmethod
     def list_user_outfits(user_id: str) -> List[OutfitResponse]:
         rows = OutfitRepository.get_outfits_by_owner(user_id)

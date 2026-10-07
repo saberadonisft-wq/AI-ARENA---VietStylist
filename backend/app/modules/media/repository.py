@@ -215,6 +215,26 @@ class MediaRepository:
         )
 
     @staticmethod
+    def list_ai_images(owner_id, limit=30, offset=0, *, conn=None):
+        return Database.fetch_all(
+            "SELECT m.id,m.status,m.created_at FROM ai_media_library l "
+            "JOIN media_assets m ON m.id=l.media_id AND m.owner_id=l.owner_id "
+            "WHERE l.owner_id=? AND m.media_type='image' "
+            "ORDER BY l.created_at DESC,l.media_id DESC LIMIT ? OFFSET ?",
+            (owner_id, limit, offset), conn=conn,
+        )
+
+    @staticmethod
+    def ai_image_purposes(owner_id, media_ids, *, conn=None):
+        if not media_ids:
+            return []
+        placeholders = ','.join('?' for _ in media_ids)
+        return Database.fetch_all(
+            f"SELECT DISTINCT media_id,purpose FROM ai_job_media WHERE owner_id=? AND media_id IN ({placeholders})",
+            (owner_id, *media_ids), conn=conn,
+        )
+
+    @staticmethod
     def get_owned_ai_images(media_ids, owner_id):
         """Resolve only this owner's image records for explicit AI job references."""
         identifiers = sorted({media_id for media_id in media_ids if isinstance(media_id, str) and media_id})

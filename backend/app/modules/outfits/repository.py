@@ -30,14 +30,19 @@ class OutfitRepository:
         )
 
     @staticmethod
-    def get_outfits_by_owner(owner_id: str) -> List[Dict[str, Any]]:
+    def get_outfits_by_owner(owner_id: str, limit: int = 50, after=None) -> List[Dict[str, Any]]:
+        where = " AND (o.updated_at, o.id) < (?, ?)" if after else ""
+        params = (owner_id, *after, limit) if after else (owner_id, limit)
         return Database.fetch_all("""
             SELECT o.*, v.snapshot_json, v.preview_image_url
             FROM outfits o
             LEFT JOIN outfit_versions v ON o.current_version_id = v.id
             WHERE o.owner_id = ? AND o.is_deleted = 0
-            ORDER BY o.updated_at DESC
-        """, (owner_id,))
+        """ + where + " ORDER BY o.updated_at DESC, o.id DESC LIMIT ?", params)
+
+    @staticmethod
+    def count_outfits_by_owner(owner_id: str) -> int:
+        return Database.fetch_one("SELECT COUNT(*) AS n FROM outfits WHERE owner_id=? AND is_deleted=0", (owner_id,))["n"]
 
     @staticmethod
     def get_outfit_by_id(outfit_id: str) -> Optional[Dict[str, Any]]:
@@ -141,10 +146,10 @@ class OutfitRepository:
         return row["max_v"] if row and row.get("max_v") else 0
 
     @staticmethod
-    def get_outfit_versions(outfit_id: str) -> List[Dict[str, Any]]:
-        return Database.fetch_all("""
-            SELECT * FROM outfit_versions WHERE outfit_id = ? ORDER BY version_number DESC
-        """, (outfit_id,))
+    def get_outfit_versions(outfit_id: str, limit: int = 50, after=None) -> List[Dict[str, Any]]:
+        where = " AND version_number < ?" if after else ""
+        params = (outfit_id, after[0], limit) if after else (outfit_id, limit)
+        return Database.fetch_all("SELECT * FROM outfit_versions WHERE outfit_id = ?" + where + " ORDER BY version_number DESC LIMIT ?", params)
 
     @staticmethod
     def soft_delete_outfit(outfit_id: str, owner_id: str) -> int:

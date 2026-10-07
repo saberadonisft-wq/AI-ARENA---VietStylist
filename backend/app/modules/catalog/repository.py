@@ -23,8 +23,7 @@ class CatalogRepository:
         *, conn=None,
     ) -> List[Dict[str, Any]]:
         query = """
-            SELECT DISTINCT i.* FROM items i
-            LEFT JOIN item_occasions io ON i.id = io.item_id
+            SELECT i.* FROM items i
             WHERE i.is_published = 1
         """
         params = []
@@ -42,7 +41,7 @@ class CatalogRepository:
             params.append(gender)
 
         if occasion_id:
-            query += " AND io.occasion_id = ?"
+            query += " AND EXISTS (SELECT 1 FROM item_occasions io WHERE io.item_id = i.id AND io.occasion_id = ?)"
             params.append(occasion_id)
 
         if search:

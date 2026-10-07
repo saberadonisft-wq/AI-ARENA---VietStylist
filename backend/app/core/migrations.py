@@ -454,6 +454,31 @@ def lookbook_community(conn):
         conn.execute(statement)
 
 
+def query_indexes(conn):
+    from importlib.resources import files
+    from app.core.database import split_sql_statements
+    for statement in split_sql_statements(files('app.data').joinpath('query_indexes.sql').read_text(encoding='utf-8')):
+        conn.execute(statement)
+
+
+def ai_media_library(conn):
+    from importlib.resources import files
+    from app.core.ai_media_migration import backfill_ai_media
+    from app.core.database import split_sql_statements
+    for statement in split_sql_statements(files('app.data').joinpath('ai_media_library.sql').read_text(encoding='utf-8')):
+        conn.execute(statement)
+    # complete_statement keeps the semicolons inside trigger bodies together.
+    pending = ''
+    for line in files('app.data').joinpath('ai_media_library_sqlite.sql').read_text(encoding='utf-8').splitlines(keepends=True):
+        pending += line
+        if sqlite3.complete_statement(pending):
+            conn.execute(pending)
+            pending = ''
+    if pending.strip():
+        raise RuntimeError('Incomplete AI media trigger migration')
+    backfill_ai_media(conn)
+
+
 MIGRATIONS = [
     ("001_initial_schema", initial),
     ("002_add_blog_articles_fields", blog),
@@ -469,6 +494,8 @@ MIGRATIONS = [
     ("012_performance_indexes_v3", performance_indexes_v3),
     ("013_heritage_images", heritage_images),
     ("014_lookbook_community", lookbook_community),
+    ("015_query_indexes", query_indexes),
+    ("016_ai_media_library", ai_media_library),
 ]
 
 
@@ -481,6 +508,13 @@ def checksum(fn):
     if fn is lookbook_community:
         from importlib.resources import files
         source += files('app.data').joinpath('lookbook_community.sql').read_text(encoding='utf-8')
+    if fn in (query_indexes, ai_media_library):
+        from importlib.resources import files
+        names = ['query_indexes.sql'] if fn is query_indexes else ['ai_media_library.sql', 'ai_media_library_sqlite.sql']
+        source += ''.join(files('app.data').joinpath(name).read_text(encoding='utf-8') for name in names)
+        if fn is ai_media_library:
+            from app.core.ai_media_migration import backfill_ai_media
+            source += inspect.getsource(backfill_ai_media)
     return hashlib.sha256(source.encode()).hexdigest()
 
 
@@ -545,6 +579,8 @@ def verify_schema(conn):
         conn.execute("SELECT user_id,post_id FROM lookbook_favorites LIMIT 0")
         conn.execute("SELECT reporter_id,status FROM lookbook_reports LIMIT 0")
         conn.execute("SELECT owner_id,bio FROM lookbook_public_profiles LIMIT 0")
+        conn.execute("SELECT owner_id,media_id,created_at FROM ai_media_library LIMIT 0")
+        conn.execute("SELECT job_id,owner_id,media_id,purpose FROM ai_job_media LIMIT 0")
         index = conn.execute(
             "SELECT sql FROM sqlite_master WHERE name='uq_solution_forms_owner'"
         ).fetchone()
