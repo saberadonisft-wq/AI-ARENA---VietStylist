@@ -1,9 +1,9 @@
-from fastapi import APIRouter, Depends, Header, Query, Response
+from fastapi import APIRouter, Depends, Header, Query, Request, Response
 from app.core.config import settings
 from app.core.errors import AppError
 from app.core.security import get_current_user_optional, require_current_user, require_role
 from app.core.rate_limit import consume
-from app.infrastructure.r2.client import r2_client
+from app.modules.media.image_cache import accepts_webp, get_image
 from app.modules.community import service
 from app.modules.community.schemas import (
     Author, PostInput, PostUpdate, PostDetail, PostPage, FavoritePage,
@@ -147,13 +147,23 @@ def report(post_id: str, req: ReportInput, user=Depends(require_current_user)):
     return {'message': 'Đã gửi báo cáo để quản trị viên xem xét.'}
 
 
-@router.get('/{post_id}/image', response_class=Response, responses={200: {'content': {'image/png': {}, 'image/jpeg': {}, 'image/webp': {}}}})
-def image(post_id: str, purpose: str = Query(max_length=300), grant: str = Query(max_length=4096)):
+@router.get('/{post_id}/image', response_class=Response, responses={200: {'content': {'image/png': {}, 'image/jpeg': {}, 'image/webp': {}}}, 304: {'description': 'Unchanged image; access was revalidated.'}})
+def image(post_id: str, request: Request, purpose: str = Query(max_length=300), grant: str = Query(max_length=4096)):
+    # Authorization happens before any cache hit or 304. Privacy transitions,
+    # moderation, expired grants and revoked share links remain immediate.
     r = service.image_asset(post_id, purpose, grant)
+    webp = accepts_webp(request.headers.get('accept', ''))
     try:
-        data = r2_client.read_object(r['bucket'], r['object_key'], settings.MEDIA_IMAGE_MAX_BYTES)
+        image = get_image(r, webp=webp)
     except FileNotFoundError:
         service.missing()
-    return Response(data, media_type=r['mime_type'], headers={'Cache-Control': 'private, no-store',
-                    'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer',
-                    'Content-Security-Policy': "default-src 'none'; sandbox"})
+    # Only public access may store browser bytes, and each reuse must contact
+    # this endpoint. Owner/share images keep their existing no-store policy.
+    public = purpose == f"post:{r['id']}:{r['revision']}:public"
+    headers = {'Cache-Control': 'private, no-cache, must-revalidate' if public else 'private, no-store',
+               'ETag': image.etag, 'Vary': 'Accept', 'X-Content-Type-Options': 'nosniff',
+               'Referrer-Policy': 'no-referrer', 'Content-Security-Policy': "default-src 'none'; sandbox"}
+    validators = [tag.strip().removeprefix('W/') for tag in request.headers.get('if-none-match', '').split(',')]
+    if public and (image.etag in validators or '*' in validators):
+        return Response(status_code=304, headers=headers)
+    return Response(image.data, media_type=image.mime_type, headers=headers)

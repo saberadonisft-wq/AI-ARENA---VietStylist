@@ -5,6 +5,7 @@ from app.modules.outfits.schemas import (
     CreateOutfitRequest,
     UpdateOutfitRequest,
     OutfitResponse,
+    OutfitVersionResponse,
     CompareRequest,
     CompareResponse,
     OutfitPageResponse,
@@ -40,8 +41,22 @@ def create_outfit(
     idempotency_key: str | None = Header(default=None, alias="Idempotency-Key", min_length=1, max_length=128),
     user: AuthenticatedUser = Depends(require_current_user),
 ):
-    """Lưu bộ phối mới của người dùng đã đăng nhập (R04)."""
+    """Lưu bộ phối mới của người dùng đã đăng nhập (R04).
+
+    Idempotency-Key cho phép thử lại lần tạo mà không tạo trùng. Nếu bộ phối đã
+    đổi phiên bản hoặc bị xóa, trả 409 REVISION_CONFLICT hoặc OUTFIT_DELETED;
+    details có outfit_id và revision=1 để giữ nguyên phiên bản của lần tạo.
+    """
     return OutfitService.create_outfit(user.user_id, req, idempotency_key)
+
+
+@router.get("/versions/{version_id}", response_model=OutfitVersionResponse)
+def get_outfit_version(
+    version_id: str,
+    user: AuthenticatedUser = Depends(require_current_user),
+):
+    """Đọc snapshot cố định của phiên bản thuộc bộ phối chưa xóa của chính mình."""
+    return OutfitService.get_outfit_version(version_id, user.user_id)
 
 
 @router.get("/{outfit_id}", response_model=OutfitResponse)

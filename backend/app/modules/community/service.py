@@ -4,6 +4,8 @@ import hashlib
 import json
 import secrets
 import uuid
+import time
+from functools import lru_cache
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlencode
 
@@ -13,12 +15,12 @@ from app.core.errors import AppError
 from app.modules.community.schemas import Author, PostCard, PostDetail
 from app.modules.media.grant_utils import create_media_grant, verify_media_grant
 
-JOIN = """ FROM lookbook_posts p
+IMAGE_JOIN = """ FROM lookbook_posts p
 JOIN outfit_versions v ON v.id=p.outfit_version_id
 JOIN outfits o ON o.id=v.outfit_id AND o.owner_id=p.owner_id
 JOIN accounts a ON a.id=p.owner_id
-JOIN media_assets m ON m.id=p.cover_media_id
-LEFT JOIN lookbook_public_profiles pr ON pr.owner_id=p.owner_id """
+JOIN media_assets m ON m.id=p.cover_media_id """
+JOIN = IMAGE_JOIN + "LEFT JOIN lookbook_public_profiles pr ON pr.owner_id=p.owner_id "
 SELECT = """SELECT p.*, v.snapshot_json,v.version_number,o.id AS outfit_id,
  a.display_name,a.avatar_url,a.is_active,pr.bio,m.status AS media_status,
  m.bucket,m.object_key,m.mime_type,o.is_deleted AS outfit_deleted """
@@ -89,12 +91,20 @@ def author(r):
     return Author(id=r['owner_id'], display_name=r['display_name'], avatar_url=r.get('avatar_url'), bio=r.get('bio') or '')
 
 
+@lru_cache(maxsize=2048)
+def image_grant(media_id, purpose, window, secret_version):
+    # Stable URL for four minutes; the grant still lives at most five minutes,
+    # and has at least one minute left when issued near a window boundary.
+    return create_media_grant(media_id, purpose, window * 240 + 300 - int(time.time()))
+
+
 def card(r, user_id=None, access='public', detail=False, favorite=False):
     snap = r['snapshot_json']
     if isinstance(snap, str):
         snap = json.loads(snap)
     purpose = f"post:{r['id']}:{r['revision']}:{access}"
-    grant = create_media_grant(r['cover_media_id'], purpose)
+    secret_version = hashlib.sha256(settings.get_jwt_secret().encode()).hexdigest()
+    grant = image_grant(r['cover_media_id'], purpose, int(time.time()) // 240, secret_version)
     image = settings.API_PUBLIC_ORIGIN.rstrip('/') + f"/api/lookbook-posts/{r['id']}/image?" + urlencode({'purpose': purpose, 'grant': grant})
     values = dict(id=r['id'], author=author(r), title=r['title'], description=r['description'],
                   visibility=r['visibility'], moderation_status=r['moderation_status'],
@@ -267,7 +277,11 @@ def resolve_share(token, user_id=None):
 
 
 def image_asset(post_id, purpose, grant):
-    r = row(post_id)
+    # Image access needs current permission/storage fields, not the complete
+    # outfit snapshot, description or author's public profile.
+    r = Database.fetch_one("""SELECT p.id,p.owner_id,p.revision,p.visibility,p.moderation_status,p.is_deleted,
+        p.cover_media_id,a.is_active,o.is_deleted AS outfit_deleted,m.status AS media_status,
+        m.bucket,m.object_key,m.mime_type""" + IMAGE_JOIN + ' WHERE p.id=?', (post_id,))
     if not r or len(purpose) > 300 or not verify_media_grant(grant, r['cover_media_id'], purpose):
         missing()
     prefix = f"post:{r['id']}:{r['revision']}:"

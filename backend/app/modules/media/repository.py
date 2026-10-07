@@ -27,8 +27,8 @@ class MediaRepository:
             )
 
     @staticmethod
-    def get_media_by_id(media_id):
-        return Database.fetch_one("SELECT * FROM media_assets WHERE id=?", (media_id,))
+    def get_media_by_id(media_id, *, conn=None):
+        return Database.fetch_one("SELECT * FROM media_assets WHERE id=?", (media_id,), conn=conn)
 
     @staticmethod
     def get_media_by_bucket_and_key(bucket, object_key):

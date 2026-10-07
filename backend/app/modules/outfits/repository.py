@@ -54,13 +54,22 @@ class OutfitRepository:
         """, (outfit_id,))
 
     @staticmethod
-    def get_outfit_by_id_and_owner(outfit_id: str, owner_id: str) -> Optional[Dict[str, Any]]:
+    def get_outfit_by_id_and_owner(outfit_id: str, owner_id: str, *, include_deleted: bool = False) -> Optional[Dict[str, Any]]:
         return Database.fetch_one("""
             SELECT o.*, v.snapshot_json, v.preview_image_url
             FROM outfits o
             LEFT JOIN outfit_versions v ON o.current_version_id = v.id
-            WHERE o.id = ? AND o.owner_id = ? AND o.is_deleted = 0
-        """, (outfit_id, owner_id))
+            WHERE o.id = ? AND o.owner_id = ? AND (o.is_deleted = 0 OR ? = 1)
+        """, (outfit_id, owner_id, int(include_deleted)))
+
+    @staticmethod
+    def get_version_by_id_and_owner(version_id: str, owner_id: str) -> Optional[Dict[str, Any]]:
+        return Database.fetch_one("""
+            SELECT v.*
+            FROM outfit_versions v
+            JOIN outfits o ON o.id = v.outfit_id
+            WHERE v.id = ? AND o.owner_id = ? AND o.is_deleted = 0
+        """, (version_id, owner_id))
 
     @staticmethod
     def create_outfit_atomic(

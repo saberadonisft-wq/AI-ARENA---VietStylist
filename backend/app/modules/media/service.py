@@ -17,6 +17,7 @@ from app.modules.media.schemas import (
     AIMediaResponse,
 )
 from app.modules.media.validation import TYPES, byte_limit, validate_content
+from app.modules.media.image_cache import evict_image, prime_image
 
 
 class MediaService:
@@ -235,7 +236,10 @@ class MediaService:
             ) from exc
         # Retain the staging ledger until its PUT capability has expired; cleanup retries.
         r2_client.delete_object(media["staging_bucket"], media["staging_key"])
-        return MediaAssetResponse(**MediaRepository.get_media_by_id(media_id))
+        ready = MediaRepository.get_media_by_id(media_id)
+        if ready["status"] == "ready" and ready["media_type"] == "image":
+            prime_image(ready, data)
+        return MediaAssetResponse(**ready)
 
     @staticmethod
     def ingest_generated_image(owner_id, content, mime_type):
@@ -371,6 +375,7 @@ class MediaService:
                 "STORAGE_DELETE_FAILED", "Chưa xóa xong file; hệ thống sẽ thử lại", 503
             )
         MediaRepository.mark_media_deleted(media_id)
+        evict_image(media)
 
     @staticmethod
     def list_ai_media(owner_id, limit=30, offset=0):

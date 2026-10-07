@@ -1,10 +1,13 @@
 """Saving an archived Studio draft must not depend on seeded occasion rows."""
 import pytest
+from concurrent.futures import ThreadPoolExecutor
 from fastapi.testclient import TestClient
 
 from app.core.database import Database
 from app.main import create_app
 from app.modules.outfits.service import OutfitService
+from app.modules.outfits.repository import OutfitRepository
+from app.modules.outfits.schemas import CreateOutfitRequest
 from conftest import auth_header
 
 
@@ -77,6 +80,68 @@ def test_create_idempotency_key_is_scoped_to_account():
     other_owner = client.post("/api/outfits", headers={"Authorization": auth_header("dev-user-123"), "Idempotency-Key": "same-local-key"}, json=payload)
     assert first.status_code == other_owner.status_code == 200
     assert first.json()["id"] != other_owner.json()["id"]
+
+
+def test_create_retry_cannot_overwrite_a_later_revision():
+    client = TestClient(create_app())
+    headers = {"Authorization": auth_header("dev-user-test-1"), "Idempotency-Key": "lost-create-before-other-edit"}
+    original = {"title": "Lần tạo bị mất phản hồi", "snapshot": {"items": []}}
+    created = client.post("/api/outfits", headers=headers, json=original).json()
+    path = f"/api/outfits/{created['id']}"
+    competing = client.put(path, headers=headers, json={"title": "Phiên khác đã lưu", "revision": 1, "snapshot": {"items": []}})
+    assert competing.status_code == 200
+
+    retry = client.post("/api/outfits", headers=headers, json=original)
+    assert retry.status_code == 409
+    assert retry.json()["error"]["code"] == "REVISION_CONFLICT"
+    assert retry.json()["error"]["details"] == {"outfit_id": created["id"], "revision": 1}
+    assert client.get(path, headers=headers).json() == competing.json()
+    assert len(OutfitRepository.get_outfit_versions(created["id"])) == 2
+
+
+def test_deleted_create_retry_is_a_conflict_and_a_fresh_key_can_save_separately():
+    client = TestClient(create_app(), raise_server_exceptions=False)
+    headers = {"Authorization": auth_header("dev-user-test-1"), "Idempotency-Key": "lost-create-before-delete"}
+    payload = {"title": "Bản nháp giữ lại", "snapshot": {"items": []}}
+    created = client.post("/api/outfits", headers=headers, json=payload).json()
+    assert client.delete(f"/api/outfits/{created['id']}", headers=headers).status_code == 200
+
+    for _ in range(2):
+        retry = client.post("/api/outfits", headers=headers, json=payload)
+        assert retry.status_code == 409
+        assert retry.json()["error"]["code"] == "OUTFIT_DELETED"
+        assert retry.json()["error"]["details"] == {"outfit_id": created["id"], "revision": 1}
+    assert client.get("/api/outfits", headers=headers).json() == []
+    fresh = client.post("/api/outfits", headers={**headers, "Idempotency-Key": "explicit-new-copy"}, json=payload)
+    assert fresh.status_code == 200
+    assert fresh.json()["id"] != created["id"]
+    assert len(client.get("/api/outfits", headers=headers).json()) == 1
+
+
+def test_parallel_create_retries_only_create_one_outfit_and_version():
+    request = CreateOutfitRequest(title="Lưu đồng thời", snapshot={"items": []})
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        results = list(executor.map(lambda _: OutfitService.create_outfit("dev-user-test-1", request, "parallel-create"), range(4)))
+    assert len({result.id for result in results}) == 1
+    assert {result.revision for result in results} == {1}
+    assert len(OutfitService.list_user_outfits("dev-user-test-1")) == 1
+    assert len(OutfitRepository.get_outfit_versions(results[0].id)) == 1
+
+
+def test_concurrent_create_and_delete_maps_the_unique_race_to_a_deleted_conflict(monkeypatch):
+    create_atomic = OutfitRepository.create_outfit_atomic
+
+    def competing_create_then_delete(**kwargs):
+        create_atomic(**kwargs)
+        OutfitRepository.soft_delete_outfit(kwargs["outfit_id"], kwargs["owner_id"])
+        create_atomic(**kwargs)
+
+    monkeypatch.setattr(OutfitRepository, "create_outfit_atomic", competing_create_then_delete)
+    client = TestClient(create_app(), raise_server_exceptions=False)
+    response = client.post("/api/outfits", headers={"Authorization": auth_header("dev-user-test-1"), "Idempotency-Key": "create-delete-race"}, json={"snapshot": {"items": []}})
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "OUTFIT_DELETED"
+    assert OutfitService.list_user_outfits("dev-user-test-1") == []
 
 
 @pytest.mark.parametrize("origin,allowed", [("http://localhost:3000", True), ("https://untrusted.example", False)])

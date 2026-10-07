@@ -7,10 +7,15 @@ def test_upgrade_keeps_collections_private_and_revokes_legacy_links(monkeypatch)
     conn.row_factory = sqlite3.Row
     conn.execute('PRAGMA foreign_keys=ON')
     current = migrations.MIGRATIONS
+    community_index = next(
+        index for index, (version, _) in enumerate(current)
+        if version == '014_lookbook_community'
+    )
     try:
         with monkeypatch.context() as patch:
-            patch.setattr(migrations, 'MIGRATIONS', current[:-1])
+            patch.setattr(migrations, 'MIGRATIONS', current[:community_index])
             migrations.run_migrations(conn)
+        assert conn.execute("SELECT name FROM sqlite_master WHERE name='lookbook_posts'").fetchone() is None
         conn.execute("INSERT INTO accounts(id,email,display_name) VALUES('owner','owner@example.invalid','Owner')")
         conn.execute("INSERT INTO lookbooks(id,owner_id,title,visibility) VALUES('private','owner','Personal','private')")
         conn.execute("INSERT INTO lookbooks(id,owner_id,title,visibility) VALUES('unlisted','owner','Shared','unlisted')")

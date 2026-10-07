@@ -32,8 +32,8 @@ def test_studio_cutout_checks_publication_even_after_cache(monkeypatch):
         read_count += 1
         return stream.getvalue()
 
-    monkeypatch.setattr(CatalogRepository, "get_item_by_id", lambda _id: published)
-    monkeypatch.setattr(MediaRepository, "get_media_by_id", lambda _id: media)
+    monkeypatch.setattr(CatalogRepository, "get_item_by_id", lambda _id, **kwargs: published)
+    monkeypatch.setattr(MediaRepository, "get_media_by_id", lambda _id, **kwargs: media)
     monkeypatch.setattr(r2_client, "read_object", read_object)
     client = TestClient(app)
     url = "/api/catalog/items/test-garment/studio-image"
@@ -47,11 +47,11 @@ def test_studio_cutout_checks_publication_even_after_cache(monkeypatch):
     assert client.get(url).status_code == 200
     assert read_count == 1
 
-    monkeypatch.setattr(CatalogRepository, "get_item_by_id", lambda _id: None)
+    monkeypatch.setattr(CatalogRepository, "get_item_by_id", lambda _id, **kwargs: None)
     assert client.get(url).status_code == 404
     assert read_count == 1
 
-    monkeypatch.setattr(CatalogRepository, "get_item_by_id", lambda _id: published)
+    monkeypatch.setattr(CatalogRepository, "get_item_by_id", lambda _id, **kwargs: published)
     media["visibility"] = "private"
     assert client.get(url).status_code == 404
     assert read_count == 1
@@ -103,8 +103,8 @@ def test_catalog_recolor_requires_independent_asset_review_before_enabling(monke
     media = {"id": "public-media", "visibility": "public", "status": "ready",
              "media_type": "image", "bucket": settings.R2_BUCKET_PUBLIC,
              "object_key": "assets/public-media/image.png", "updated_at": "now"}
-    monkeypatch.setattr(CatalogRepository, "get_item_by_id", lambda _id: published)
-    monkeypatch.setattr(MediaRepository, "get_media_by_id", lambda _id: media)
+    monkeypatch.setattr(CatalogRepository, "get_item_by_id", lambda _id, **kwargs: published)
+    monkeypatch.setattr(MediaRepository, "get_media_by_id", lambda _id, **kwargs: media)
     monkeypatch.setattr(r2_client, "read_object", lambda *_args: pytest.fail("Unreviewed recolor must not process or cache the source image"))
 
     client = TestClient(app)
