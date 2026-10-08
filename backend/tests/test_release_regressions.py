@@ -56,6 +56,31 @@ def test_update_response_keeps_its_own_revision_when_another_save_commits(monkey
     assert OutfitService.get_outfit(outfit.id, OWNER).current_snapshot.backgroundFade == 42
 
 
+@pytest.mark.parametrize("key", [None, "create-response-race"])
+def test_create_response_does_not_adopt_a_competing_revision(monkeypatch, key):
+    original = OutfitRepository.create_outfit_atomic
+
+    def create_then_compete(**kwargs):
+        saved = original(**kwargs)
+        OutfitRepository.save_revision(outfit_id=kwargs["outfit_id"], expected_revision=1,
+            version_id="after-create", snapshot_json=OutfitSnapshot(backgroundFade=42).model_dump_json(),
+            title="Writer B", owner_id=OWNER)
+        return saved
+
+    monkeypatch.setattr(OutfitRepository, "create_outfit_atomic", create_then_compete)
+    request = CreateOutfitRequest(title="Writer A", snapshot=OutfitSnapshot(backgroundFade=7))
+    response = OutfitService.create_outfit(OWNER, request, key)
+    assert response.revision == 1 and response.title == "Writer A"
+    assert response.current_snapshot.backgroundFade == 7
+    with pytest.raises(AppError) as conflict:
+        OutfitService.update_outfit(response.id, OWNER, UpdateOutfitRequest(
+            revision=response.revision, snapshot=response.current_snapshot))
+    assert conflict.value.code == "REVISION_CONFLICT"
+    if key:
+        with pytest.raises(AppError) as replay:
+            OutfitService.create_outfit(OWNER, request, key)
+        assert replay.value.code == "REVISION_CONFLICT"
+    assert OutfitService.get_outfit(response.id, OWNER).title == "Writer B"
 
 
 

@@ -54,13 +54,13 @@ class OutfitRepository:
         """, (outfit_id,))
 
     @staticmethod
-    def get_outfit_by_id_and_owner(outfit_id: str, owner_id: str, *, include_deleted: bool = False) -> Optional[Dict[str, Any]]:
+    def get_outfit_by_id_and_owner(outfit_id: str, owner_id: str, *, include_deleted: bool = False, conn=None) -> Optional[Dict[str, Any]]:
         return Database.fetch_one("""
             SELECT o.*, v.snapshot_json, v.preview_image_url
             FROM outfits o
             LEFT JOIN outfit_versions v ON o.current_version_id = v.id
             WHERE o.id = ? AND o.owner_id = ? AND (o.is_deleted = 0 OR ? = 1)
-        """, (outfit_id, owner_id, int(include_deleted)))
+        """, (outfit_id, owner_id, int(include_deleted)), conn=conn)
 
     @staticmethod
     def get_version_by_id_and_owner(version_id: str, owner_id: str) -> Optional[Dict[str, Any]]:
@@ -81,7 +81,7 @@ class OutfitRepository:
         version_id: str,
         snapshot_json: str,
         preview_image_url: Optional[str] = None,
-    ) -> None:
+    ) -> Dict[str, Any]:
         """Tạo outfit, version 1 và trỏ current_version_id trong cùng một transaction nguyên tử (O03)."""
         # Historical snapshots may refer to a removed/unseeded occasion. Preserve
         # the snapshot; link optional catalog metadata only when its row exists.
@@ -95,6 +95,8 @@ class OutfitRepository:
                 INSERT INTO outfit_versions (id, outfit_id, version_number, snapshot_json, preview_image_url)
                 VALUES (?, ?, 1, ?, ?)
             """, (version_id, outfit_id, snapshot_json, preview_image_url))
+            saved = OutfitRepository.get_outfit_by_id_and_owner(outfit_id, owner_id, conn=conn)
+        return saved
 
     @staticmethod
     def save_revision(
