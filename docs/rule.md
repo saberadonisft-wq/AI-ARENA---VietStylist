@@ -85,9 +85,9 @@ Nếu Backend thay đổi response, Backend phải cập nhật `shared/openapi.
 
 Những file sau không thuộc riêng Frontend hay Backend:
 
-- `README.md` và `rule.md`.
-- `.gitignore` và toàn bộ `.vscode/**`.
-- `run_app.bat`, `start_dev.bat`, `stop_dev.bat` và các script ở thư mục gốc.
+- `README.md` và `docs/rule.md`.
+- `.gitignore` và cấu hình phát triển dùng chung.
+- `backend/run_app.bat`, `backend/start_dev.bat`, `backend/stop_dev.bat` và các script khởi động dùng chung.
 - Tài liệu nghiên cứu, kế hoạch hoặc file cấu hình được đặt tại thư mục gốc.
 
 Trước khi sửa file dùng chung, người thực hiện gửi một thông báo theo mẫu:
@@ -122,7 +122,7 @@ Nội dung: cập nhật hướng dẫn chạy giao diện
 | Lỗi hiển thị nhưng API trả đúng contract | Frontend | Frontend sửa và bổ sung test giao diện |
 | API trả sai dữ liệu hoặc sai status code | Backend | Backend sửa và bổ sung test API |
 | Chưa rõ lỗi nằm ở đâu | Cả hai cùng chẩn đoán | Gửi request, response, log và bước tái hiện; người sở hữu nơi phát sinh lỗi sẽ sửa |
-| Sửa tài liệu hoặc task VS Code | Người đã khóa file | Phải làm theo quy trình `[LOCK]`/`[UNLOCK]` |
+| Sửa tài liệu hoặc script khởi động | Người đã khóa file | Phải làm theo quy trình `[LOCK]`/`[UNLOCK]` |
 
 ### 1.6. Ví dụ ranh giới đúng và sai
 
@@ -257,9 +257,9 @@ Nếu có conflict trong file dùng chung, dừng lại và trao đổi người
 
 Chỉ cập nhật `.env.example` bằng placeholder khi bổ sung biến môi trường mới.
 
-## 6. Chạy toàn bộ dự án bằng `Ctrl+Shift+B`
+## 6. Phát triển với Google AI Studio và chạy ứng dụng
 
-Repo đã có task mặc định tại `.vscode/tasks.json` để chạy Backend và Frontend song song. Task Backend ưu tiên `.venv` ở thư mục gốc; nếu không tìm thấy, task dùng lệnh `python` trong `PATH`.
+Công cụ hỗ trợ phát triển được chủ dự án chọn là [Google AI Studio](https://aistudio.google.com/). Khi giao task, cung cấp [hướng dẫn làm việc](./google-ai-studio.md), [hướng dẫn frontend](./google-ai-studio-frontend.md) nếu liên quan, cùng source và contract hiện tại.
 
 Chuẩn bị một lần:
 
@@ -267,14 +267,14 @@ Chuẩn bị một lần:
 2. Tạo `backend/.env` từ `backend/.env.example`.
 3. Tạo `frontend/.env.local` từ `frontend/.env.example`.
 4. Chạy `npm ci` trong `frontend/`.
-5. Mở đúng thư mục gốc `AI-ARENA---VietStylist` bằng VS Code.
+5. Chạy các lệnh khởi động từ thư mục gốc `AI-ARENA---VietStylist` theo README.
 
 Khởi động:
 
-1. Nhấn `Ctrl+Shift+B`.
-2. Nếu VS Code hỏi chọn task, chọn **Start VietStylist (Backend + Frontend)**.
-3. VS Code sẽ mở hai terminal: FastAPI tại <http://127.0.0.1:4000> và Next.js tại <http://localhost:3000>.
+1. Chạy Backend và Frontend trong hai terminal theo [README](../README.md) để nạp đầy đủ biến môi trường.
+2. Trên Windows, có thể dùng `backend/start_dev.bat` sau khi đã cài dependencies và cấu hình môi trường.
+3. Kiểm tra API tại <http://127.0.0.1:4000/health> và giao diện tại <http://localhost:3000>.
 
-Dừng ứng dụng bằng `Ctrl+C` trong hai terminal đang chạy, hoặc mở Command Palette và chọn **Tasks: Run Task** → **Stop VietStylist**.
+Dừng ứng dụng bằng `Ctrl+C` trong hai terminal đang chạy, hoặc dùng `backend/stop_dev.bat` để dừng tiến trình trên cổng 3000 và 4000.
 
-Không nhấn `Ctrl+Shift+B` lần nữa khi hai server vẫn đang chạy. Task đã giới hạn một instance, nhưng nên dừng phiên cũ trước khi khởi động lại.
+Dừng phiên cũ trước khi khởi động lại để tránh chạy nhiều server trên cùng cổng.

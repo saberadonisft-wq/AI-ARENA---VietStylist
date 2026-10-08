@@ -29,7 +29,7 @@ Sửa bổ sung khi đối soát: Google account/profile/role nằm trong cùng 
 
 ## 2. Kết quả kiểm thử
 
-Bằng chứng chính trong `evidence/` (artifact cục bộ, không commit theo mục 5 của `rule.md`; checkout mới không có các file này, cần chạy lại script kiểm chứng để tạo bằng chứng):
+Bằng chứng chính trong `evidence/` (artifact cục bộ, không commit theo mục 5 của `docs/rule.md`; checkout mới không có các file này, cần chạy lại script kiểm chứng để tạo bằng chứng):
 
 - `package_final.json`: build wheel từ source sạch, cài vào virtualenv không dùng system site-packages, constraints CPython 3.13/Windows; `pip check`, smoke import từ site-packages và full suite bằng interpreter mới.
 - `pytest.xml`: kết quả pytest trên workspace, có từng test case/thời gian.
@@ -72,7 +72,7 @@ Lượt soak cuối được khởi chạy trước bổ sung **schema OpenAPI r
 
 Hướng dẫn đầy đủ: [Backend README](../README.md), [handoff frontend](handoff_fe.md). Các lệnh migrate/cleanup chưa chạy trên DB/media thật.
 
-1. Chốt contract/Frontend handoff theo `rule.md`; không dùng checklist gốc để khẳng định đã E2E.
+1. Chốt contract/Frontend handoff theo `docs/rule.md`; không dùng checklist gốc để khẳng định đã E2E.
 2. Bảo trì dừng ghi, backup DB bằng SQLite backup và backup/versioning object storage. Chạy `migrate.py --dry-run` trên cấu hình đích, đối soát duplicate/legacy references.
 3. Nếu duplicate form: chọn `owner_id → keep_id` tường minh, dry-run với `--resolve-forms`; apply archive nguyên field của các bản dư. Không tự chọn bản mới nhất hoặc đổi owner.
 4. Apply migration bằng CLI, kiểm tra checksum/schema và `/ready`. App production chỉ đọc schema, không tạo/seed bảng khi startup.

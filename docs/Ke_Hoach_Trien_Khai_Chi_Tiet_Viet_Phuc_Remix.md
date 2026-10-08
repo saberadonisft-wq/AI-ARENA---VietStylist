@@ -2,23 +2,25 @@
 
 Ngày cập nhật: **16/09/2026**. Baseline kiểm tra: commit `739a73a`.
 
-**Người thực hiện dự kiến: Gemini 3.8 theo yêu cầu chủ dự án.** Đây là tài liệu bàn giao công việc, không phải yêu cầu đổi model Gemini API trong ứng dụng.
+Hướng dẫn công cụ phát triển cập nhật: **08/10/2026**.
+
+**Công cụ hỗ trợ phát triển được chọn: Google AI Studio theo yêu cầu chủ dự án.** Đây là tài liệu bàn giao công việc, không phải yêu cầu đổi model Gemini API trong ứng dụng.
 
 **Trạng thái: CHƯA TRIỂN KHAI.** Lượt này chỉ cập nhật kế hoạch. Chưa sửa backend/frontend, chưa chạy migration trên dữ liệu thật, chưa triển khai production.
 
 Tài liệu này thay thế toàn bộ kế hoạch cũ và chỉ mô tả công việc sửa lỗi, tối ưu, tích hợp và nghiệm thu dựa trên code hiện tại. Các checklist chưa đánh dấu không phải công việc đã hoàn thành.
 
-## A0. Chỉ dẫn bắt buộc cho Gemini khi nhận việc
+## A0. Chỉ dẫn bắt buộc khi nhận việc trong Google AI Studio
 
 ### A0.1. Mục tiêu và giới hạn
 
 Hoàn thành lần lượt: đóng 11 lỗi đã xác nhận; bổ sung kiểm thử hồi quy; bảo toàn dữ liệu; đồng bộ OpenAPI; tối ưu backend có số đo; bàn giao thay đổi tích hợp cho Frontend. Không xây lại ứng dụng hoặc đổi toàn bộ stack để tránh sửa lỗi.
 
-1. Đọc `rule.md` và `AGENTS.md` nếu có trước khi sửa. Nếu repo có `.codegraph/`, dùng CodeGraph trước để tìm hiểu code; không tự tạo index.
+1. Đọc `docs/rule.md`, `docs/google-ai-studio.md` và `docs/google-ai-studio-frontend.md` nếu task liên quan frontend. Công cụ hỗ trợ phát triển được chủ dự án chọn là Google AI Studio; cung cấp hướng dẫn cùng source và yêu cầu của từng task. Các đường dẫn source trong kế hoạch được tính từ thư mục gốc repository.
 2. Đối chiếu lại branch, HEAD, working tree và các symbol được nêu. Số dòng là mốc review, có thể thay đổi. Nếu code đã sửa, chạy lại tình huống lỗi và ghi bằng chứng thay vì áp dụng bản vá trùng.
 3. Backend phụ trách `backend/**`, `supabase/**`, `shared/openapi.json`. Frontend là task riêng; không sửa UI/type/client để che một lỗi backend hoặc làm test pass.
 4. Không làm trực tiếp trên `main`. Tạo branch từ điểm tích hợp đã thống nhất; không tự chuyển branch, reset, stash, pull/rebase khi có thay đổi chưa được bảo toàn. Không `git add .`, không force-push, không commit secret/database/media.
-5. Người dùng đã yêu cầu cập nhật chính tài liệu này. Với các file chung khác, thực hiện quy trình phối hợp `[LOCK]`/`[UNLOCK]` trong `rule.md`; không coi tài liệu này là quyền sửa tùy ý mọi file gốc.
+5. Người dùng đã yêu cầu cập nhật chính tài liệu này. Với các file chung khác, thực hiện quy trình phối hợp `[LOCK]`/`[UNLOCK]` trong `docs/rule.md`; không coi tài liệu này là quyền sửa tùy ý mọi file gốc.
 6. Mỗi task gồm: xác nhận nguyên nhân → test tái hiện trên dữ liệu tạm → sửa tối thiểu đúng thiết kế → test pass → cập nhật contract nếu cần → mô tả thay đổi và giới hạn. Không xóa test bảo mật hoặc bỏ kiểm tra để lấy kết quả xanh.
 7. Không đọc/ghi/xóa file thật khi thử path traversal. Chỉ tạo sentinel dưới thư mục tạm riêng và xác nhận đường dẫn nằm trong đó trước khi dọn.
 8. Không gọi Google/Gemini/R2 thật trong test mặc định. Không dùng key trong `.env` cho test; cấu hình test và chặn outbound trước khi import app.
@@ -106,7 +108,7 @@ Chọn phương án thực thi M1: **khách phối đồ/xuất ảnh/lưu nháp
 
 ### A2.3. Breaking changes và phối hợp
 
-Các thay đổi xác thực của R04/R05, privacy R09, status/error mới, share revoke và cấu hình URL là thay đổi contract/hành vi dù JSON cũ giữ nguyên. Backend phải xuất OpenAPI, nêu payload mẫu và thông báo cho Frontend trước khi tích hợp. Theo `rule.md`, Frontend cập nhật sau commit contract; không merge/deploy một nửa luồng guest-save rồi coi là hoàn thành.
+Các thay đổi xác thực của R04/R05, privacy R09, status/error mới, share revoke và cấu hình URL là thay đổi contract/hành vi dù JSON cũ giữ nguyên. Backend phải xuất OpenAPI, nêu payload mẫu và thông báo cho Frontend trước khi tích hợp. Theo `docs/rule.md`, Frontend cập nhật sau commit contract; không merge/deploy một nửa luồng guest-save rồi coi là hoàn thành.
 
 Không đổi token sang cookie/session mới trong bản vá này. Nếu đổi cơ chế lưu token, cần task riêng về CSRF, CORS, SameSite, refresh/logout và tương thích client.
 
@@ -364,7 +366,7 @@ Các O-task là công việc tăng độ bền/hiệu năng phát hiện khi đ�
 - Chọn cơ chế lock/constraints phù hợp, lưu phiên bản resolve theo chính sách repo; dependency mới chỉ khi có lợi ích cụ thể và kiểm tra license/compatibility. Không commit virtualenv hoặc cache.
 - Conftest: cấu hình env và dependency injection trước import app; account fixture có DB thật tạm và JWT test; lifecycle TestClient được chạy rõ. Mock HTTP/R2 injectable; thêm autouse guard không cho outbound thật ở test mặc định.
 - Test file mới theo nghiệp vụ/security thay vì một file khổng lồ; dùng fixture chung, không sao chép chữ ký secret hoặc dữ liệu người dùng thật.
-- CI nếu thêm workflow là file dùng chung, theo `rule.md` cần phối hợp. Local checks phải chạy được trước khi yêu cầu thêm workflow; không để task chờ CI mới viết regression tests.
+- CI nếu thêm workflow là file dùng chung, theo `docs/rule.md` cần phối hợp. Local checks phải chạy được trước khi yêu cầu thêm workflow; không để task chờ CI mới viết regression tests.
 
 ## A5. Thứ tự triển khai, dependency và chia commit
 
@@ -390,7 +392,7 @@ R10 không phải việc để cuối cùng mới làm: mỗi PR đổi API cậ
 
 ### A5.2. Nhóm commit đề xuất
 
-Tạo branch task riêng theo `rule.md`; nếu làm tuần tự một nhánh dài đã được thống nhất thì vẫn tách commit logic và không đồng thời sửa cùng file với người khác. Các tên dưới đây là đề xuất, chưa phải branch/commit đã tồn tại:
+Tạo branch task riêng theo `docs/rule.md`; nếu làm tuần tự một nhánh dài đã được thống nhất thì vẫn tách commit logic và không đồng thời sửa cùng file với người khác. Các tên dưới đây là đề xuất, chưa phải branch/commit đã tồn tại:
 
 1. `test(backend): reproduce auth media and ownership regressions` — fixture an toàn và test hành vi đích; có thể squash cùng bản sửa tương ứng để không merge main đang đỏ.
 2. `fix(backend): enforce token validation and explicit role grants` — R02/R03, tests, env example và contract.
@@ -715,7 +717,7 @@ Không yêu cầu key Gemini/R2/Google cho unit test và export OpenAPI. Develop
 
 ### A9.4. Gói bàn giao bắt buộc cho mỗi mốc
 
-Tạo dưới `backend/docs/` hoặc vị trí artifact đã thống nhất; file report được commit phải không chứa secret/PII, raw logs/benchmark transient không commit nếu `rule.md` cấm báo cáo sinh tự động.
+Tạo dưới `backend/docs/` hoặc vị trí artifact đã thống nhất; file report được commit phải không chứa secret/PII, raw logs/benchmark transient không commit nếu `docs/rule.md` cấm báo cáo sinh tự động.
 
 - Bảng R01–R11/O01–O08: status, file/symbol sửa, tên test, kết quả, giới hạn còn lại.
 - Contract diff + payload success/error dùng dữ liệu giả + breaking changes + commit để Frontend tích hợp.
@@ -770,9 +772,9 @@ Việc tiếp theo:
 - [ ] M1: 11 lỗi đóng, các O-task nghiệm thu, không thiếu phần BE/FE bắt buộc.
 - [ ] M2 (đợt riêng nếu được giao): Supabase migration/auth cutover và đối soát dữ liệu/quyền.
 
-### A10.2. Chỉ dẫn ngắn có thể đưa trực tiếp cho Gemini
+### A10.2. Chỉ dẫn ngắn có thể đưa trực tiếp vào Google AI Studio
 
-> Đọc `rule.md` và toàn bộ kế hoạch này. Xác minh lại baseline rồi thực hiện S0–S9 theo dependency, bắt đầu bằng test tái hiện và chặn các lỗ hổng. Sửa đủ R01–R11, làm O01–O08 với số đo. Giữ đúng phạm vi Backend và bàn giao Frontend bằng contract đã commit; không tự sửa file ngoài quyền sở hữu. Mọi test dùng DB/media tạm và provider giả mặc định. Không làm Supabase cutover hoặc bật AI try-on nếu task hiện tại chỉ là M1. Không đánh dấu DONE nếu mới có mock/test đơn vị nhưng chưa đạt acceptance tương ứng. Khi báo cáo, nêu bằng chứng, thay đổi contract/migration, dữ liệu cũ, rollback và giới hạn còn lại. Không chỉ trả lời kế hoạch nếu người dùng đã giao triển khai; làm theo từng gate và bảo toàn thay đổi đang có.
+> Đọc `docs/rule.md` và toàn bộ kế hoạch này. Xác minh lại baseline rồi thực hiện S0–S9 theo dependency, bắt đầu bằng test tái hiện và chặn các lỗ hổng. Sửa đủ R01–R11, làm O01–O08 với số đo. Giữ đúng phạm vi Backend và bàn giao Frontend bằng contract đã commit; không tự sửa file ngoài quyền sở hữu. Mọi test dùng DB/media tạm và provider giả mặc định. Không làm Supabase cutover hoặc bật AI try-on nếu task hiện tại chỉ là M1. Không đánh dấu DONE nếu mới có mock/test đơn vị nhưng chưa đạt acceptance tương ứng. Khi báo cáo, nêu bằng chứng, thay đổi contract/migration, dữ liệu cũ, rollback và giới hạn còn lại. Không chỉ trả lời kế hoạch nếu người dùng đã giao triển khai; làm theo từng gate và bảo toàn thay đổi đang có.
 
 ### A10.3. Nguồn kỹ thuật đã đối chiếu khi lập kế hoạch
 
@@ -785,4 +787,4 @@ Các nguồn bổ trợ cho thiết kế, không thay thế source code trong re
 - [Supabase — JWT signing keys](https://supabase.com/docs/guides/auth/signing-keys): verification và rotation cho đợt M2, không giả định HS256 cho mọi token Supabase.
 - [Supabase — service role và RLS](https://supabase.com/docs/guides/troubleshooting/why-is-my-service-role-key-client-getting-rls-errors-or-not-returning-data-7_1K9z): không dùng service-role bypass làm cơ chế owner authorization.
 
-Nguồn nội bộ: `rule.md`, `backend/app/**`, `backend/tests/**`, `shared/openapi.json`, `supabase/migrations/**`, `frontend/src/lib/api/client.ts` và các consumer được liệt kê ở FE01–FE05. **Tài liệu này là kế hoạch thực thi mới; không giữ phụ lục kế hoạch cũ.**
+Nguồn nội bộ: `docs/rule.md`, `backend/app/**`, `backend/tests/**`, `shared/openapi.json`, `supabase/migrations/**`, `frontend/src/lib/api/client.ts` và các consumer được liệt kê ở FE01–FE05. **Tài liệu này là kế hoạch thực thi mới; không giữ phụ lục kế hoạch cũ.**

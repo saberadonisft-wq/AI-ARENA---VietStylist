@@ -2,7 +2,9 @@
 
 Cập nhật: **17/09/2026** — dự án Việt phục Remix / VietStylist.
 
-Tài liệu này ghi lại trạng thái sau đợt sửa lỗi nghiệm thu để đồng nghiệp Frontend cập nhật client, type và giao diện. Quy ước cộng tác vẫn theo [rule.md](rule.md).
+Tài liệu này ghi lại trạng thái sau đợt sửa lỗi nghiệm thu để đồng nghiệp Frontend cập nhật client, type và giao diện. Quy ước cộng tác vẫn theo [rule.md](./rule.md).
+
+> Tài liệu lưu trữ theo trạng thái ngày 17/09/2026. Đối chiếu source, OpenAPI và README hiện tại trước khi sử dụng; các số liệu bên dưới không phải trạng thái nghiệm thu production hiện tại.
 
 ## 1. Trạng thái bàn giao
 
@@ -15,12 +17,12 @@ Các tài liệu cần đọc:
 
 | Tài liệu | Dùng để làm gì |
 | --- | --- |
-| [shared/openapi.json](shared/openapi.json) | Nguồn contract: method, endpoint, request, response, trường bắt buộc |
-| [handoff_fe.md](backend/docs/handoff_fe.md) | Chi tiết tích hợp API sau sửa nghiệm thu |
-| [remediation_results_20260917.md](backend/docs/remediation_results_20260917.md) | Đối chiếu F01–F16, kết quả test và giới hạn nghiệm thu |
-| [Backend README](backend/README.md) | Chạy backend, cấu hình, migration và triển khai |
+| [shared/openapi.json](../shared/openapi.json) | Nguồn contract: method, endpoint, request, response, trường bắt buộc |
+| [handoff_fe.md](../backend/docs/handoff_fe.md) | Chi tiết tích hợp API sau sửa nghiệm thu |
+| [remediation_results_20260917.md](../backend/docs/remediation_results_20260917.md) | Đối chiếu F01–F16, kết quả test và giới hạn nghiệm thu |
+| [Backend README](../backend/README.md) | Chạy backend, cấu hình, migration và triển khai |
 
-Frontend cập nhật `frontend/**`; Backend quản lý API, migration và OpenAPI. Không sửa OpenAPI bằng tay để khớp mock UI. Nếu cần đổi contract, trao đổi với người phụ trách Backend theo `rule.md`.
+Frontend cập nhật `frontend/**`; Backend quản lý API, migration và OpenAPI. Không sửa OpenAPI bằng tay để khớp mock UI. Nếu cần đổi contract, trao đổi với người phụ trách Backend theo `docs/rule.md`.
 
 ## 2. Những thay đổi cần chú ý ngay
 
@@ -190,8 +192,8 @@ Các mục dưới đây là **việc còn cần làm/kiểm chứng**, không p
 
 | Thứ tự | Công việc | Vị trí bắt đầu đọc |
 | --- | --- | --- |
-| FE01 | Rà JWT, guest draft → login → sync, bảo toàn snapshot/transform và xử lý revision conflict | [auth/context.tsx](frontend/src/lib/auth/context.tsx), [studio/state.ts](frontend/src/features/studio/state.ts) |
-| FE02 | Triển khai upload session/local multipart/R2 raw PUT/complete/access/delete và lỗi từng bước | [api/client.ts](frontend/src/lib/api/client.ts), [types/api.ts](frontend/src/lib/types/api.ts), UI media liên quan |
+| FE01 | Rà JWT, guest draft → login → sync, bảo toàn snapshot/transform và xử lý revision conflict | [auth/context.tsx](../frontend/src/lib/auth/context.tsx), [studio/state.ts](../frontend/src/features/studio/state.ts) |
+| FE02 | Triển khai upload session/local multipart/R2 raw PUT/complete/access/delete và lỗi từng bước | [api/client.ts](../frontend/src/lib/api/client.ts), [types/api.ts](../frontend/src/lib/types/api.ts), UI media liên quan |
 | FE03 | Cập nhật lookbook entries, quyền unlisted, tạo/thu hồi/share hết hạn | Client, type và page lookbook/share trong `frontend/src/app/**` |
 | FE04 | Empty state cho nội dung unpublished, nguồn fallback AI/weather, try-on unavailable, cache theo quyền | Các tính năng catalog/heritage/gợi ý và API client |
 | FE05 | Chuẩn hóa lỗi, request_id, 429/retry; bổ sung kiểm thử tích hợp | API client và `frontend/tests/**` |
@@ -214,7 +216,7 @@ Checklist bàn giao lại sau khi Frontend hoàn tất:
 
 ## 9. Backend đã xác minh đến đâu?
 
-Theo [báo cáo và bằng chứng lưu trong repository](backend/docs/remediation_results_20260917.md):
+Theo [báo cáo và bằng chứng lưu trong repository](../backend/docs/remediation_results_20260917.md):
 
 - 125/125 test pass, không fail/error/skip; môi trường cài mới từ wheel cũng đạt 125 test và `pip check`.
 - Soak cục bộ 600 giây: 11.073 request, toàn bộ HTTP 200, các ngưỡng đo đều đạt. Đây là workload kiểm thử cục bộ, không phải cam kết tải production.

@@ -241,7 +241,7 @@ Không tối ưu bằng cách bỏ validation, giảm kiểm tra quyền, bỏ e
 ## 11. Cách triển khai và điều kiện phát hành
 
 - Trước khi sửa, lập danh sách thay đổi V3 đang có trong working tree, không reset hoặc ghi đè. Tách nền thay đổi sẵn có khỏi từng đợt remediation.
-- Backend và Frontend có branch/commit riêng theo `rule.md`; Backend bàn giao contract trước phần tích hợp FE. File dùng chung thực hiện đúng quy ước phối hợp hiện có.
+- Backend và Frontend có branch/commit riêng theo `docs/rule.md`; Backend bàn giao contract trước phần tích hợp FE. File dùng chung thực hiện đúng quy ước phối hợp hiện có.
 - Mỗi đợt bàn giao gồm vấn đề, thay đổi, test đã chạy, phần chưa xác minh và cách rollback. Không cộng việc CI pass thành bằng chứng chất lượng AI hoặc vận hành production.
 - Giai đoạn 0–3 là điều kiện bắt buộc trước khi cân nhắc phát hành bản sửa ổn định. V3 chỉ bật sau giai đoạn 4; AI ảnh chỉ bật sau giai đoạn 6.
 - Trước deployment: backup theo phạm vi DB/media, kiểm tra migration trên bản sao, `/ready`, CORS, quyền media và luồng đăng nhập thật trong staging. Hoàn thành artifact và bằng chứng trước bước quyết định phát hành.
