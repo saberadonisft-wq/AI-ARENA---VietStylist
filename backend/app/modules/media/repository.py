@@ -172,6 +172,10 @@ class MediaRepository:
         for table in ("asset_layers", "render_profiles_v3"):
             if conn.execute(f"SELECT 1 FROM {table} WHERE media_asset_id=? LIMIT 1", (media_id,)).fetchone():
                 return "in_use"
+        # Private stylist submissions have a media ID but no public URL.
+        if conn.execute("SELECT 1 FROM items WHERE metadata LIKE ? LIMIT 1",
+                        ("%" + media_id + "%",)).fetchone():
+            return "in_use"
         if url:
             for table, column in (("accounts", "avatar_url"), ("profiles", "avatar_url"),
                                   ("avatars", "base_image_url"), ("lookbooks", "cover_image_url"),
@@ -180,8 +184,8 @@ class MediaRepository:
                     return "in_use"
             # Conservative matching is deliberate: retaining a possible
             # catalog reference is preferable to deleting its image.
-            if conn.execute("SELECT 1 FROM items WHERE metadata LIKE ? OR metadata LIKE ? LIMIT 1",
-                            ("%" + media_id + "%", "%" + url + "%")).fetchone():
+            if conn.execute("SELECT 1 FROM items WHERE metadata LIKE ? LIMIT 1",
+                            ("%" + url + "%",)).fetchone():
                 return "in_use"
         if conn.execute("SELECT 1 FROM generation_profiles_v3 WHERE reference_media_ids_json LIKE ? LIMIT 1",
                         ("%" + media_id + "%",)).fetchone():

@@ -113,3 +113,62 @@ def submission_request(media_id):
     return CreateGarmentSubmissionRequest(name="Release garment", garment_type_id="release-type",
         slot="outerwear", description="A synthetic garment for regression checks.",
         color_name="Red", hex_color="#ff0000", media_id=media_id)
+
+
+def test_private_stylist_image_is_retained_until_its_last_submission_is_deleted(png_bytes):
+    image = MediaService.ingest_generated_image(OWNER, png_bytes, "image/png")
+    request = submission_request(image.id)
+    first = StylistCatalogService.create(OWNER, request)
+    second = StylistCatalogService.create(OWNER, request)
+    assert MediaRepository.get_media_by_id(image.id)["public_url"] is None
+    with pytest.raises(AppError) as direct_delete:
+        MediaService.delete_media(image.id, OWNER)
+    assert direct_delete.value.code == "MEDIA_IN_USE"
+    assert StylistCatalogService.delete_own_submission(first["id"], OWNER)["status"] == "deleted"
+    assert MediaRepository.get_media_by_id(image.id)["status"] == "ready"
+    assert StylistCatalogService.preview_url(second["id"]).access_url
+    assert StylistCatalogService.delete_own_submission(second["id"], OWNER)["media_cleanup_pending"] == 0
+    assert MediaRepository.get_media_by_id(image.id)["status"] == "deleted"
+
+
+def test_stylist_deletion_retains_cleanup_ledger_after_storage_failure(png_bytes, monkeypatch):
+    image = MediaService.ingest_generated_image(OWNER, png_bytes, "image/png")
+    submission = StylistCatalogService.create(OWNER, submission_request(image.id))
+    with monkeypatch.context() as cleanup:
+        cleanup.setattr(stylist_service.r2_client, "delete_object", lambda *args: False)
+        result = StylistCatalogService.delete_own_submission(submission["id"], OWNER)
+    assert result == {"status": "deleted", "media_cleanup_pending": 1}
+    assert Database.fetch_one("SELECT id FROM items WHERE id=?", (submission["id"],)) is None
+    assert MediaRepository.get_media_by_id(image.id)["status"] == "deleting"
+    assert MediaRepository.objects(image.id)
+    MediaService.delete_media(image.id, OWNER)
+    assert MediaRepository.get_media_by_id(image.id)["status"] == "deleted"
+
+
+def test_stylist_deletion_rolls_back_unlink_when_media_is_busy(png_bytes):
+    image = MediaService.ingest_generated_image(OWNER, png_bytes, "image/png")
+    submission = StylistCatalogService.create(OWNER, submission_request(image.id))
+    Database.execute("UPDATE media_assets SET status='processing',lease_until=9999999999 WHERE id=?", (image.id,))
+    with pytest.raises(AppError) as busy:
+        StylistCatalogService.delete_own_submission(submission["id"], OWNER)
+    assert busy.value.code == "MEDIA_BUSY"
+    assert Database.fetch_one("SELECT id FROM items WHERE id=?", (submission["id"],))
+    assert MediaRepository.get_media_by_id(image.id)["status"] == "processing"
+
+
+def test_submission_creation_cannot_reference_media_reserved_for_deletion(png_bytes, monkeypatch):
+    image = MediaService.ingest_generated_image(OWNER, png_bytes, "image/png")
+    request = submission_request(image.id)
+    original = stylist_service.db_transaction
+
+    @contextmanager
+    def deletion_wins_before_submission_lock():
+        assert MediaRepository.mark_media_deleting_if_unused(image.id, OWNER) == "marked"
+        with original() as conn:
+            yield conn
+
+    monkeypatch.setattr(stylist_service, "db_transaction", deletion_wins_before_submission_lock)
+    with pytest.raises(AppError) as rejected:
+        StylistCatalogService.create(OWNER, request)
+    assert rejected.value.code == "SUBMISSION_IMAGE_REQUIRED"
+    assert Database.fetch_one("SELECT id FROM items WHERE metadata LIKE ?", ("%" + image.id + "%",)) is None

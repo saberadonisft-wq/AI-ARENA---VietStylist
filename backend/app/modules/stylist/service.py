@@ -82,8 +82,8 @@ class StylistCatalogService:
         return value if isinstance(value, dict) else {}
 
     @classmethod
-    def get_submission(cls, item_id):
-        item = Database.fetch_one("SELECT * FROM items WHERE id=?", (item_id,))
+    def get_submission(cls, item_id, *, conn=None):
+        item = Database.fetch_one("SELECT * FROM items WHERE id=?", (item_id,), conn=conn)
         metadata = cls._metadata(item or {})
         submission = metadata.get("stylist_submission")
         if not item or item.get("is_published") or not isinstance(submission, dict):
@@ -92,14 +92,17 @@ class StylistCatalogService:
 
     @classmethod
     def create(cls, user_id, req: CreateGarmentSubmissionRequest):
-        media = MediaService._owned(req.media_id, user_id)
-        if media.get("media_type") != "image" or media.get("status") != "ready" or media.get("visibility") != "private":
-            raise AppError("SUBMISSION_IMAGE_REQUIRED", "Tải ảnh riêng tư lên hoàn tất trước khi gửi mẫu.", 422)
         item_id = f"stylist_{uuid.uuid4().hex}"
         now = datetime.now(timezone.utc).isoformat()
         metadata = {"stylist_submission": {"submitter_id": user_id, "media_id": req.media_id, "status": "pending", "submitted_at": now}}
         try:
             with db_transaction() as conn:
+                # Validate while holding the same write lock used by media deletion.
+                media = MediaRepository.get_media_by_id(req.media_id, conn=conn)
+                if not media or media.get("owner_id") != user_id:
+                    raise AppError("MEDIA_NOT_FOUND", "Không tìm thấy file", 404)
+                if media.get("media_type") != "image" or media.get("status") != "ready" or media.get("visibility") != "private":
+                    raise AppError("SUBMISSION_IMAGE_REQUIRED", "Tải ảnh riêng tư lên hoàn tất trước khi gửi mẫu.", 422)
                 conn.execute("INSERT INTO items(id,garment_type_id,name,slot,gender,description,era,is_published,metadata) VALUES(?,?,?,?,?,?,?,0,?)",
                     (item_id, req.garment_type_id, req.name, req.slot, req.gender, req.description, req.era, json.dumps(metadata, ensure_ascii=False, separators=(",", ":"))))
                 conn.execute("INSERT INTO item_variants(id,item_id,color_name,hex_color,material,is_default) VALUES(?,?,?,?,?,1)",
@@ -152,19 +155,33 @@ class StylistCatalogService:
 
     @classmethod
     def delete_own_submission(cls, item_id, user_id):
-        item, metadata, submission = cls.get_submission(item_id)
-        if submission.get("submitter_id") != user_id:
-            raise AppError("SUBMISSION_NOT_FOUND", "Không tìm thấy mẫu của bạn.", 404)
-        if submission.get("status") == "approved":
-            raise AppError("SUBMISSION_ALREADY_APPROVED", "Mẫu đã vào thư viện; liên hệ admin nếu cần gỡ.", 409)
-        if submission.get("media_id"):
+        cleanup_id = None
+        with db_transaction() as conn:
+            _, _, submission = cls.get_submission(item_id, conn=conn)
+            if submission.get("submitter_id") != user_id:
+                raise AppError("SUBMISSION_NOT_FOUND", "Không tìm thấy mẫu của bạn.", 404)
+            if submission.get("status") == "approved":
+                raise AppError("SUBMISSION_ALREADY_APPROVED", "Mẫu đã vào thư viện; liên hệ admin nếu cần gỡ.", 409)
+            conn.execute("DELETE FROM items WHERE id=? AND is_published=0", (item_id,))
+            media_id = submission.get("media_id")
+            media = MediaRepository.get_media_by_id(media_id, conn=conn) if media_id else None
+            if media and media.get("owner_id") == user_id and media.get("status") != "deleted":
+                marked = MediaRepository.mark_media_deleting_if_unused(media_id, user_id, conn=conn)
+                if marked == "busy":
+                    raise AppError("MEDIA_BUSY", "File đang được xử lý; thử lại sau", 409)
+                if marked == "marked":
+                    conn.execute("UPDATE media_assets SET next_reconcile_at=0 WHERE id=?", (media_id,))
+                    cleanup_id = media_id
+        pending = 0
+        if cleanup_id:
             try:
-                MediaService.delete_media(submission["media_id"], user_id)
-            except AppError as exc:
-                if exc.status_code != 404:
-                    raise
-        Database.execute("DELETE FROM items WHERE id=? AND is_published=0", (item_id,))
-        return {"status": "deleted"}
+                MediaService.delete_media(cleanup_id, user_id)
+            except Exception:
+                # The committed deletion is successful; the durable media ledger
+                # lets the janitor retry storage cleanup outside this transaction.
+                pending = 1
+                logger.warning("Stylist media cleanup pending media_id=%s", cleanup_id)
+        return {"status": "deleted", "media_cleanup_pending": pending}
 
     @classmethod
     def review(cls, item_id, moderator_id, action, note=None):
