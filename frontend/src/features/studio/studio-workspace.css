@@ -1,6 +1,3 @@
-/* Hallmark · genre: modern-minimal · macrostructure: Workbench · theme: studied-DNA (source: image, light adaptation)
- * tone: light, restrained · anchor hue: heritage crimson · fonts: Be Vietnam Pro + Noto Serif
- * pre-emit critique: P4 H4 E4 S4 R5 V4 */
 @import './studio-tokens.css';
 
 .studio-site-frame { display: grid; grid-template-rows: auto minmax(0, 1fr); height: 100dvh; min-height: 0; }
