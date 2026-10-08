@@ -8,7 +8,7 @@ import tempfile
 import warnings
 import xml.etree.ElementTree as ET
 from pathlib import Path
-from PIL import Image, UnidentifiedImageError
+from PIL import Image, ImageOps, UnidentifiedImageError
 from app.core.config import settings
 from app.core.errors import AppError
 
@@ -53,9 +53,11 @@ def validate_content(data, mime_type):
                 if width * height > settings.MEDIA_MAX_PIXELS:
                     raise ValueError("Pixel limit exceeded")
                 picture.load()
+                picture = ImageOps.exif_transpose(picture)
+                width, height = picture.size
                 output = io.BytesIO()
                 # Decode and re-encode: discard appended bytes and untrusted metadata.
-                picture.save(output, format=formats[mime_type])
+                picture.save(output, format=formats[mime_type], exif=b"")
                 clean = output.getvalue()
                 if len(clean) > settings.MEDIA_IMAGE_MAX_BYTES:
                     raise ValueError("Normalized file too large")

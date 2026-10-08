@@ -172,3 +172,23 @@ def test_submission_creation_cannot_reference_media_reserved_for_deletion(png_by
         StylistCatalogService.create(OWNER, request)
     assert rejected.value.code == "SUBMISSION_IMAGE_REQUIRED"
     assert Database.fetch_one("SELECT id FROM items WHERE metadata LIKE ?", ("%" + image.id + "%",)) is None
+
+
+@pytest.mark.parametrize("orientation", range(1, 9))
+def test_image_normalization_applies_exif_orientation_before_stripping_metadata(orientation):
+    picture = Image.new("RGB", (80, 40), "red")
+    picture.paste("blue", (40, 0, 80, 40))
+    picture.paste("green", (0, 20, 40, 40))
+    exif = Image.Exif()
+    exif[274] = orientation
+    exif[271] = "Untrusted camera metadata"
+    source = io.BytesIO()
+    picture.save(source, format="JPEG", quality=95, exif=exif)
+    expected = ImageOps.exif_transpose(Image.open(io.BytesIO(source.getvalue())))
+    clean, width, height, duration = validate_content(source.getvalue(), "image/jpeg")
+    normalized = Image.open(io.BytesIO(clean))
+    assert normalized.size == expected.size == (width, height)
+    assert not normalized.getexif()
+    assert duration is None
+    difference = ImageChops.difference(normalized, expected)
+    assert max(ImageStat.Stat(difference).mean) < 5
