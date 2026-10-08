@@ -69,6 +69,9 @@ export default function DragShadowImage({ url, x, y, width, height }: {
   useEffect(() => {
     let active = true, objectUrl: string | undefined;
     setImageUrl(undefined);
+    // Private session images must never enter the module-level blob cache.
+    // The original SVG image already renders its shadow and supports dragging.
+    if (url.startsWith("blob:")) return;
     const timer = setTimeout(() => {
       void shadowBlob(url, width, height).then(blob => {
         if (!active || !blob) return;

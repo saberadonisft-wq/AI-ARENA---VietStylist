@@ -430,7 +430,7 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
       const source = item.metadata?.catalog_media_id
         ? `${API_ORIGIN}/api/catalog/items/${encodeURIComponent(item.id)}/studio-image`
         : (item.metadata?.flatlay_image_url as string | undefined) || (item.metadata?.real_image_url as string | undefined);
-      if (!source || !imageRetry) return source;
+      if (!source || !imageRetry || source.startsWith("blob:")) return source;
       const hashStart = source.indexOf("#");
       const path = hashStart < 0 ? source : source.slice(0, hashStart);
       const hash = hashStart < 0 ? "" : source.slice(hashStart);
