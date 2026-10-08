@@ -20,6 +20,8 @@ import {
 import { api } from "@/lib/api/client";
 import { useStudioDocument } from "@/features/studio/useStudioDocument";
 import { mergeUnlockedItems } from "@/features/studio/state";
+import SessionGarmentUpload from "@/features/studio/SessionGarmentUpload";
+import { hasSessionGarments, isSessionGarment, SESSION_SAVE_NOTICE } from "@/features/studio/sessionGarments";
 import { occasionBackgroundPatch, neutralBackground, type BackgroundTheme } from "@/features/studio/backgrounds";
 import { useAuth } from "@/lib/auth/context";
 import { useCatalog } from "@/lib/catalog/CatalogProvider";
@@ -107,13 +109,15 @@ export default function StudioPage() {
   const {
     garmentTypes,
     occasions,
-    catalogItems,
+    catalogItems: publishedCatalogItems,
     avatars,
     isLoading: isInitialLoading,
     error: catalogError,
     itemsError: catalogItemsError,
     refreshCatalog,
   } = useCatalog();
+  const catalogItems = useMemo(() => [...publishedCatalogItems, ...studio.sessionGarments.items], [publishedCatalogItems, studio.sessionGarments.items]);
+  const hasTemporaryImages = hasSessionGarments(snapshot);
   const currentAvatar = avatars.find(a => a.id === snapshot.avatarId) || null;
   const [selectedGarmentType, setSelectedGarmentType] = useState("all");
   const [workspacePanel, setWorkspacePanel] = useState<StudioPanelId | null>(null);
@@ -128,7 +132,7 @@ export default function StudioPage() {
   const equippedItems = snapshot.items;
   const unavailableSnapshotItems = useMemo(() => {
     if (isInitialLoading || catalogItemsError) return [];
-    const publishedIds = new Set(catalogItems.filter(item => item.is_published).map(item => item.id));
+    const publishedIds = new Set(catalogItems.filter(item => item.is_published || isSessionGarment(item.id)).map(item => item.id));
     return equippedItems.filter(item => !publishedIds.has(item.itemId));
   }, [equippedItems, catalogItems, catalogItemsError, isInitialLoading]);
   const lockedSlots = useMemo(() => new Set(snapshot.lockedSlots || []), [snapshot.lockedSlots]);
@@ -266,6 +270,10 @@ export default function StudioPage() {
     window.location.assign('/lookbook?dang=1&outfit=' + encodeURIComponent(saved.id));
   };
   const requestAccountAction = (action: "save" | "save-new" | "publish" | "export" | "try-on" | "recommendations") => {
+    if (hasTemporaryImages && ["save", "save-new", "publish", "try-on"].includes(action)) {
+      setActionNotice(SESSION_SAVE_NOTICE);
+      return;
+    }
     if ((action === "export" || action === "try-on") && equippedItems.length === 0) {
       setActionNotice("Thêm ít nhất một món trang phục trước khi xuất ảnh hoặc thử đồ AI.");
       return;
@@ -394,14 +402,14 @@ export default function StudioPage() {
   const culturalPayload = JSON.stringify({
     garment_type_id: selectedGarmentType === "all" ? undefined : selectedGarmentType,
     occasion_id: selectedOccasion, style_mode: styleMode, overlap_direction: overlapDirection,
-    items: equippedItems.map(it => ({ slot: it.slot, item_id: it.itemId, variant_id: it.variantId, color_hex: it.colorHex })),
+    items: equippedItems.filter(it => !isSessionGarment(it.itemId)).map(it => ({ slot: it.slot, item_id: it.itemId, variant_id: it.variantId, color_hex: it.colorHex })),
   });
   useEffect(() => {
     if (!studio.hydrated) return;
     let active = true;
     setCulturalCheck(null);
     setCulturalCheckError(null);
-    if (!equippedItems.length) {
+    if (hasTemporaryImages || !equippedItems.length) {
       setCulturalCheckStatus("empty");
       return () => { active = false; };
     }
@@ -412,7 +420,7 @@ export default function StudioPage() {
         .catch((error: any) => { if (active) { setCulturalCheck(null); setCulturalCheckError(error?.message || "Không nhận được phản hồi."); setCulturalCheckStatus("error"); } });
     }, 200);
     return () => { active = false; clearTimeout(timer); };
-  }, [culturalPayload, studio.hydrated, culturalCheckRetry, equippedItems.length]);
+  }, [culturalPayload, studio.hydrated, culturalCheckRetry, equippedItems.length, hasTemporaryImages]);
 
   const pushHistory = setEquippedItems;
   const handleUndo = () => studio.dispatch({ type: "undo" });
@@ -580,6 +588,7 @@ export default function StudioPage() {
   // Trợ lý AI Gemini gợi ý phối đồ (F11)
   const handleAskAIStylist = async () => {
     if (!isLoggedIn) { requestAccountAction("recommendations"); return; }
+    if (hasTemporaryImages) { setRecommendationError("Trợ lý AI hiện gợi ý từ kho trang phục. Hãy bỏ ảnh cá nhân khỏi bảng phối trước khi dùng gợi ý AI."); return; }
     if (recommendationRequest.current || isApplyingRecommendation) return;
     const occasion = occasions.find(item => item.id === questionnaire.occasionId);
     const garmentType = garmentTypes.find(item => item.id === questionnaire.garmentTypeId);
@@ -675,7 +684,7 @@ export default function StudioPage() {
   // Danh sách màu hiện tại phục vụ ColorAnalysis (Memoized)
   const currentColorsForAnalysis = useMemo(() => {
     return equippedItems
-      .filter((it) => it.colorHex)
+      .filter((it) => it.colorHex && !isSessionGarment(it.itemId))
       .map((it) => ({
         slot: it.slot,
         hex_color: it.colorHex!,
@@ -691,7 +700,7 @@ export default function StudioPage() {
 
   // Lọc danh mục hiển thị bên trái (Memoized)
   const filteredCatalogItems = useMemo(() => {
-    return catalogItems.filter((ci) => {
+    return publishedCatalogItems.filter((ci) => {
       if (selectedGarmentType !== "all" && ci.garment_type_id && ci.garment_type_id !== selectedGarmentType) {
         return false;
       }
@@ -701,7 +710,7 @@ export default function StudioPage() {
       if (catalogSearch.trim() && !ci.name.toLocaleLowerCase("vi").includes(catalogSearch.trim().toLocaleLowerCase("vi"))) return false;
       return true;
     });
-  }, [catalogItems, selectedGarmentType, activeSlot, catalogSearch]);
+  }, [publishedCatalogItems, selectedGarmentType, activeSlot, catalogSearch]);
 
   const handleWeatherSuggestion = async (accessories: string[]) => {
     const normalize = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d").toLowerCase().replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
@@ -809,23 +818,7 @@ export default function StudioPage() {
             <button type="button" onClick={() => { setPinnedSnapshotA(null); setIsCompareOpen(false); }} className="min-h-11 rounded-lg border border-stone-300 bg-white px-3 text-xs font-semibold">Bỏ ghim bản A</button>
           </>}</div>);
 
-  return (
-    <div className="studio-workspace">
-      <ToastContainer toasts={notifications} onDismiss={id => {
-        if (id === "guest") setGuestNoticeDismissed(true);
-        else if (id === "action") setActionNotice(null);
-        else if (id === "save-success") studio.dismissMessage();
-      }} />
-      <StudioWorkbench
-        notices={workspaceNotices}
-        panel={workspacePanel} onPanelChange={openWorkspacePanel}
-        canvasTools={<div role="group" aria-label="Phong cách bản phối" className="studio-style-switch">
-          {Object.entries(STYLE_LABELS).map(([mode, label]) => <button key={mode} type="button" aria-label={label} title={label}
-            aria-pressed={styleMode === mode} onClick={() => setStyleMode(mode as OutfitSnapshot["styleMode"])}>
-            {mode === "remix" ? "Remix" : mode === "modern_fusion" ? "Cách tân" : label}
-          </button>)}
-        </div>}
-        documentControls={<><div className="studio-document">
+  const documentControls = (<><div className="studio-document">
           <input
             type="text"
             aria-label="Tên bản phối"
@@ -834,7 +827,7 @@ export default function StudioPage() {
             className="studio-title min-w-0 w-full max-w-full sm:w-48 font-serif font-bold text-xl text-stone-900 bg-transparent border-b border-transparent hover:border-stone-300 focus:border-heritage-red focus:outline-none px-1 py-0.5 tracking-tight"
           />
 
-          <p className="studio-save-status" role="status">{studio.loading ? "Đang tải bộ phối…" : isSaving ? "Đang lưu…" : studio.error ? "Chưa lưu được" : studio.isDirty ? "Có thay đổi · chưa lưu" : "Bản phối đang mở"}</p></div>
+          <p className="studio-save-status" role="status">{hasTemporaryImages ? "Có ảnh trong phiên · xuất PNG để giữ" : studio.loading ? "Đang tải bộ phối…" : isSaving ? "Đang lưu…" : studio.error ? "Chưa lưu được" : studio.isDirty ? isLoggedIn ? "Có thay đổi · chưa lưu" : "Chế độ khách · chưa lưu" : isLoggedIn ? "Bản phối đang mở" : "Chế độ khách · đăng nhập để lưu"}</p></div>
         <div className="studio-actions">
           <button
             onClick={handleSaveOutfit}
@@ -846,7 +839,7 @@ export default function StudioPage() {
             <Save className="w-3.5 h-3.5" />
             <span>{isSaving ? "Đang lưu…" : "Lưu"}</span>
           </button>
-          <details className="studio-document-menu"><summary aria-label="Thao tác bộ phối" title="Thao tác bộ phối"><MoreHorizontal size={20} /></summary><div className="studio-action-menu" onClick={event => {
+          <details className="studio-document-menu"><summary aria-label="Thao tác bộ phối" title="Thao tác bộ phối"><MoreHorizontal size={20} /><span>Thao tác bộ phối</span></summary><div className="studio-action-menu" onClick={event => {
             if (!(event.target instanceof Element) || !event.target.closest("button:not(:disabled)")) return;
             const menu = event.currentTarget.closest("details");
             if (!menu) return;
@@ -887,12 +880,33 @@ export default function StudioPage() {
             <span>Lưu thành bản mới</span>
           </button>
           </div></details>
-        </div></>}
+        </div></>);
+
+  return (
+    <div className="studio-workspace">
+      <ToastContainer toasts={notifications} onDismiss={id => {
+        if (id === "guest") setGuestNoticeDismissed(true);
+        else if (id === "action") setActionNotice(null);
+        else if (id === "save-success") studio.dismissMessage();
+      }} />
+      <StudioWorkbench
+        notices={workspaceNotices}
+        panel={workspacePanel} onPanelChange={openWorkspacePanel}
+        canvasTools={<div role="group" aria-label="Phong cách bản phối" className="studio-style-switch">
+          {Object.entries(STYLE_LABELS).map(([mode, label]) => <button key={mode} type="button" aria-label={label} title={label}
+            aria-pressed={styleMode === mode} onClick={() => setStyleMode(mode as OutfitSnapshot["styleMode"])}>
+            {mode === "remix" ? "Remix" : mode === "modern_fusion" ? "Cách tân" : label}
+          </button>)}
+        </div>}
+
         panels={{
           catalog: <><details className="studio-garment-adjustments" hidden={equippedItems.length === 0}>
             <summary>Điều chỉnh trang phục</summary>
             <div ref={setControlsHost} />
-          </details><div className="studio-catalog bg-white p-4 rounded-xl border border-stone-200 space-y-3">
+          </details><SessionGarmentUpload library={studio.sessionGarments} slot={activeSlot} onSlotChange={setActiveSlot} onSelect={handleSelectItem}
+            lockedSlots={lockedSlots} equippedIds={equippedItems.map(item => item.itemId)} signedIn={isLoggedIn} onLogin={() => setShowAuthModal(true)} />
+          {hasTemporaryImages && <p className="px-3 text-xs leading-relaxed text-stone-600">{SESSION_SAVE_NOTICE}</p>}
+          <div className="studio-catalog bg-white p-4 rounded-xl border border-stone-200 space-y-3">
             <label className="studio-search"><Search size={16} aria-hidden="true" /><input type="search" aria-label="Tìm trang phục" placeholder="Tìm trang phục..." value={catalogSearch} onChange={event => setCatalogSearch(event.target.value)} /></label>
             {/* Tiêu đề mục phân loại */}
             <div className="studio-catalog-count flex flex-wrap items-center justify-between gap-2">
@@ -1298,7 +1312,7 @@ export default function StudioPage() {
               </button>
               </div>
               <p className="pl-5 text-[11px] leading-relaxed text-stone-600">Dùng cho kiểm tra văn hóa và gợi ý AI. Ảnh trên bảng phối không đổi hướng; ứng dụng không lật ảnh để giả lập cài vạt.</p>
-            </div>{process.env.NEXT_PUBLIC_STUDIO_V3 === "true" ? <StudioComposerPanel snapshot={snapshot} onSettingsChange={culturalSettings => studio.dispatch({ type: "commit", update: doc => ({ ...doc, snapshot: { ...doc.snapshot, culturalSettings } }) })} /> : <CulturalCheckBadge
+            </div>{hasTemporaryImages ? <p className="text-xs leading-relaxed text-stone-600">Ảnh cá nhân chưa có dữ liệu văn hóa để kiểm tra. Bạn vẫn có thể phối và xuất PNG.</p> : process.env.NEXT_PUBLIC_STUDIO_V3 === "true" ? <StudioComposerPanel snapshot={snapshot} onSettingsChange={culturalSettings => studio.dispatch({ type: "commit", update: doc => ({ ...doc, snapshot: { ...doc.snapshot, culturalSettings } }) })} /> : <CulturalCheckBadge
             checkData={culturalCheck}
             status={culturalCheckStatus}
             error={culturalCheckError}
@@ -1362,6 +1376,7 @@ export default function StudioPage() {
             onColorLoadFailure={handleColorLoadFailure}
             onTransformsCommit={(changes) => studio.dispatch({ type: "commit", update: doc => ({ ...doc, snapshot: { ...doc.snapshot, items: doc.snapshot.items.map(item => item.slot in changes ? { ...item, transform: changes[item.slot] } : item) } }) })}
             controlsContainer={controlsHost}
+            documentControls={documentControls}
             toolbarLeading={<>
               <button
                 type="button"
