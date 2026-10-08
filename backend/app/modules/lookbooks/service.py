@@ -133,33 +133,6 @@ class LookbookService:
     def update_lookbook(
         lookbook_id: str, owner_id: str, req: UpdateLookbookRequest
     ) -> LookbookResponse:
-        current = LookbookRepository.get_lookbook_by_id(lookbook_id)
-        if not current:
-            raise AppError(
-                code="LOOKBOOK_NOT_FOUND",
-                message="Không tìm thấy lookbook yêu cầu",
-                status_code=404,
-            )
-        if current["owner_id"] != owner_id:
-            raise AppError(
-                code="LOOKBOOK_NOT_FOUND",
-                message="Không tìm thấy lookbook",
-                status_code=404,
-            )
-
-        title = req.title if req.title is not None else current["title"]
-        description = (
-            req.description if req.description is not None else current["description"]
-        )
-        cover_image_url = (
-            req.cover_image_url
-            if req.cover_image_url is not None
-            else current["cover_image_url"]
-        )
-        visibility = (
-            req.visibility if req.visibility is not None else current["visibility"]
-        )
-
         entries_data = None
         if req.entries is not None:
             entries_data = [
@@ -175,10 +148,10 @@ class LookbookService:
         LookbookRepository.update_with_entries(
             lookbook_id=lookbook_id,
             owner_id=owner_id,
-            title=title,
-            description=description,
-            cover_image_url=cover_image_url,
-            visibility=visibility,
+            title=req.title,
+            description=req.description,
+            cover_image_url=req.cover_image_url,
+            visibility=req.visibility,
             entries=entries_data,
         )
         return LookbookService.get_lookbook(lookbook_id, owner_id)

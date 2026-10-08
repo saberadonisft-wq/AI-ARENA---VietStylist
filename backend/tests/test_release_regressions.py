@@ -83,6 +83,29 @@ def test_create_response_does_not_adopt_a_competing_revision(monkeypatch, key):
     assert OutfitService.get_outfit(response.id, OWNER).title == "Writer B"
 
 
+def test_title_only_edit_preserves_concurrent_private_setting_and_share_revocation(monkeypatch):
+    lookbook = LookbookService.create_lookbook(OWNER, CreateLookbookRequest(title="Original", visibility="public"))
+    share = LookbookService.generate_share_link(lookbook.id, OWNER)
+    original = LookbookRepository.update_with_entries
+
+    def update_after_privacy_change(**kwargs):
+        original(lookbook.id, OWNER, None, "New description", "https://example.invalid/new.png", "private", None)
+        return original(**kwargs)
+
+    monkeypatch.setattr(LookbookRepository, "update_with_entries", update_after_privacy_change)
+    result = LookbookService.update_lookbook(lookbook.id, OWNER, UpdateLookbookRequest(title="Renamed"))
+    assert result.title == "Renamed" and result.visibility == "private"
+    assert result.description == "New description"
+    assert result.cover_image_url == "https://example.invalid/new.png"
+    with pytest.raises(AppError) as anonymous:
+        LookbookService.get_lookbook(lookbook.id, None)
+    assert anonymous.value.status_code == 401
+    with pytest.raises(AppError) as revoked:
+        LookbookService.resolve_shared_token(share.share_token)
+    assert revoked.value.code == "SHARE_NOT_FOUND"
+    # An explicit publication remains supported; revoked links stay revoked.
+    public = LookbookService.update_lookbook(lookbook.id, OWNER, UpdateLookbookRequest(visibility="public"))
+    assert public.visibility == "public"
 
 
 def submission_request(media_id):
