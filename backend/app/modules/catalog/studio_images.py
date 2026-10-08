@@ -238,6 +238,28 @@ def preview_studio_color(item_id: str, color_hex: str) -> dict:
     }
 
 
+def make_session_cutout(data: bytes, mime_type: str) -> bytes:
+    """Use the normal cutout model without storing user bytes or derivatives."""
+    from app.modules.media.validation import validate_content
+
+    if mime_type not in {"image/png", "image/jpeg", "image/webp"}:
+        raise AppError("INVALID_MEDIA_TYPE", "Chọn ảnh PNG, JPG hoặc WebP.", 422)
+    # Share the inference lock with catalog processing; do not queue private
+    # uploads in memory behind other inference requests.
+    if not _processing.acquire(blocking=False):
+        raise AppError("CUTOUT_BUSY", "Đang xử lý ảnh, vui lòng thử lại.", 503)
+    try:
+        clean, _, _, _ = validate_content(data, mime_type)
+        return make_cutout(clean)
+    except AppError:
+        raise
+    except Exception as exc:
+        logger.warning("Session cutout failed: %s", type(exc).__name__)
+        raise AppError("CUTOUT_UNAVAILABLE", "Chưa thể tách nền ảnh. Vui lòng thử lại.", 503) from exc
+    finally:
+        _processing.release()
+
+
 def get_studio_image(item_id: str, color_hex: str | None = None,
                      source_version: str | None = None,
                      algorithm_version: str | None = None) -> bytes:

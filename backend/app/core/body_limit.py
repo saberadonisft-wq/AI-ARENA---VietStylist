@@ -16,10 +16,11 @@ class LocalUploadBodyLimit:
         if scope["type"] != "http" or scope["method"] != "POST":
             return await self.app(scope, receive, send)
         stylist_upload = scope["path"].rstrip("/") == "/api/stylist/garment-image"
+        session_upload = scope["path"].rstrip("/") == "/api/media/session-cutout"
         local_upload = scope["path"].startswith("/api/media/local-upload/") and settings.is_local_media_enabled()
-        if not (stylist_upload or local_upload):
+        if not (stylist_upload or session_upload or local_upload):
             return await self.app(scope, receive, send)
-        limit = (settings.MEDIA_IMAGE_MAX_BYTES if stylist_upload else settings.MEDIA_VIDEO_MAX_BYTES) + 64 * 1024
+        limit = settings.MEDIA_IMAGE_MAX_BYTES if session_upload else (settings.MEDIA_IMAGE_MAX_BYTES if stylist_upload else settings.MEDIA_VIDEO_MAX_BYTES) + 64 * 1024
         headers = dict(scope.get("headers", []))
 
         async def respond(error):
@@ -28,7 +29,7 @@ class LocalUploadBodyLimit:
             response.headers["X-Request-ID"] = request_id
             await response(scope, receive, send)
 
-        if stylist_upload:
+        if stylist_upload or session_upload:
             # FastAPI parses UploadFile before resolving route dependencies.
             # Check the live account/roles here without consuming the body.
             try:
@@ -38,7 +39,7 @@ class LocalUploadBodyLimit:
                 )
                 if user is None:
                     raise AppError("UNAUTHORIZED", "Yêu cầu đăng nhập để upload.", 401)
-                if not user.is_stylist:
+                if stylist_upload and not user.is_stylist:
                     raise AppError("FORBIDDEN", "Chỉ stylist hoặc admin được upload trang phục.", 403)
             except AppError as exc:
                 return await respond(exc)
@@ -62,10 +63,18 @@ class LocalUploadBodyLimit:
 
         async def bounded_receive():
             nonlocal size, exceeded
+            if session_upload and exceeded:
+                return {"type": "http.disconnect"}
             message = await receive()
             size += len(message.get("body", b""))
             if size > limit:
                 exceeded = True
+                if session_upload:
+                    # Raw bodies have no multipart parser to close. End the
+                    # stream and let the endpoint reject before inference;
+                    # raising here also reaches BaseHTTPMiddleware's listener.
+                    scope.setdefault("state", {})["session_upload_exceeded"] = True
+                    return {"type": "http.request", "body": b"", "more_body": False}
                 # Starlette closes all spooled files on this parser error.
                 raise MultiPartException("Upload body limit exceeded")
             return message
