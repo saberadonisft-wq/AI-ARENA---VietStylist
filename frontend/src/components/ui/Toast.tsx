@@ -45,6 +45,7 @@ export const ToastContainer: React.FC<ToastContainerProps> = ({ toasts, onDismis
         return (
           <div
             key={toast.id}
+            data-toast-id={toast.id}
             className="pointer-events-auto relative shrink-0 rounded-2xl border border-stone-200 bg-white p-4 text-stone-800 shadow-lg"
             role="status"
           >
