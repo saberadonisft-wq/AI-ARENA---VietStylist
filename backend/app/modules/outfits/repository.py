@@ -107,7 +107,7 @@ class OutfitRepository:
         style_mode: str = "traditional",
         preview_image_url: Optional[str] = None,
         owner_id: Optional[str] = None,
-    ) -> bool:
+    ) -> Optional[Dict[str, Any]]:
         """Lưu phiên bản mới nguyên tử có kiểm tra quyền owner và optimistic revision lock (R04, O03)."""
         # Resolve the optional occasion link in SQL, just as for a new outfit.
         with get_db_connection() as conn:
@@ -124,7 +124,7 @@ class OutfitRepository:
                         (outfit_id,),
                     ).fetchone()
                 if not current or current["revision"] != expected_revision:
-                    return False
+                    return None
 
                 version_number = conn.execute(
                     "SELECT COALESCE(MAX(version_number), 0) + 1 FROM outfit_versions WHERE outfit_id = ?",
@@ -145,7 +145,14 @@ class OutfitRepository:
                         "UPDATE outfits SET current_version_id = ?, revision = revision + 1, title = ?, occasion_id = (SELECT id FROM occasions WHERE id = ?), style_mode = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
                         (version_id, title, occasion_id, style_mode, outfit_id),
                     )
-        return True
+                # Capture our own committed version before another writer can
+                # advance the revision used by the caller's next save.
+                saved = Database.fetch_one("""
+                    SELECT o.*, v.snapshot_json, v.preview_image_url
+                    FROM outfits o JOIN outfit_versions v ON o.current_version_id=v.id
+                    WHERE o.id=?
+                """, (outfit_id,), conn=conn)
+        return saved
 
     @staticmethod
     def get_latest_version_number(outfit_id: str) -> int:

@@ -224,7 +224,7 @@ class OutfitService:
         if not saved:
             raise AppError(code="REVISION_CONFLICT", message="Bộ phối đã thay đổi ở phiên khác. Vui lòng tải lại trước khi lưu.", status_code=409)
 
-        return OutfitService.get_outfit(outfit_id, user_id)
+        return OutfitService._outfit_response(saved)
 
     @staticmethod
     def delete_outfit(outfit_id: str, user_id: str) -> None:

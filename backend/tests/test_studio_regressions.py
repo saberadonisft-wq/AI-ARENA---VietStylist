@@ -83,7 +83,9 @@ def test_parallel_saves_only_accept_one_revision():
 
     with ThreadPoolExecutor(max_workers=2) as executor:
         results = list(executor.map(save, [1, 2]))
-    assert sorted(results) == [False, True]
+    accepted = [row for row in results if row is not None]
+    assert len(accepted) == 1
+    assert accepted[0]["revision"] == 2
     assert len(OutfitRepository.get_outfit_versions(created["id"])) == 2
 
 
