@@ -9,6 +9,7 @@ import { INITIAL_DOCUMENT, parseDraft, sameDocument, studioReducer } from "./sta
 import type { StudioAction, StudioHistory } from "./state";
 import { saveOutfitDocument } from "./persistence";
 import type { OutfitSaveIdentity } from "./persistence";
+import { useSessionGarments } from "./useSessionGarments";
 
 const initialHistory = (): StudioHistory => ({ past: [], present: structuredClone(INITIAL_DOCUMENT), future: [] });
 
@@ -234,13 +235,14 @@ function useStudioDocumentState(ownerId: string | undefined, authReady: boolean,
   return { history, isManaging: !!managedId, hydrated: authReady && documentScope?.ownerId === ownerId && documentScope?.managedId === managedId, dispatch, updateSnapshot, startNewDocument, error, conflict, saving, loading, message, dismissMessage: () => setMessage(null), save, loadServerCopy, requestedOutfit, keepLocal: () => setRequestedOutfit(null), isDirty, enterStudio };
 }
 
-const StudioDocumentContext = createContext<ReturnType<typeof useStudioDocumentState> | null>(null);
+const StudioDocumentContext = createContext<(ReturnType<typeof useStudioDocumentState> & { sessionGarments: ReturnType<typeof useSessionGarments> }) | null>(null);
 
 /** Own the open outfit for this tab's lifetime; never write a browser draft. */
 export function StudioDocumentProvider({ children }: { children: ReactNode }) {
   const { user, isReady, isAdmin } = useAuth();
   const document = useStudioDocumentState(user?.id, isReady, isAdmin);
-  return createElement(StudioDocumentContext.Provider, { value: document }, children);
+  const sessionGarments = useSessionGarments(user?.id, isReady);
+  return createElement(StudioDocumentContext.Provider, { value: { ...document, sessionGarments } }, children);
 }
 
 export function useStudioDocument() {

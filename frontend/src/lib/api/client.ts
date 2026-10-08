@@ -46,8 +46,9 @@ export class ApiError extends Error {
   }
 }
 
-export async function apiFetch<T>(endpoint: string, options: RequestInit & { timeoutMs?: number } = {}): Promise<T> {
+export async function apiFetch<T>(endpoint: string, options: RequestInit & { timeoutMs?: number; responseType?: "json" | "blob" } = {}): Promise<T> {
   const url = `${API_ORIGIN}${endpoint.startsWith("/api") ? endpoint : `/api${endpoint}`}`;
+  const { timeoutMs = 10000, responseType = "json", ...fetchOptions } = options;
   
   const headers = new Headers(options.headers || {});
   if (options.body != null && !headers.has("Content-Type") && !(options.body instanceof FormData)) {
@@ -62,7 +63,6 @@ export async function apiFetch<T>(endpoint: string, options: RequestInit & { tim
     }
   }
 
-  const timeoutMs = options.timeoutMs ?? 10000;
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
   const abort = () => controller.abort();
@@ -73,13 +73,14 @@ export async function apiFetch<T>(endpoint: string, options: RequestInit & { tim
   let data: any;
   try {
     response = await fetch(url, {
-      ...options,
+      ...fetchOptions,
       // Publication and access can change between reads, even for catalog data.
       // Cache only after the API supports revalidation/invalidation explicitly.
       cache: "no-store",
       headers,
       signal: controller.signal,
     });
+    if (response.ok && responseType === "blob") return await response.blob() as T;
     const text = await response.text();
     try { data = text ? JSON.parse(text) : null; }
     catch {
@@ -127,6 +128,10 @@ export async function apiFetch<T>(endpoint: string, options: RequestInit & { tim
 // --- API Service Methods ---
 
 export const api = {
+  cutoutSessionImage: (file: File, signal: AbortSignal) => apiFetch<Blob>("/api/media/session-cutout", {
+    method: "POST", body: file, headers: { "Content-Type": file.type },
+    responseType: "blob", timeoutMs: 120000, signal,
+  }),
   // Catalog
   getGarmentTypes: () => apiFetch<GarmentType[]>("/api/catalog/garment-types"),
   getOccasions: () => apiFetch<Occasion[]>("/api/catalog/occasions"),
