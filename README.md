@@ -43,9 +43,9 @@ Hệ thống gồm frontend Next.js 15/React 18 và backend FastAPI/Pydantic, gi
 > [!NOTE]
 > Thử đồ AI gửi ảnh bản phối Studio làm tham chiếu; ảnh nhân vật là tùy chọn. Có ảnh nhân vật, prompt yêu cầu giữ danh tính người đó; không có ảnh, AI chọn người mặc trưởng thành phù hợp. Sinh ảnh thử đồ bằng Gemini mặc định tắt và API trả HTTP `503` nếu chưa cấu hình. Chế độ thủ công cho tải ảnh bản phối và sao chép prompt; lưu bộ phối lên tài khoản cần đăng nhập.
 
-### Tính năng đang phát triển
+### Ảnh trang phục trong phiên
 
-Luồng tải ảnh trang phục cá nhân để tách nền, phối và xuất PNG đang được phát triển local, chưa thuộc đợt commit tài liệu và dọn cấu hình này. Luồng này giới hạn ảnh trong phiên hiện tại; bộ phối có ảnh trong phiên cần bỏ các ảnh đó trước khi lưu, đăng Lookbook hoặc thử đồ AI.
+Người dùng đã đăng nhập có thể tải ảnh PNG, JPEG hoặc WebP để tách nền, phối và xuất PNG; mỗi ảnh tối đa 10 MB, tối đa 12 ảnh trong phiên. Ảnh chỉ được giữ trong bộ nhớ của phiên hiện tại và được xóa khi tải lại trang, đăng xuất hoặc đổi tài khoản. Bộ phối có ảnh trong phiên cần bỏ các ảnh đó trước khi lưu, đăng Lookbook hoặc thử đồ AI.
 
 ## Công nghệ sử dụng
 

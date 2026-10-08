@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { INITIAL_DOCUMENT } from "../src/features/studio/state";
-import { chooseStudioGarment, openStudioPanel, openStudioProperties } from "./helpers/studio-ui";
+import { chooseStudioGarment, openStudioDocument, openStudioPanel, openStudioProperties } from "./helpers/studio-ui";
 import { assertNoStoredOutfits, installStorageProbe, mockDeviceStorageApi, seedLogin, SERVER_OUTFIT, USER_A, USER_B } from "./helpers/device-storage";
 
 test.use({ viewport: { width: 1440, height: 950 } });
@@ -17,6 +17,7 @@ async function openSession(page: Page, linked = false) {
   await page.goto(linked ? `/studio?loadOutfit=${SERVER_OUTFIT.id}` : "/studio");
   if (linked) await expect(page.getByLabel("Tên bản phối", { exact: true })).toHaveValue(SERVER_OUTFIT.title);
   else await chooseStudioGarment(page, "Trang phục kiểm thử");
+  await openStudioDocument(page);
   await page.getByLabel("Tên bản phối", { exact: true }).fill("Bộ phối trong phiên");
   return api;
 }
@@ -31,6 +32,7 @@ test("navigation retains the outfit, placement, background, locks and undo histo
   await page.getByRole("button", { name: "Giấy Dó", exact: true }).click();
   await page.getByRole("button", { name: "1:1", exact: true }).click();
   const title = page.getByLabel("Tên bản phối", { exact: true });
+  await openStudioDocument(page);
   await title.fill("Tên mới trong phiên");
 
   await navigate(page, "Thư viện Cổ phục");
@@ -57,6 +59,7 @@ test("reload and closing the tab discard the unsaved session even while the acco
   await expect(page.getByLabel("Tên bản phối", { exact: true })).toHaveValue(INITIAL_DOCUMENT.title);
   await expect(page.locator("#content-outerwear image")).toHaveCount(0);
   await chooseStudioGarment(page, "Trang phục kiểm thử");
+  await openStudioDocument(page);
   await page.getByLabel("Tên bản phối", { exact: true }).fill("Bộ phối sẽ bỏ khi đóng");
   await assertNoStoredOutfits(page, true);
   await page.close();
@@ -105,6 +108,7 @@ test("switching accounts while away from Studio removes the previous account's s
   await expect(page.getByLabel("Tên bản phối", { exact: true })).toHaveValue(INITIAL_DOCUMENT.title);
   await expect(page.locator("#content-outerwear image")).toHaveCount(0);
   await chooseStudioGarment(page, "Trang phục kiểm thử");
+  await openStudioDocument(page);
   await page.getByRole("button", { name: "Lưu bộ phối", exact: true }).click();
   await expect.poll(() => writes.length).toBe(1);
   expect(writes[0]).toMatchObject({ method: "POST", authorization: "Bearer token-b" });
@@ -123,6 +127,7 @@ test("a save completing away from Studio retains its identity so the next save u
     await held;
     return route.fallback();
   });
+  await openStudioDocument(page);
   await page.getByRole("button", { name: "Lưu bộ phối", exact: true }).click();
   await expect.poll(() => creates).toBe(1);
   await navigate(page, "Thư viện Cổ phục");
@@ -130,7 +135,9 @@ test("a save completing away from Studio retains its identity so the next save u
   await expect.poll(() => writes.length).toBe(1);
   await navigate(page, "Studio Phối đồ");
   await expect(page.getByLabel("Tên bản phối", { exact: true })).toHaveValue("Bộ phối trong phiên");
+  await openStudioDocument(page);
   await page.getByLabel("Tên bản phối", { exact: true }).fill("Sửa sau khi quay lại");
+  await openStudioDocument(page);
   await page.getByRole("button", { name: "Lưu bộ phối", exact: true }).click();
   await expect.poll(() => writes.length).toBe(2);
   expect(creates).toBe(1);
@@ -148,11 +155,14 @@ test("an uncertain save keeps its retry receipt through navigation", async ({ pa
     if (creates.length === 1) return route.abort("failed");
     return route.fulfill({ json: { ...SERVER_OUTFIT, id: "recovered-outfit", title: body.title, revision: 1, current_snapshot: body.snapshot } });
   });
+  await openStudioDocument(page);
   await page.getByRole("button", { name: "Lưu bộ phối", exact: true }).click();
   await expect(page.getByRole("alert", { name: "Lưu bộ phối" })).toBeVisible();
   await navigate(page, "Thư viện Cổ phục");
   await navigate(page, "Studio Phối đồ");
+  await openStudioDocument(page);
   await page.getByLabel("Tên bản phối", { exact: true }).fill("Thay đổi sau khi quay lại");
+  await openStudioDocument(page);
   await page.getByRole("button", { name: "Lưu bộ phối", exact: true }).click();
   await expect(page.getByText("Đã lưu bộ phối vào Tủ đồ.", { exact: true })).toBeVisible();
   expect(creates).toHaveLength(2);
@@ -171,6 +181,7 @@ test("opening an account outfit asks before replacing session edits, including a
   await page.goto("/studio");
   await chooseStudioGarment(page, "Trang phục kiểm thử");
   const title = page.getByLabel("Tên bản phối", { exact: true });
+  await openStudioDocument(page);
   await title.fill("Bản đang làm cần giữ");
   const openSavedLink = async () => {
     await page.locator("header").getByRole("button", { name: new RegExp(USER_A.displayName) }).click();

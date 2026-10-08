@@ -32,6 +32,7 @@ test("real login, two-tab conflict, lookbook creation and revocable anonymous sh
   await expect(page.getByLabel("Tên bản phối", { exact: true })).toHaveValue("Nháp khách trước đăng nhập");
   await openStudioDocument(page);
   const createdOutfit = page.waitForResponse(response => response.url().endsWith("/api/outfits") && response.request().method() === "POST");
+  await openStudioDocument(page);
   await page.getByRole("button", { name: "Lưu bộ phối", exact: true }).click();
   const creation = await createdOutfit;
   expect(creation.ok()).toBeTruthy();
@@ -133,7 +134,9 @@ for (const state of ["unchanged", "edited", "deleted"] as const) {
     await page.goto("/studio");
     await openStudioDocument(page);
     const title = page.getByLabel("Tên bản phối", { exact: true });
+    await openStudioDocument(page);
     await title.fill("Bộ phối trước lỗi mạng");
+    await openStudioDocument(page);
     await page.getByRole("button", { name: "Lưu bộ phối", exact: true }).click();
     await expect(page.getByRole("alert", { name: "Lưu bộ phối" })).toContainText("Giữ trang mở");
     expect(first?.id).toBeTruthy();
@@ -144,9 +147,11 @@ for (const state of ["unchanged", "edited", "deleted"] as const) {
     } else if (state === "deleted") {
       expect((await request.delete(path, { headers })).ok()).toBeTruthy();
     }
+    await openStudioDocument(page);
     await title.fill("Chỉnh sửa cần giữ sau lỗi mạng");
     if (state !== "unchanged") {
       const failed = page.waitForResponse(response => response.url().endsWith("/api/outfits") && response.request().method() === "POST");
+      await openStudioDocument(page);
       await page.getByRole("button", { name: "Lưu bộ phối", exact: true }).click();
       const response = await failed;
       expect(response.status()).toBe(409);

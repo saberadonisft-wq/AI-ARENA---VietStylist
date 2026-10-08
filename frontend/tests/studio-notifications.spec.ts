@@ -32,6 +32,7 @@ test("edits and undo remain available in the open page and unsaved work disappea
   await chooseStudioGarment(page, "Trang phục kiểm thử");
   await openStudioDocument(page);
   const title = page.getByLabel("Tên bản phối", { exact: true });
+  await openStudioDocument(page);
   await title.fill("Bộ phối chỉ ở phiên đang mở");
   await expect(page.locator("#content-outerwear image")).toBeVisible();
   await page.getByTitle("Hoàn tác (Ctrl+Z)").click();

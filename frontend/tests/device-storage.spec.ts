@@ -20,6 +20,7 @@ test("an initial server load blocks save actions until its outfit identity is av
   await openStudioDocument(page);
   await expect.poll(() => getRequests).toBeGreaterThan(0);
   await expect(page.getByText("Đang tải bộ phối…", { exact: true })).toBeVisible();
+  await openStudioDocument(page);
   const save = page.getByRole("button", { name: "Lưu bộ phối", exact: true });
   await expect(save).toBeDisabled();
   await page.getByLabel("Thao tác bộ phối", { exact: true }).click();
@@ -33,6 +34,7 @@ test("an initial server load blocks save actions until its outfit identity is av
   const title = page.getByLabel("Tên bản phối", { exact: true });
   await expect(title).toHaveValue(SERVER_OUTFIT.title);
   await expect(save).toBeEnabled();
+  await openStudioDocument(page);
   await title.fill("Đã tải xong rồi mới lưu");
   await save.click();
   await expect(page.getByText("Đã lưu bộ phối vào Tủ đồ.", { exact: true })).toBeVisible();
@@ -58,7 +60,9 @@ test("edits made while a server outfit loads remain open until the user chooses 
   await openStudioDocument(page);
   await expect.poll(() => getRequests).toBeGreaterThan(0);
   const title = page.getByLabel("Tên bản phối", { exact: true });
+  await openStudioDocument(page);
   await title.fill("Thay đổi trong khi chờ tải");
+  await openStudioDocument(page);
   await expect(page.getByRole("button", { name: "Lưu bộ phối", exact: true })).toBeDisabled();
   release();
   const openSaved = page.getByRole("button", { name: "Mở bộ phối từ liên kết", exact: true });
@@ -68,7 +72,9 @@ test("edits made while a server outfit loads remain open until the user chooses 
   await openSaved.click();
   await expect(title).toHaveValue(SERVER_OUTFIT.title);
   await expect(page.locator("#content-outerwear image")).toBeVisible();
+  await openStudioDocument(page);
   await title.fill("Chỉnh sửa phiên bản đã chọn");
+  await openStudioDocument(page);
   await page.getByRole("button", { name: "Lưu bộ phối", exact: true }).click();
   await expect(page.getByText("Đã lưu bộ phối vào Tủ đồ.", { exact: true })).toBeVisible();
   expect(writes).toHaveLength(1);
@@ -85,7 +91,9 @@ test("server outfit links load the saved document and save changes through PUT w
   const title = page.getByLabel("Tên bản phối", { exact: true });
   await expect(title).toHaveValue(SERVER_OUTFIT.title);
   await expect(page.locator("#content-outerwear image")).toBeVisible();
+  await openStudioDocument(page);
   await title.fill("Bộ phối được cập nhật trên máy chủ");
+  await openStudioDocument(page);
   await page.getByRole("button", { name: "Lưu bộ phối", exact: true }).click();
   await expect.poll(() => writes.length).toBe(1);
   expect(writes[0]).toMatchObject({ method: "PUT", path: `/api/outfits/${SERVER_OUTFIT.id}`, body: { title: "Bộ phối được cập nhật trên máy chủ", revision: SERVER_OUTFIT.revision, snapshot: { items: [TEST_ITEM] } } });
@@ -123,7 +131,9 @@ test("a lost create response retries the same in-memory receipt before saving ne
   await chooseStudioGarment(page, "Trang phục kiểm thử");
   await openStudioDocument(page);
   const title = page.getByLabel("Tên bản phối", { exact: true });
+  await openStudioDocument(page);
   await title.fill("Phiên bản gửi lần đầu");
+  await openStudioDocument(page);
   await page.getByRole("button", { name: "Lưu bộ phối", exact: true }).click();
   await expect(page.getByRole("alert", { name: "Lưu bộ phối" })).toBeVisible();
   expect(creates).toHaveLength(1);
@@ -131,7 +141,9 @@ test("a lost create response retries the same in-memory receipt before saving ne
   expect(creates[0].body).toMatchObject({ title: "Phiên bản gửi lần đầu", snapshot: { items: [TEST_ITEM] } });
   await assertNoStoredOutfits(page, true);
 
+  await openStudioDocument(page);
   await title.fill("Thay đổi sau khi mất phản hồi");
+  await openStudioDocument(page);
   await page.getByRole("button", { name: "Lưu bộ phối", exact: true }).click();
   await expect(page.getByText("Đã lưu bộ phối vào Tủ đồ.", { exact: true })).toBeVisible();
   expect(creates).toHaveLength(2);
@@ -152,7 +164,9 @@ test("guest edits survive signing in on the same page and are saved only to the 
   await chooseStudioGarment(page, "Trang phục kiểm thử");
   await openStudioDocument(page);
   const title = page.getByLabel("Tên bản phối", { exact: true });
+  await openStudioDocument(page);
   await title.fill("Bộ phối khách đang mở");
+  await openStudioDocument(page);
   await page.getByRole("button", { name: "Lưu bộ phối", exact: true }).click();
   const auth = page.getByRole("dialog", { name: "Đăng nhập hoặc tạo tài khoản" });
   await expect(auth).toBeVisible();
@@ -188,7 +202,9 @@ test("changing accounts clears the previous in-memory outfit and ignores its pen
   await chooseStudioGarment(page, "Trang phục kiểm thử");
   await openStudioDocument(page);
   const title = page.getByLabel("Tên bản phối", { exact: true });
+  await openStudioDocument(page);
   await title.fill("Riêng tư của tài khoản A");
+  await openStudioDocument(page);
   await page.getByRole("button", { name: "Lưu bộ phối", exact: true }).click();
   await expect.poll(() => oldSaveRequests).toBe(1);
 
@@ -204,11 +220,13 @@ test("changing accounts clears the previous in-memory outfit and ignores its pen
   release();
   await completed;
   await expect(title).toHaveValue(INITIAL_DOCUMENT.title);
+  await openStudioDocument(page);
   await expect(page.getByRole("button", { name: "Lưu bộ phối", exact: true })).toBeEnabled();
 
   await chooseStudioGarment(page, "Trang phục kiểm thử");
   await openStudioDocument(page);
   await title.fill("Bộ phối riêng của tài khoản B");
+  await openStudioDocument(page);
   await page.getByRole("button", { name: "Lưu bộ phối", exact: true }).click();
   await expect(page.getByText("Đã lưu bộ phối vào Tủ đồ.", { exact: true })).toBeVisible();
   expect(writes).toHaveLength(1);
@@ -281,6 +299,7 @@ test("a guest pending save waits for the linked outfit to load after signing in"
   await page.goto(`/studio?loadOutfit=${SERVER_OUTFIT.id}`);
   await openStudioDocument(page);
   await expect(page.getByRole("alert", { name: "Lưu bộ phối" })).toBeVisible();
+  await openStudioDocument(page);
   await page.getByRole("button", { name: "Lưu bộ phối", exact: true }).click();
   const auth = page.getByRole("dialog", { name: "Đăng nhập hoặc tạo tài khoản" });
   await auth.getByLabel("Địa chỉ Email").fill(USER_A.email);
@@ -288,7 +307,9 @@ test("a guest pending save waits for the linked outfit to load after signing in"
   await auth.getByRole("button", { name: "Đăng nhập vào VietStylist" }).click();
   await expect(auth).toBeHidden();
   await expect.poll(() => authenticatedLoads).toBeGreaterThan(0);
+  await openStudioDocument(page);
   await expect(page.getByText("Đang tải bộ phối…", { exact: true })).toBeVisible();
+  await openStudioDocument(page);
   await expect(page.getByRole("button", { name: "Lưu bộ phối", exact: true })).toBeDisabled();
   expect(writes).toHaveLength(0);
   release();

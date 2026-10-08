@@ -3,6 +3,8 @@ import { expect, type Page } from "@playwright/test";
 export type StudioTool = "Chọn trang phục" | "Mẫu phối" | "Màu sắc" | "Bối cảnh" | "Văn hóa" | "Trợ lý AI";
 export async function openStudioDocument(page: Page) {
   if (await page.evaluate(() => matchMedia("(max-width: 1023px)").matches)) await closeStudioPanels(page);
+  const trigger = page.getByRole("button", { name: "Quản lý bộ phối", exact: true });
+  if (await trigger.getAttribute("aria-expanded") !== "true") await trigger.click();
   await expect(page.getByLabel("Tên bản phối", { exact: true })).toBeVisible();
 }
 export async function openStudioPanel(page: Page, name: StudioTool) {
@@ -16,8 +18,13 @@ export async function openStudioProperties(page: Page) {
   await expect(page.getByRole("region", { name: "Điều chỉnh trang phục", exact: true })).toBeVisible();
 }
 export async function closeStudioPanels(page: Page) {
-  const tool = page.locator(".studio-tool-panel:not([hidden]) .studio-panel-heading > button");
-  if (await tool.isVisible()) await tool.click();
+  // Resizing can close a tool between a visibility check and a click.
+  // Escape also closes an open document menu before closing the tool.
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".studio-tool-panel:not([hidden])")).toHaveCount(0);
+  const document = page.getByRole("button", { name: "Quản lý bộ phối", exact: true });
+  if (await document.getAttribute("aria-expanded") === "true") await document.click();
 }
 export async function chooseStudioGarment(page: Page, name: string) {
   await openStudioPanel(page, "Chọn trang phục");
