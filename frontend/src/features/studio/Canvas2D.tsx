@@ -21,6 +21,7 @@ import {
   Lock,
   Unlock,
   X,
+  FilePenLine,
 } from "lucide-react";
 
 export interface Canvas2DHandle {
@@ -61,6 +62,7 @@ export interface Canvas2DProps {
   controlsContainer?: HTMLElement | null;
   toolbarLeading?: React.ReactNode;
   toolbarTrailing?: React.ReactNode;
+  documentControls?: React.ReactNode;
 }
 
 interface ItemGeometry {
@@ -370,6 +372,7 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
       controlsContainer,
       toolbarLeading,
       toolbarTrailing,
+      documentControls,
     },
     ref
   ) => {
@@ -380,6 +383,35 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
     const viewportRef = useRef<HTMLDivElement | null>(null);
     const zoomAnchorRef = useRef({ x: 0.5, y: 0.5 });
     const [boardZoom, setBoardZoom] = useState(1);
+    const [documentOpen, setDocumentOpen] = useState(false);
+    const documentTriggerRef = useRef<HTMLButtonElement>(null);
+    const documentPanelRef = useRef<HTMLElement>(null);
+    const documentPanelId = `${instanceId}-document-controls`;
+    useEffect(() => {
+      if (!documentOpen) {
+        documentPanelRef.current?.querySelectorAll<HTMLDetailsElement>("details[open]").forEach(menu => { menu.open = false; });
+        return;
+      }
+      documentPanelRef.current?.focus({ preventScroll: true });
+      const closeOutside = (event: PointerEvent) => {
+        if (document.querySelector('dialog[open], [role="dialog"][aria-modal="true"], [role="alertdialog"]')) return;
+        if (event.target instanceof Node && !documentPanelRef.current?.contains(event.target) && !documentTriggerRef.current?.contains(event.target)) setDocumentOpen(false);
+      };
+      const closeWithEscape = (event: KeyboardEvent) => {
+        if (event.key !== "Escape" || event.defaultPrevented || document.querySelector('dialog[open], [role="dialog"][aria-modal="true"], [role="alertdialog"]')) return;
+        // Let the workbench close the inner action menu first.
+        if (documentPanelRef.current?.querySelector(".studio-document-menu[open]")) return;
+        event.preventDefault();
+        setDocumentOpen(false);
+        documentTriggerRef.current?.focus({ preventScroll: true });
+      };
+      document.addEventListener("pointerdown", closeOutside);
+      window.addEventListener("keydown", closeWithEscape);
+      return () => {
+        document.removeEventListener("pointerdown", closeOutside);
+        window.removeEventListener("keydown", closeWithEscape);
+      };
+    }, [documentOpen]);
     const changeBoardZoom = (next: number) => {
       if (dragSessionRef.current) return;
       const viewport = viewportRef.current;
@@ -430,7 +462,7 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
       const source = item.metadata?.catalog_media_id
         ? `${API_ORIGIN}/api/catalog/items/${encodeURIComponent(item.id)}/studio-image`
         : (item.metadata?.flatlay_image_url as string | undefined) || (item.metadata?.real_image_url as string | undefined);
-      if (!source || !imageRetry) return source;
+      if (!source || !imageRetry || source.startsWith("blob:")) return source;
       const hashStart = source.indexOf("#");
       const path = hashStart < 0 ? source : source.slice(0, hashStart);
       const hash = hashStart < 0 ? "" : source.slice(hashStart);
@@ -1169,6 +1201,10 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
         "--studio-board-zoom": boardZoom,
       } as React.CSSProperties}>
       {!readOnly && <div role="group" aria-label="Thu phóng bảng phối" className="studio-board-zoom">
+        {documentControls && <button ref={documentTriggerRef} type="button" aria-label="Quản lý bộ phối" title="Quản lý bộ phối"
+          aria-expanded={documentOpen} aria-controls={documentPanelId} onClick={() => setDocumentOpen(open => !open)}>
+          <FilePenLine size={18} aria-hidden="true" />
+        </button>}
         {toolbarLeading}
         <button type="button" aria-label="Thu nhỏ bảng phối" disabled={boardZoom <= 0.5 || !!dragSession}
           onClick={() => changeBoardZoom(boardZoom - 0.25)}><ZoomOut size={16} /></button>
@@ -1178,6 +1214,8 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
         <button type="button" disabled={!!dragSession} onClick={() => changeBoardZoom(1)} className="studio-board-fit">Vừa khung</button>
         {toolbarTrailing}
       </div>}
+      {!readOnly && documentControls && <section ref={documentPanelRef} id={documentPanelId} hidden={!documentOpen}
+        tabIndex={-1} aria-label="Quản lý bộ phối" className="studio-document-float studio-document-popover">{documentControls}</section>}
       <div ref={viewportRef} className={readOnly ? "h-full" : "studio-artboard-viewport"} data-zoomed={boardZoom > 1}
         role={readOnly ? undefined : "region"} aria-label={readOnly ? undefined : "Vùng xem bảng phối"} tabIndex={readOnly ? undefined : 0}>
       <div className={readOnly ? "h-full" : "studio-artboard-surface"}>
@@ -1280,9 +1318,9 @@ const Canvas2D = forwardRef<Canvas2DHandle, Canvas2DProps>(
         </svg>
 
         {viewMode === "flatlay" && equippedItems.length === 0 && (
-          <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 px-6 text-center">
+          <div className="studio-empty-board absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 px-6 text-center">
             <p className="font-serif text-lg font-semibold text-stone-900">Bảng phối đang trống</p>
-            <p className="max-w-xs text-sm leading-relaxed text-stone-600">Chọn một món trong danh sách trang phục để thêm vào bảng phối.</p>
+            <p className="studio-empty-description max-w-xs text-sm leading-relaxed text-stone-600">Chọn một món trong danh sách trang phục để thêm vào bảng phối.</p>
             {onBrowseCatalog && (
               <button type="button" onClick={onBrowseCatalog} className="min-h-11 rounded-lg bg-stone-900 px-4 py-2 text-sm font-semibold text-white hover:bg-stone-700">
                 Chọn trang phục

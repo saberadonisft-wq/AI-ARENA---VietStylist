@@ -6,6 +6,7 @@ import { api } from "@/lib/api/client";
 import { itemLabel, slotLabel, styleLabel } from "@/lib/catalog/display";
 import Modal from "@/components/ui/Modal";
 import { X, ArrowRightLeft } from "lucide-react";
+import { hasSessionGarments } from "./sessionGarments";
 
 type Comparison = { summary_message: string; style_changed: boolean; diffs: Array<{
   slot: string; is_changed: boolean; item_a_name?: string; item_a_id?: string;
@@ -27,6 +28,17 @@ export default function CompareModal({ isOpen, onClose, snapshotA, snapshotB, ca
     if (!isOpen) { request.current = undefined; return; }
     let active = true;
     setDiffData(null); setError(null); setLoading(true);
+    if (hasSessionGarments(snapshotA) || hasSessionGarments(snapshotB)) {
+      // Temporary IDs and private images must never enter a server snapshot.
+      setDiffData({ summary_message: "So sánh các ảnh đang mở trong phiên.", style_changed: snapshotA.styleMode !== snapshotB.styleMode,
+        diffs: [...new Set([...snapshotA.items, ...snapshotB.items].map(item => item.slot))].map(slot => {
+          const a = snapshotA.items.find(item => item.slot === slot);
+          const b = snapshotB.items.find(item => item.slot === slot);
+          return { slot, is_changed: JSON.stringify(a) !== JSON.stringify(b), item_a_id: a?.itemId, item_b_id: b?.itemId };
+        }) });
+      setLoading(false);
+      return;
+    }
     const key = JSON.stringify([snapshotA, snapshotB, retry]);
     // Reuse the pending request across Strict Mode mount cleanup. Retry and
     // document changes still issue a fresh comparison.

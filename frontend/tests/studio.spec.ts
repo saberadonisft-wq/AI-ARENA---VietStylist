@@ -38,11 +38,12 @@ async function openStudio(page: Page) {
   const loaded = fixture?.ownerId ? page.waitForResponse(response =>
     new URL(response.url()).pathname === "/api/outfits/test-fixture" && response.request().method() === "GET") : null;
   await page.goto(fixture?.ownerId ? "/studio?loadOutfit=test-fixture" : "/studio");
-  await expect(page.getByLabel("Tên bản phối", { exact: true })).toBeVisible();
+  await openStudioDocument(page);
   if (fixture?.ownerId) {
     await loaded;
     await expect(page.getByLabel("Tên bản phối", { exact: true })).toHaveValue(fixture.document.title);
     await expect(page.locator('#flatlay-outfit-board [id^="interactive-slot-"]')).toHaveCount(fixture.document.snapshot.items.length);
+    await openStudioDocument(page);
     await expect(page.getByRole("button", { name: "Lưu bộ phối", exact: true })).toBeEnabled();
   } else if (fixture) {
     await chooseStudioGarment(page, "Trang phục 0");
@@ -303,13 +304,17 @@ test("in-memory edits undo, saves update one outfit, and reload requires a serve
   await loginForGeneration(page);
   await openStudio(page);
   const title = page.getByLabel("Tên bản phối", { exact: true });
+  await openStudioDocument(page);
   await title.fill("Tên trước khi lưu");
   await page.getByRole("button", { name: "Remix · kết hợp hiện đại" }).click();
   await page.getByTitle("Hoàn tác (Ctrl+Z)").click();
   await expect(page.getByRole("button", { name: "Truyền thống", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await openStudioDocument(page);
   await page.getByRole("button", { name: "Lưu bộ phối", exact: true }).click();
   await expect.poll(() => saves.length).toBe(1);
+  await openStudioDocument(page);
   await title.fill("Tên sau khi sửa");
+  await openStudioDocument(page);
   await page.getByRole("button", { name: "Lưu bộ phối", exact: true }).click();
   await expect.poll(() => saves.length).toBe(2);
   expect(saves.map(save => save.method)).toEqual(["POST", "PUT"]);
@@ -318,6 +323,7 @@ test("in-memory edits undo, saves update one outfit, and reload requires a serve
   await expect(title).toHaveValue(INITIAL_DOCUMENT.title);
   await page.goto("/studio?loadOutfit=saved-1");
   await expect(title).toHaveValue("Tên sau khi sửa");
+  await openStudioDocument(page);
   await title.fill("Chưa lưu lên máy chủ");
   await page.reload();
   await expect(title).toHaveValue("Tên sau khi sửa");
@@ -756,10 +762,12 @@ test("signing in saves the current guest work without a device-draft choice", as
   await openStudio(page);
   await chooseStudioGarment(page, "Trang phục 0");
   await closeStudioPanels(page);
+  await openStudioDocument(page);
   await page.getByLabel("Tên bản phối", { exact: true }).fill("Bộ phối khách đang mở");
   const account = { id: "guest-handoff", email: "handoff@example.invalid", display_name: "Guest Handoff", roles: ["user"] };
   await page.route("**/api/auth/login", route => route.fulfill({ json: { access_token: "guest-handoff-token", token_type: "bearer", user: account } }));
   await page.route("**/api/auth/me", route => route.fulfill({ json: account }));
+  await openStudioDocument(page);
   await page.getByRole("button", { name: "Lưu bộ phối", exact: true }).click();
   const auth = page.getByRole("dialog", { name: "Đăng nhập hoặc tạo tài khoản" });
   await auth.getByLabel("Địa chỉ Email").fill(account.email);
@@ -1215,7 +1223,9 @@ test("failed save connection preserves the draft and can be retried", async ({ p
   await page.getByRole("button", { name: "Lưu bộ phối", exact: true }).click();
   await expect(page.getByText("Đã lưu bộ phối vào Tủ đồ.")).toBeVisible();
   expect(saves).toHaveLength(1);
+  await openStudioDocument(page);
   await title.fill("Tên sau khi thử lại");
+  await openStudioDocument(page);
   await page.getByRole("button", { name: "Lưu bộ phối", exact: true }).click();
   await expect.poll(() => saves.length).toBe(2);
   expect(saves.map(save => save.method)).toEqual(["POST", "PUT"]);
@@ -1244,6 +1254,7 @@ test("publishing opens the exact saved outfit when its local receipt cannot be w
   await openStudio(page);
   await chooseStudioGarment(page, "Trang phục 0");
   await closeStudioPanels(page);
+  await openStudioDocument(page);
   await page.getByLabel("Tên bản phối", { exact: true }).fill("Bộ phối vừa lưu để đăng");
   await clickStudioAction(page, "Đăng lên Lookbook");
   await expect(page).toHaveURL(/\/lookbook\?dang=1&outfit=published-source$/);
@@ -1564,14 +1575,18 @@ test("save in flight preserves newer edits and prevents duplicate submissions", 
   });
   await openStudio(page);
   const title = page.getByLabel("Tên bản phối", { exact: true });
+  await openStudioDocument(page);
   await title.fill("Version submitted");
+  await openStudioDocument(page);
   await page.getByRole("button", { name: "Lưu bộ phối", exact: true }).evaluate((button: HTMLButtonElement) => { button.click(); button.click(); });
   await expect.poll(() => posts).toBe(1);
   await expect(page.getByRole("button", { name: "Đang lưu bộ phối", exact: true })).toBeDisabled();
+  await openStudioDocument(page);
   await title.fill("Newer unsaved edits");
   release();
   await expect(page.getByText("Đã lưu phiên bản vừa gửi vào Tủ đồ; thay đổi mới trên trang chưa được lưu.")).toBeVisible();
   await expect(title).toHaveValue("Newer unsaved edits");
+  await openStudioDocument(page);
   await page.getByRole("button", { name: "Lưu bộ phối", exact: true }).click();
   await expect.poll(() => saves.length).toBe(1);
   expect(saves[0]).toMatchObject({ method: "PUT", body: { title: "Newer unsaved edits", revision: 1 } });
@@ -1583,7 +1598,9 @@ test("revision conflict preserves edits until explicit server selection and upda
   await loginForGeneration(page);
   await openStudio(page);
   const title = page.getByLabel("Tên bản phối", { exact: true });
+  await openStudioDocument(page);
   await title.fill("Saved version");
+  await openStudioDocument(page);
   await page.getByRole("button", { name: "Lưu bộ phối", exact: true }).click();
   await expect.poll(() => saves.length).toBe(1);
   const attempted: any[] = [];
@@ -1595,7 +1612,9 @@ test("revision conflict preserves edits until explicit server selection and upda
     }
     return route.fulfill({ json: { id: "saved-1", revision: 2, title: "Other tab version", current_snapshot: INITIAL_DOCUMENT.snapshot } });
   });
+  await openStudioDocument(page);
   await title.fill("My losing edit");
+  await openStudioDocument(page);
   await page.getByRole("button", { name: "Lưu bộ phối", exact: true }).click();
   await expect(page.getByRole("alert", { name: "Lưu bộ phối" })).toContainText("Thay đổi của bạn vẫn đang mở trên trang");
   expect(attempted[0].revision).toBe(1);
@@ -1604,6 +1623,7 @@ test("revision conflict preserves edits until explicit server selection and upda
   await expect(title).toHaveValue("Other tab version");
   await page.getByTitle("Hoàn tác (Ctrl+Z)").click();
   await expect(title).toHaveValue("My losing edit");
+  await openStudioDocument(page);
   await page.getByRole("button", { name: "Lưu bộ phối", exact: true }).click();
   await expect.poll(() => attempted.length).toBe(2);
   expect(attempted[1]).toMatchObject({ revision: 2, title: "My losing edit" });
@@ -1633,6 +1653,7 @@ test("opening an outfit link after a page navigation loads only the server versi
     return route.fulfill({ json: { id: "from-link", revision: 3, title: "Bộ phối từ liên kết", current_snapshot: INITIAL_DOCUMENT.snapshot } });
   });
   await openStudio(page);
+  await openStudioDocument(page);
   await page.getByLabel("Tên bản phối", { exact: true }).fill("Chỉnh sửa chưa lưu");
   await page.goto("/studio?loadOutfit=from-link");
   await expect(page.getByLabel("Tên bản phối", { exact: true })).toHaveValue("Bộ phối từ liên kết");
@@ -1647,6 +1668,7 @@ test("leaving Studio retains session work without device storage and reload clea
   await openStudio(page);
   await chooseStudioGarment(page, "Trang phục 0");
   await closeStudioPanels(page);
+  await openStudioDocument(page);
   await page.getByLabel("Tên bản phối", { exact: true }).fill("Bộ phối chưa lưu");
   await page.locator('header a[href="/lookbook"]').click();
   await expect(page).toHaveURL(/\/lookbook$/, { timeout: 30000 });
@@ -1657,6 +1679,7 @@ test("leaving Studio retains session work without device storage and reload clea
   await page.reload();
   await expect(page.getByLabel("Tên bản phối", { exact: true })).toHaveValue(INITIAL_DOCUMENT.title);
   await expect(page.getByText("Bảng phối đang trống", { exact: true })).toBeVisible();
+  await openStudioDocument(page);
   await page.getByLabel("Thao tác bộ phối", { exact: true }).click();
   await expect(page.getByRole("button", { name: "Xem bản khôi phục trên thiết bị" })).toHaveCount(0);
 });
@@ -1722,6 +1745,7 @@ test("an account switch in another tab hides old work and ignores its pending sa
   release(); await completed;
   await openStudioDocument(page);
   await page.getByLabel("Tên bản phối", { exact: true }).fill("Bản nháp B");
+  await openStudioDocument(page);
   await page.getByRole("button", { name: "Lưu bộ phối", exact: true }).click();
   await expect.poll(() => saves).toBe(2);
   expect(requests[1]).toMatchObject({ authorization: "Bearer token-b", body: { title: "Bản nháp B" } });

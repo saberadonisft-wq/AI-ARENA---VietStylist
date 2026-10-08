@@ -1,4 +1,7 @@
 @echo off
+setlocal
+pushd "%~dp0.."
+if errorlevel 1 exit /b 1
 chcp 65001 > nul
 echo ===================================================
 echo   Khởi động Việt Phục Remix (VietStylist)
@@ -14,4 +17,5 @@ echo Đã khởi động xong cả 2 máy chủ!
 echo - Frontend: http://localhost:3000
 echo - Backend:  http://127.0.0.1:4000/docs
 echo ===================================================
-
+popd
+endlocal

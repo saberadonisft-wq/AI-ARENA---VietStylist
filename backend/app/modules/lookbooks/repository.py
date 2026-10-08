@@ -110,15 +110,15 @@ class LookbookRepository:
     def update_with_entries(
         lookbook_id: str,
         owner_id: str,
-        title: str,
+        title: Optional[str],
         description: Optional[str],
         cover_image_url: Optional[str],
-        visibility: str,
+        visibility: Optional[str],
         entries: Optional[List[Dict[str, Any]]],
     ) -> None:
         with db_transaction() as conn:
             cur = conn.execute(
-                "SELECT owner_id FROM lookbooks WHERE id = ?", (lookbook_id,)
+                "SELECT * FROM lookbooks WHERE id = ?", (lookbook_id,)
             )
             current = cur.fetchone()
             if not current:
@@ -129,11 +129,17 @@ class LookbookRepository:
                 )
             if current["owner_id"] != owner_id:
                 raise AppError(
-                    code="FORBIDDEN",
-                    message="Bạn không có quyền sửa lookbook này",
-                    status_code=403,
+                    code="LOOKBOOK_NOT_FOUND",
+                    message="Không tìm thấy lookbook",
+                    status_code=404,
                 )
 
+            # Resolve omitted fields under the same write lock as the update.
+            # An unrelated edit must never restore a stale privacy setting.
+            title = title if title is not None else current["title"]
+            description = description if description is not None else current["description"]
+            cover_image_url = cover_image_url if cover_image_url is not None else current["cover_image_url"]
+            visibility = visibility if visibility is not None else current["visibility"]
             conn.execute(
                 """
                 UPDATE lookbooks

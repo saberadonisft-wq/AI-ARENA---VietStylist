@@ -1,7 +1,5 @@
 "use client";
 
-/* Hallmark · pre-emit critique: P4 H5 E4 S5 R5 V4 */
-
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";

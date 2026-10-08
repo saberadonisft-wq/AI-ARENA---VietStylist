@@ -1,5 +1,6 @@
 from typing import Optional
-from fastapi import APIRouter, Depends, UploadFile, File, Query
+from fastapi import APIRouter, Depends, UploadFile, File, Query, Request
+from starlette.concurrency import run_in_threadpool
 from fastapi.responses import Response
 from app.core.config import settings
 from app.core.security import (
@@ -23,6 +24,35 @@ from app.infrastructure.r2.client import r2_client
 from app.modules.media.validation import byte_limit
 
 router = APIRouter(prefix="/media", tags=["Cloudflare R2 Media Management"])
+
+
+@router.post(
+    "/session-cutout",
+    response_class=Response,
+    responses={200: {"content": {"image/png": {"schema": {"type": "string", "format": "binary"}}}, "description": "Temporary background-removed garment; never persisted."}},
+    openapi_extra={"requestBody": {"required": True, "content": {
+        mime: {"schema": {"type": "string", "format": "binary"}}
+        for mime in ("image/png", "image/jpeg", "image/webp")
+    }}},
+)
+async def session_cutout(request: Request, user: AuthenticatedUser = Depends(require_current_user)):
+    """All authenticated roles can process an image for their current tab only.
+
+    Raw bounded input avoids multipart temporary files. No media, catalog, DB,
+    object storage or derivative-cache writes are made by this operation.
+    """
+    from app.modules.catalog.studio_images import make_session_cutout
+
+    data = await request.body()
+    if getattr(request.state, "session_upload_exceeded", False):
+        raise AppError("PAYLOAD_TOO_LARGE", "File vượt giới hạn dung lượng", 413)
+    result = await run_in_threadpool(make_session_cutout, data, request.headers.get("content-type", "").split(";")[0].strip().lower())
+    return Response(result, media_type="image/png", headers={
+        "Cache-Control": "no-store, private", "Pragma": "no-cache",
+        "X-Content-Type-Options": "nosniff",
+    })
+
+
 local_router = APIRouter(
     prefix="/media", tags=["Development media"], include_in_schema=False
 )

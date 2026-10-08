@@ -13,8 +13,7 @@ const tools = [
   { id: "assistant", label: "Trợ lý AI", accessible: "Trợ lý AI", icon: Sparkles },
 ] as const;
 
-export default function StudioWorkbench({ documentControls, canvasTools, notices, children, panel, onPanelChange, panels }: {
-  documentControls: ReactNode;
+export default function StudioWorkbench({ canvasTools, notices, children, panel, onPanelChange, panels }: {
   canvasTools: ReactNode;
   notices: ReactNode;
   children: ReactNode;
@@ -91,10 +90,7 @@ export default function StudioWorkbench({ documentControls, canvasTools, notices
         <div className="studio-panel-body">{panels[id]}</div>
       </section>)}
       <section id="studio-board" className="studio-center" aria-label="Bảng phối Studio">
-        <div className="studio-canvas-heading">{canvasTools}<div className="studio-view-actions">
-          <section className="studio-document-float" aria-label="Quản lý bộ phối">{documentControls}</section>
-        </div>
-        </div>
+        <div className="studio-canvas-heading">{canvasTools}</div>
         {children}
       </section>
     </div>

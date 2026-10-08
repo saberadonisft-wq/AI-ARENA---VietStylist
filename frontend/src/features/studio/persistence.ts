@@ -3,6 +3,7 @@ import type { OutfitResponse } from "@/lib/types/api";
 import { ApiError } from "@/lib/api/client";
 import { sameDocument } from "./state";
 import type { StudioDocument, StudioDraft } from "./state";
+import { hasSessionGarments, SESSION_SAVE_NOTICE } from "./sessionGarments";
 
 export interface OutfitSavePayload {
   title: string;
@@ -12,6 +13,7 @@ export interface OutfitSavePayload {
 }
 
 export function toOutfitSavePayload(document: StudioDocument): OutfitSavePayload {
+  if (hasSessionGarments(document.snapshot)) throw new Error(SESSION_SAVE_NOTICE);
   return {
     title: document.title,
     snapshot: document.snapshot,

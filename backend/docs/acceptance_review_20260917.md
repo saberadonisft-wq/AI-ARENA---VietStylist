@@ -6,7 +6,7 @@
 
 Phạm vi kiểm tra: branch `backend/m1-be-remediation`, HEAD `c3d49b2`, bao gồm nội dung working tree tại thời điểm review. Trước review đã có thay đổi chưa commit ở `backend/README.md`, `backend/app/core/http_client.py`, `backend/docs/handoff_fe.md`; các thay đổi đó được giữ nguyên. Báo cáo này không sửa implementation hoặc checklist kế hoạch.
 
-Đối chiếu: `Ke_Hoach_Trien_Khai_Chi_Tiet_Viet_Phuc_Remix.md`, `rule.md`, code và test thực tế. Những mục được đánh dấu `[x]` trong kế hoạch chưa đủ bằng chứng để coi là đã nghiệm thu.
+Đối chiếu: `docs/Ke_Hoach_Trien_Khai_Chi_Tiet_Viet_Phuc_Remix.md`, `docs/rule.md`, code và test thực tế. Những mục được đánh dấu `[x]` trong kế hoạch chưa đủ bằng chứng để coi là đã nghiệm thu.
 
 ## 1. Cách kiểm chứng và kết quả tổng quát
 

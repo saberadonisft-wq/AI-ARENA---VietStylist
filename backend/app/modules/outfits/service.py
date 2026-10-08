@@ -106,7 +106,7 @@ class OutfitService:
             outfit_id = str(uuid.uuid4())
 
         try:
-            OutfitRepository.create_outfit_atomic(
+            saved = OutfitRepository.create_outfit_atomic(
                 outfit_id=outfit_id,
                 owner_id=user_id,
                 title=req.title,
@@ -127,11 +127,9 @@ class OutfitService:
             raise
 
         if idempotency_key:
-            recovered = OutfitService._recover_create(outfit_id, user_id, scoped_key)
-            if recovered:
-                return recovered
+            OutfitRepository.finish_create_receipt(scoped_key, outfit_id)
 
-        return OutfitService.get_outfit(outfit_id, user_id)
+        return OutfitService._outfit_response(saved)
 
     @staticmethod
     def _recover_create(outfit_id: str, user_id: str, scoped_key: str) -> Optional[OutfitResponse]:
@@ -224,7 +222,7 @@ class OutfitService:
         if not saved:
             raise AppError(code="REVISION_CONFLICT", message="Bộ phối đã thay đổi ở phiên khác. Vui lòng tải lại trước khi lưu.", status_code=409)
 
-        return OutfitService.get_outfit(outfit_id, user_id)
+        return OutfitService._outfit_response(saved)
 
     @staticmethod
     def delete_outfit(outfit_id: str, user_id: str) -> None:

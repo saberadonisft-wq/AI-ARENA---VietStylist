@@ -1,4 +1,7 @@
 @echo off
+setlocal
+pushd "%~dp0.."
+if errorlevel 1 exit /b 1
 chcp 65001 > nul
 echo ===================================================
 echo     VIỆT PHỤC REMIX (VIETSTYLIST) - KHỞI ĐỘNG HỆ THỐNG
@@ -23,5 +26,6 @@ echo.
 echo   (Đóng các cửa sổ console tương ứng để dừng dịch vụ)
 echo ===================================================
 echo.
+popd
+endlocal
 pause
-

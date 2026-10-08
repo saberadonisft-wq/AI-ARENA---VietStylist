@@ -87,8 +87,38 @@ def test_postgres_runtime_rollback_only(monkeypatch, png_bytes):
                 assert changed.status_code == 200, changed.text
                 assert changed.json()["revision"] == 2
                 assert client.put('/api/outfits/' + outfit['id'], headers=headers, json=update).status_code == 409
-                lookbook = client.post('/api/lookbooks', headers=headers, json={"title": "Probe", "entries": [{"outfit_version_id": changed.json()["current_version_id"]}]})
+                # Exercise response isolation on the production SQL transport.
+                from app.modules.outfits.repository import OutfitRepository
+                from app.modules.outfits.schemas import OutfitSnapshot
+                save_revision = OutfitRepository.save_revision
+                with monkeypatch.context() as race:
+                    def competing_save(**kwargs):
+                        saved = save_revision(**kwargs)
+                        if saved:
+                            save_revision(outfit_id=outfit['id'], expected_revision=3,
+                                version_id='pg-competing-version', owner_id=owner, title='Writer B',
+                                snapshot_json=OutfitSnapshot(backgroundFade=42).model_dump_json())
+                        return saved
+                    race.setattr(OutfitRepository, 'save_revision', competing_save)
+                    own_update = client.put('/api/outfits/' + outfit['id'], headers=headers,
+                        json={**update, 'revision': 2, 'title': 'Writer A'})
+                    assert own_update.status_code == 200, own_update.text
+                    assert own_update.json()['revision'] == 3 and own_update.json()['title'] == 'Writer A'
+                    assert client.put('/api/outfits/' + outfit['id'], headers=headers,
+                        json={**update, 'revision': 3}).status_code == 409
+                lookbook = client.post('/api/lookbooks', headers=headers, json={"title": "Probe", "visibility": "public", "entries": [{"outfit_version_id": changed.json()["current_version_id"]}]})
                 assert lookbook.status_code == 200, lookbook.text
+                from app.modules.lookbooks.repository import LookbookRepository
+                update_lookbook = LookbookRepository.update_with_entries
+                with monkeypatch.context() as race:
+                    def private_before_title(**kwargs):
+                        update_lookbook(lookbook.json()['id'], owner, None, None, None, 'private', None)
+                        return update_lookbook(**kwargs)
+                    race.setattr(LookbookRepository, 'update_with_entries', private_before_title)
+                    renamed = client.put('/api/lookbooks/' + lookbook.json()['id'], headers=headers,
+                        json={'title': 'Renamed'})
+                    assert renamed.status_code == 200 and renamed.json()['visibility'] == 'private'
+                    assert client.get('/api/lookbooks/' + lookbook.json()['id']).status_code == 401
                 assert client.get('/api/solution-form', headers=headers).status_code == 200
 
                 # Admin workflows use the same SQL transport on an empty schema;
@@ -128,6 +158,19 @@ def test_postgres_runtime_rollback_only(monkeypatch, png_bytes):
                 assert stored['status'] == 'ready' and stored['staging_key'] is None
                 assert len(MediaRepository.objects(image.id)) == 1
                 assert MediaService.probe_image(stored)
+                from app.modules.stylist.schemas import CreateGarmentSubmissionRequest
+                from app.modules.stylist.service import StylistCatalogService
+                Database.execute("INSERT INTO garment_types(id,name) VALUES('pg_stylist_type','Probe stylist')")
+                stylist_image = MediaService.ingest_generated_image(owner, png_bytes, 'image/png')
+                submission_request = CreateGarmentSubmissionRequest(name='Probe stylist',
+                    garment_type_id='pg_stylist_type', slot='outerwear', description='Synthetic PostgreSQL garment',
+                    color_name='Red', hex_color='#ff0000', media_id=stylist_image.id)
+                submissions = [StylistCatalogService.create(owner, submission_request) for _ in range(2)]
+                assert MediaRepository.mark_media_deleting_if_unused(stylist_image.id, owner) == 'in_use'
+                StylistCatalogService.delete_own_submission(submissions[0]['id'], owner)
+                assert StylistCatalogService.preview_url(submissions[1]['id']).access_url
+                StylistCatalogService.delete_own_submission(submissions[1]['id'], owner)
+                assert MediaRepository.get_media_by_id(stylist_image.id)['status'] == 'deleted'
 
                 publication = {'title': 'Áo tấc PostgreSQL', 'visibility': 'public',
                                'outfit_version_id': changed.json()['current_version_id'], 'cover_media_id': image.id}

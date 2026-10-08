@@ -175,7 +175,7 @@ test("Studio starts with panels hidden and opens tools and document actions on d
   await fixture(page);
   await expect(page.getByRole("tabpanel").filter({ visible: true })).toHaveCount(0);
   await expect(page.getByRole("region", { name: "Món đang chọn", exact: true })).toHaveCount(0);
-  await expect(page.getByLabel("Tên bản phối", { exact: true })).toBeVisible();
+  await expect(page.getByLabel("Tên bản phối", { exact: true })).toBeHidden();
   await expect(page.locator(".studio-document-menu")).not.toHaveAttribute("open");
   await openStudioPanel(page, "Chọn trang phục");
   await expect(page.getByRole("tabpanel", { name: "Bảng Trang phục", exact: true })).toBeVisible();
@@ -186,14 +186,14 @@ test("Studio starts with panels hidden and opens tools and document actions on d
   expect(before.items).toHaveLength(1);
   const toolbar = page.getByRole("group", { name: "Thu phóng bảng phối", exact: true });
   const checkToolbar = async (width: number) => {
-    await expect(toolbar.getByRole("button")).toHaveCount(6);
+    await expect(toolbar.getByRole("button")).toHaveCount(7);
     for (const button of await toolbar.getByRole("button").all()) await expect(button).toBeInViewport();
     await expect(toolbar.getByRole("button", { name: /^Nền · / })).toBeVisible();
     const controls = await toolbar.locator("button, output").evaluateAll(elements => elements.map(element => {
       const box = element.getBoundingClientRect();
       return { center: box.x + box.width / 2, top: box.y, bottom: box.bottom };
     }));
-    expect(controls).toHaveLength(7);
+    expect(controls).toHaveLength(8);
     for (let index = 1; index < controls.length; index++) {
       expect(controls[index].center).toBeCloseTo(controls[0].center, 0);
       expect(controls[index].top).toBeGreaterThanOrEqual(controls[index - 1].bottom);
@@ -262,7 +262,7 @@ test("Studio starts with panels hidden and opens tools and document actions on d
     await page.getByLabel("Thao tác bộ phối", { exact: true }).click();
     await page.keyboard.press("Escape");
     await closeStudioPanels(page);
-    await expect(page.getByLabel("Tên bản phối", { exact: true })).toBeVisible();
+    await expect(page.getByLabel("Tên bản phối", { exact: true })).toBeHidden();
     await expect(page.locator(".studio-document-menu")).not.toHaveAttribute("open");
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     expect(await outfitView(page)).toEqual(before);
@@ -338,6 +338,7 @@ test("starter confirmation preserves locked items while reload discards unsaved 
   await expect(page.getByRole("button", { name: "Mở khóa món đang chọn", exact: true })).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByLabel("Góc xoay trang phục", { exact: true })).toHaveText("15°");
   await closeStudioPanels(page);
+  await openStudioDocument(page);
   await page.getByLabel("Thao tác bộ phối", { exact: true }).click();
   await expect(page.getByRole("button", { name: "Xem bản khôi phục trên thiết bị", exact: true })).toHaveCount(0);
   await page.reload();
@@ -400,6 +401,7 @@ test("light Studio keeps navigation and session edits, resets on reload and load
   await page.setViewportSize({ width: 1920, height: 1080 });
   await fixture(page);
   await chooseStudioGarment(page, garment.name);
+  await openStudioDocument(page);
   await page.getByLabel("Tên bản phối", { exact: true }).fill("Bản chưa lưu trước khi sang Thư viện");
   expect((await outfitView(page)).items).toHaveLength(1);
   const navbar = page.locator(".studio-site-frame > header");

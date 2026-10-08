@@ -66,18 +66,12 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# OS and Editor files
+# OS files
 .DS_Store
 Thumbs.db
-.vscode/*
-!.vscode/extensions.json
-!.vscode/tasks.json
-.idea/
-
 
 # Isolated build and browser test outputs
 .next-test/
 .next-build/
 test-results/
 playwright-report/
-!.vscode/settings.json
